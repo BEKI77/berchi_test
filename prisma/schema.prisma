@@ -1,0 +1,357 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================================
+// ENUMS
+// ============================================================
+
+enum StaffRole {
+  SERVER
+  CASHIER
+  OWNER
+}
+
+enum AppointmentStatus {
+  SCHEDULED
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  NO_SHOW
+  CANCELLED
+}
+
+enum AppointmentSource {
+  MANUAL
+  ONLINE
+}
+
+enum OrderStatus {
+  IN_PROGRESS
+  SENT_TO_CASHIER
+  CHECKED_OUT
+  CANCELLED
+}
+
+enum InvoiceStatus {
+  PENDING
+  PAID
+  REFUNDED
+  VOIDED
+}
+
+enum DiscountType {
+  PERCENTAGE
+  FIXED
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  MOBILE
+}
+
+enum ExpenseCategory {
+  SUPPLIES
+  RENT
+  UTILITIES
+  EQUIPMENT
+  MARKETING
+  SALARIES
+  OTHER
+}
+
+enum StockMovementType {
+  RESTOCK
+  USED_IN_SERVICE
+  SOLD
+  ADJUSTMENT
+  DAMAGED
+}
+
+// ============================================================
+// MODELS
+// ============================================================
+
+model Customer {
+  id         String   @id @default(uuid())
+  firstName  String   @map("first_name") @db.VarChar(100)
+  lastName   String   @map("last_name") @db.VarChar(100)
+  phone      String?  @unique @db.VarChar(20)
+  email      String?  @unique @db.VarChar(255)
+  birthday   DateTime? @db.Date
+  notes      String?  @db.Text
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  appointments  Appointment[]
+  serviceOrders ServiceOrder[]
+
+  @@map("customers")
+}
+
+model Staff {
+  id             String    @id @default(uuid())
+  firstName      String    @map("first_name") @db.VarChar(100)
+  lastName       String    @map("last_name") @db.VarChar(100)
+  email          String    @unique @db.VarChar(255)
+  passwordHash   String    @map("password_hash") @db.VarChar(255)
+  phone          String?   @db.VarChar(20)
+  role           StaffRole
+  commissionRate Decimal   @default(0) @map("commission_rate") @db.Decimal(5, 2)
+  isActive       Boolean   @default(true) @map("is_active")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  appointments      Appointment[]
+  serviceOrders     ServiceOrder[]
+  serviceOrderItems ServiceOrderItem[]
+  expenses          Expense[]
+  stockMovements    StockMovement[]
+  commissionLogs    CommissionLog[]
+
+  @@map("staff")
+}
+
+model ServiceCategory {
+  id          String   @id @default(uuid())
+  name        String   @unique @db.VarChar(100)
+  description String?  @db.Text
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  services Service[]
+
+  @@map("service_categories")
+}
+
+model Service {
+  id              String   @id @default(uuid())
+  name            String   @db.VarChar(200)
+  description     String?  @db.Text
+  categoryId      String   @map("category_id")
+  basePrice       Decimal  @map("base_price") @db.Decimal(10, 2)
+  durationMinutes Int      @map("duration_minutes")
+  isActive        Boolean  @default(true) @map("is_active")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  category          ServiceCategory    @relation(fields: [categoryId], references: [id])
+  appointments      Appointment[]
+  serviceOrderItems ServiceOrderItem[]
+
+  @@map("services")
+}
+
+model ProductCategory {
+  id          String   @id @default(uuid())
+  name        String   @unique @db.VarChar(100)
+  description String?  @db.Text
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  products Product[]
+
+  @@map("product_categories")
+}
+
+model Product {
+  id             String   @id @default(uuid())
+  name           String   @db.VarChar(200)
+  sku            String?  @unique @db.VarChar(50)
+  categoryId     String   @map("category_id")
+  costPrice      Decimal  @map("cost_price") @db.Decimal(10, 2)
+  sellPrice      Decimal  @map("sell_price") @db.Decimal(10, 2)
+  usagePrice     Decimal  @default(0) @map("usage_price") @db.Decimal(10, 2)
+  quantityOnHand Int      @default(0) @map("quantity_on_hand")
+  reorderLevel   Int      @default(5) @map("reorder_level")
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  category            ProductCategory      @relation(fields: [categoryId], references: [id])
+  serviceOrderProducts ServiceOrderProduct[]
+  stockMovements      StockMovement[]
+
+  @@map("products")
+}
+
+model Appointment {
+  id         String            @id @default(uuid())
+  customerId String            @map("customer_id")
+  staffId    String?           @map("staff_id")
+  serviceId  String            @map("service_id")
+  startTime  DateTime          @map("start_time")
+  endTime    DateTime?         @map("end_time")
+  status     AppointmentStatus @default(SCHEDULED)
+  source     AppointmentSource @default(MANUAL)
+  notes      String?           @db.Text
+  createdAt  DateTime          @default(now()) @map("created_at")
+  updatedAt  DateTime          @updatedAt @map("updated_at")
+
+  customer      Customer       @relation(fields: [customerId], references: [id])
+  staff         Staff?         @relation(fields: [staffId], references: [id])
+  service       Service        @relation(fields: [serviceId], references: [id])
+  serviceOrders ServiceOrder[]
+
+  @@map("appointments")
+}
+
+model ServiceOrder {
+  id            String      @id @default(uuid())
+  orderNumber   String      @unique @map("order_number") @db.VarChar(20)
+  customerId    String      @map("customer_id")
+  serverId      String      @map("server_id")
+  appointmentId String?     @map("appointment_id")
+  status        OrderStatus @default(IN_PROGRESS)
+  notes         String?     @db.Text
+  startedAt     DateTime    @default(now()) @map("started_at")
+  completedAt   DateTime?   @map("completed_at")
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
+
+  customer Customer     @relation(fields: [customerId], references: [id])
+  server   Staff        @relation(fields: [serverId], references: [id])
+  appointment Appointment? @relation(fields: [appointmentId], references: [id])
+
+  items    ServiceOrderItem[]
+  products ServiceOrderProduct[]
+  invoice  Invoice?
+
+  @@map("service_orders")
+}
+
+model ServiceOrderItem {
+  id        String  @id @default(uuid())
+  orderId   String  @map("order_id")
+  serviceId String  @map("service_id")
+  unitPrice Decimal @map("unit_price") @db.Decimal(10, 2)
+  quantity  Int     @default(1)
+  staffId   String  @map("staff_id")
+
+  order   ServiceOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  service Service      @relation(fields: [serviceId], references: [id])
+  staff   Staff        @relation(fields: [staffId], references: [id])
+
+  commissionLogs CommissionLog[]
+
+  @@map("service_order_items")
+}
+
+model ServiceOrderProduct {
+  id        String  @id @default(uuid())
+  orderId   String  @map("order_id")
+  productId String  @map("product_id")
+  quantity  Int
+  unitPrice Decimal @map("unit_price") @db.Decimal(10, 2)
+
+  order   ServiceOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product      @relation(fields: [productId], references: [id])
+
+  @@map("service_order_products")
+}
+
+model Invoice {
+  id             String        @id @default(uuid())
+  invoiceNumber  String        @unique @map("invoice_number") @db.VarChar(20)
+  orderId        String        @unique @map("order_id")
+  subtotal       Decimal       @db.Decimal(10, 2)
+  taxRate        Decimal       @map("tax_rate") @db.Decimal(5, 2)
+  taxAmount      Decimal       @map("tax_amount") @db.Decimal(10, 2)
+  discountType   DiscountType? @map("discount_type")
+  discountValue  Decimal       @default(0) @map("discount_value") @db.Decimal(10, 2)
+  discountAmount Decimal       @default(0) @map("discount_amount") @db.Decimal(10, 2)
+  tipAmount      Decimal       @default(0) @map("tip_amount") @db.Decimal(10, 2)
+  totalAmount    Decimal       @map("total_amount") @db.Decimal(10, 2)
+  status         InvoiceStatus @default(PENDING)
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+
+  order   ServiceOrder @relation(fields: [orderId], references: [id])
+  payment Payment?
+
+  @@map("invoices")
+}
+
+model Payment {
+  id        String        @id @default(uuid())
+  invoiceId String        @unique @map("invoice_id")
+  method    PaymentMethod
+  amount    Decimal       @db.Decimal(10, 2)
+  reference String?       @db.VarChar(255)
+  createdAt DateTime      @default(now()) @map("created_at")
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id])
+
+  @@map("payments")
+}
+
+model Expense {
+  id         String          @id @default(uuid())
+  description String         @db.VarChar(500)
+  category   ExpenseCategory
+  amount     Decimal         @db.Decimal(10, 2)
+  date       DateTime        @db.Date
+  loggedBy   String          @map("logged_by")
+  receiptUrl String?         @map("receipt_url") @db.VarChar(500)
+  createdAt  DateTime        @default(now()) @map("created_at")
+  updatedAt  DateTime        @updatedAt @map("updated_at")
+
+  staff Staff @relation(fields: [loggedBy], references: [id])
+
+  @@map("expenses")
+}
+
+model StockMovement {
+  id             String            @id @default(uuid())
+  productId      String            @map("product_id")
+  type           StockMovementType
+  quantityChange Int               @map("quantity_change")
+  referenceId    String?           @map("reference_id")
+  note           String?           @db.Text
+  performedBy    String            @map("performed_by")
+  createdAt      DateTime          @default(now()) @map("created_at")
+
+  product Product @relation(fields: [productId], references: [id])
+  staff   Staff   @relation(fields: [performedBy], references: [id])
+
+  @@map("stock_movements")
+}
+
+model CommissionLog {
+  id                 String  @id @default(uuid())
+  staffId            String  @map("staff_id")
+  invoiceId          String  @map("invoice_id")
+  serviceOrderItemId String  @map("service_order_item_id")
+  commissionRate     Decimal @map("commission_rate") @db.Decimal(5, 2)
+  serviceAmount      Decimal @map("service_amount") @db.Decimal(10, 2)
+  commissionAmount   Decimal @map("commission_amount") @db.Decimal(10, 2)
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  staff            Staff            @relation(fields: [staffId], references: [id])
+  serviceOrderItem ServiceOrderItem @relation(fields: [serviceOrderItemId], references: [id])
+
+  @@map("commission_logs")
+}
+
+model SalonSettings {
+  id              String   @id @default(uuid())
+  salonName       String   @default("Berchi Salon") @map("salon_name") @db.VarChar(200)
+  address         String?  @db.VarChar(500)
+  phone           String?  @db.VarChar(20)
+  logoUrl         String?  @map("logo_url") @db.VarChar(500)
+  taxRate         Decimal  @default(0) @map("tax_rate") @db.Decimal(5, 2)
+  currency        String   @default("ETB") @db.VarChar(10)
+  receiptsEnabled Boolean  @default(true) @map("receipts_enabled")
+  businessHours   String?  @map("business_hours") @db.Text
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@map("salon_settings")
+}

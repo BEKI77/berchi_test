@@ -1,0 +1,46 @@
+export const APP_NAME = "Berchi Salon";
+
+export const ROLES = {
+  SERVER: "SERVER",
+  CASHIER: "CASHIER",
+  OWNER: "OWNER",
+} as const;
+
+export const ORDER_STATUSES = {
+  IN_PROGRESS: "IN_PROGRESS",
+  SENT_TO_CASHIER: "SENT_TO_CASHIER",
+  CHECKED_OUT: "CHECKED_OUT",
+  CANCELLED: "CANCELLED",
+} as const;
+
+export const INVOICE_STATUSES = {
+  PENDING: "PENDING",
+  PAID: "PAID",
+  REFUNDED: "REFUNDED",
+  VOIDED: "VOIDED",
+} as const;
+
+export const PAYMENT_METHODS = {
+  CASH: "CASH",
+  CARD: "CARD",
+  MOBILE: "MOBILE",
+} as const;
+
+export const EXPENSE_CATEGORIES = {
+  SUPPLIES: "SUPPLIES",
+  RENT: "RENT",
+  UTILITIES: "UTILITIES",
+  EQUIPMENT: "EQUIPMENT",
+  MARKETING: "MARKETING",
+  SALARIES: "SALARIES",
+  OTHER: "OTHER",
+} as const;
+
+export const APPOINTMENT_STATUSES = {
+  SCHEDULED: "SCHEDULED",
+  CONFIRMED: "CONFIRMED",
+  IN_PROGRESS: "IN_PROGRESS",
+  COMPLETED: "COMPLETED",
+  NO_SHOW: "NO_SHOW",
+  CANCELLED: "CANCELLED",
+} as const;

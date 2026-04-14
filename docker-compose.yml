@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: berchi-salon-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: berchi
+      POSTGRES_PASSWORD: berchi_secret
+      POSTGRES_DB: berchi_salon
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:

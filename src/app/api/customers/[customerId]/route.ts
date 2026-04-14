@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { eq } from "drizzle-orm";
+import { db } from "@/db";
+import { customers } from "@/db/schema";
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ customerId: string }> }) {
   const session = await auth();
@@ -20,12 +22,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ custom
     if (phone !== undefined) updateData.phone = phone;
     if (email !== undefined) updateData.email = email;
     if (notes !== undefined) updateData.notes = notes;
-    if (birthday !== undefined) updateData.birthday = birthday ? new Date(birthday) : null;
+    if (birthday !== undefined) updateData.birthday = birthday ? new Date(birthday).toISOString().split("T")[0] : null;
 
-    const customer = await prisma.customer.update({
-      where: { id: customerId },
-      data: updateData,
-    });
+    const [customer] = await db
+      .update(customers)
+      .set(updateData)
+      .where(eq(customers.id, customerId))
+      .returning();
 
     return NextResponse.json(customer);
   } catch (error) {

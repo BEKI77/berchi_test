@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { eq, desc } from "drizzle-orm";
+import { db } from "@/db";
+import { staff, serviceOrders, serviceOrderItems, commissionLogs } from "@/db/schema";
 
 export async function GET(
   _req: Request,
@@ -14,75 +16,60 @@ export async function GET(
   try {
     const { staffId } = await params;
 
-    const staff = await prisma.staff.findUnique({
-      where: { id: staffId },
-      select: {
-        id: true,
-        firstName: true,
-        lastName: true,
-        email: true,
-        phone: true,
-        role: true,
-        commissionRate: true,
-        isActive: true,
-        createdAt: true,
-      },
-    });
+    const [staffMember] = await db
+      .select({
+        id: staff.id,
+        firstName: staff.firstName,
+        lastName: staff.lastName,
+        email: staff.email,
+        phone: staff.phone,
+        role: staff.role,
+        commissionRate: staff.commissionRate,
+        isActive: staff.isActive,
+        createdAt: staff.createdAt,
+      })
+      .from(staff)
+      .where(eq(staff.id, staffId))
+      .limit(1);
 
-    if (!staff) {
+    if (!staffMember) {
       return NextResponse.json({ error: "Staff not found" }, { status: 404 });
     }
 
     const [orders, serviceItems, commissions] = await Promise.all([
-      prisma.serviceOrder.findMany({
-        where: { serverId: staffId },
-        orderBy: { startedAt: "desc" },
-        take: 50,
-        select: {
-          id: true,
-          orderNumber: true,
-          status: true,
-          startedAt: true,
-          completedAt: true,
-          customer: { select: { firstName: true, lastName: true } },
+      db.query.serviceOrders.findMany({
+        where: eq(serviceOrders.serverId, staffId),
+        orderBy: [desc(serviceOrders.startedAt)],
+        limit: 50,
+        columns: { id: true, orderNumber: true, status: true, startedAt: true, completedAt: true },
+        with: {
+          customer: { columns: { firstName: true, lastName: true } },
           items: {
-            select: {
-              unitPrice: true,
-              quantity: true,
-              service: { select: { name: true } },
-            },
+            columns: { unitPrice: true, quantity: true },
+            with: { service: { columns: { name: true } } },
           },
           products: {
-            select: {
-              unitPrice: true,
-              quantity: true,
-              product: { select: { name: true } },
-            },
+            columns: { unitPrice: true, quantity: true },
+            with: { product: { columns: { name: true } } },
           },
         },
       }),
-      prisma.serviceOrderItem.findMany({
-        where: { staffId },
-        select: {
-          unitPrice: true,
-          quantity: true,
-          service: { select: { name: true } },
-        },
+      db.query.serviceOrderItems.findMany({
+        where: eq(serviceOrderItems.staffId, staffId),
+        columns: { unitPrice: true, quantity: true },
+        with: { service: { columns: { name: true } } },
       }),
-      prisma.commissionLog.findMany({
-        where: { staffId },
-        orderBy: { createdAt: "desc" },
-        take: 50,
-        select: {
-          id: true,
-          commissionRate: true,
-          serviceAmount: true,
-          commissionAmount: true,
-          createdAt: true,
+      db.query.commissionLogs.findMany({
+        where: eq(commissionLogs.staffId, staffId),
+        orderBy: [desc(commissionLogs.createdAt)],
+        limit: 50,
+        columns: { id: true, commissionRate: true, serviceAmount: true, commissionAmount: true, createdAt: true },
+        with: {
           serviceOrderItem: {
-            select: {
-              service: { select: { name: true } },
-              order: { select: { orderNumber: true } },
+            columns: {},
+            with: {
+              service: { columns: { name: true } },
+              order: { columns: { orderNumber: true } },
             },
           },
         },
@@ -112,7 +99,7 @@ export async function GET(
       .sort((a, b) => b.revenue - a.revenue);
 
     return NextResponse.json({
-      staff,
+      staff: staffMember,
       stats: {
         totalOrders,
         completedOrders,

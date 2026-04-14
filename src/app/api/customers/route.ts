@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { asc } from "drizzle-orm";
+import { db } from "@/db";
+import { customers } from "@/db/schema";
 
 export async function GET() {
   const session = await auth();
@@ -8,19 +10,19 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const customers = await prisma.customer.findMany({
-    orderBy: { firstName: "asc" },
-    select: {
-      id: true,
-      firstName: true,
-      lastName: true,
-      phone: true,
-      email: true,
-      notes: true,
-    },
-  });
+  const result = await db
+    .select({
+      id: customers.id,
+      firstName: customers.firstName,
+      lastName: customers.lastName,
+      phone: customers.phone,
+      email: customers.email,
+      notes: customers.notes,
+    })
+    .from(customers)
+    .orderBy(asc(customers.firstName));
 
-  return NextResponse.json(customers);
+  return NextResponse.json(result);
 }
 
 export async function POST(req: Request) {
@@ -39,9 +41,10 @@ export async function POST(req: Request) {
     );
   }
 
-  const customer = await prisma.customer.create({
-    data: { firstName, lastName: lastName || "", phone, email, notes },
-  });
+  const [customer] = await db
+    .insert(customers)
+    .values({ firstName, lastName: lastName || "", phone, email, notes })
+    .returning();
 
   return NextResponse.json(customer, { status: 201 });
 }

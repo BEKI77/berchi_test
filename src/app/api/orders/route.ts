@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { and, eq, gte, desc, count as countFn, SQL } from "drizzle-orm";
+import { db } from "@/db";
+import { serviceOrders } from "@/db/schema";
 
 // GET: List orders for the current server (or all for cashier/owner)
 export async function GET(req: Request) {
@@ -13,48 +15,32 @@ export async function GET(req: Request) {
   const status = searchParams.get("status");
   const serverId = searchParams.get("serverId");
 
-  const where: Record<string, unknown> = {};
-
+  const conditions: SQL[] = [];
   if (status) {
-    where.status = status;
+    conditions.push(eq(serviceOrders.status, status as typeof serviceOrders.status.enumValues[number]));
   }
-
   if (serverId) {
-    where.serverId = serverId;
+    conditions.push(eq(serviceOrders.serverId, serverId));
   } else if (session.user.role === "SERVER") {
-    where.serverId = session.user.id;
+    conditions.push(eq(serviceOrders.serverId, session.user.id));
   }
 
-  const orders = await prisma.serviceOrder.findMany({
-    where,
-    include: {
-      customer: {
-        select: { id: true, firstName: true, lastName: true, phone: true },
-      },
-      server: {
-        select: { id: true, firstName: true, lastName: true },
-      },
+  const orders = await db.query.serviceOrders.findMany({
+    where: conditions.length > 0 ? and(...conditions) : undefined,
+    with: {
+      customer: { columns: { id: true, firstName: true, lastName: true, phone: true } },
+      server: { columns: { id: true, firstName: true, lastName: true } },
       items: {
-        include: {
-          service: {
-            select: { id: true, name: true },
-          },
-        },
+        with: { service: { columns: { id: true, name: true } } },
       },
       products: {
-        include: {
-          product: {
-            select: { id: true, name: true },
-          },
-        },
+        with: { product: { columns: { id: true, name: true } } },
       },
       invoice: {
-        include: {
-          payment: true,
-        },
+        with: { payment: true },
       },
     },
-    orderBy: { createdAt: "desc" },
+    orderBy: [desc(serviceOrders.createdAt)],
   });
 
   return NextResponse.json(orders);
@@ -84,34 +70,33 @@ export async function POST(req: Request) {
   // Generate order number: ORD-YYYYMMDD-XXXX
   const today = new Date();
   const dateStr = today.toISOString().slice(0, 10).replace(/-/g, "");
-  const count = await prisma.serviceOrder.count({
-    where: {
-      createdAt: {
-        gte: new Date(today.getFullYear(), today.getMonth(), today.getDate()),
-      },
-    },
-  });
-  const orderNumber = `ORD-${dateStr}-${String(count + 1).padStart(4, "0")}`;
+  const [{ value: orderCount }] = await db
+    .select({ value: countFn() })
+    .from(serviceOrders)
+    .where(gte(serviceOrders.createdAt, new Date(today.getFullYear(), today.getMonth(), today.getDate())));
+  const orderNumber = `ORD-${dateStr}-${String(Number(orderCount) + 1).padStart(4, "0")}`;
 
-  const order = await prisma.serviceOrder.create({
-    data: {
+  const [order] = await db
+    .insert(serviceOrders)
+    .values({
       orderNumber,
       customerId,
       serverId: session.user.id,
       status: "IN_PROGRESS",
       notes,
-    },
-    include: {
-      customer: {
-        select: { id: true, firstName: true, lastName: true, phone: true },
-      },
-      server: {
-        select: { id: true, firstName: true, lastName: true },
-      },
+    })
+    .returning();
+
+  // Re-fetch with relations
+  const fullOrder = await db.query.serviceOrders.findFirst({
+    where: eq(serviceOrders.id, order.id),
+    with: {
+      customer: { columns: { id: true, firstName: true, lastName: true, phone: true } },
+      server: { columns: { id: true, firstName: true, lastName: true } },
       items: true,
       products: true,
     },
   });
 
-  return NextResponse.json(order, { status: 201 });
+  return NextResponse.json(fullOrder, { status: 201 });
 }

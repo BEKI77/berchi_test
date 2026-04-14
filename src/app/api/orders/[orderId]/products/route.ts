@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { and, eq } from "drizzle-orm";
+import { db } from "@/db";
+import { serviceOrders, products, serviceOrderProducts } from "@/db/schema";
 
 // POST: Add a product to an order
 export async function POST(
@@ -20,9 +22,7 @@ export async function POST(
     return NextResponse.json({ error: "Product is required" }, { status: 400 });
   }
 
-  const order = await prisma.serviceOrder.findUnique({
-    where: { id: orderId },
-  });
+  const [order] = await db.select().from(serviceOrders).where(eq(serviceOrders.id, orderId)).limit(1);
 
   if (!order || order.status !== "IN_PROGRESS") {
     return NextResponse.json(
@@ -31,9 +31,7 @@ export async function POST(
     );
   }
 
-  const product = await prisma.product.findUnique({
-    where: { id: productId },
-  });
+  const [product] = await db.select().from(products).where(eq(products.id, productId)).limit(1);
 
   if (!product) {
     return NextResponse.json({ error: "Product not found" }, { status: 404 });
@@ -47,28 +45,37 @@ export async function POST(
   }
 
   // Check if product already exists in this order
-  const existing = await prisma.serviceOrderProduct.findFirst({
-    where: { orderId, productId },
-  });
+  const [existing] = await db
+    .select()
+    .from(serviceOrderProducts)
+    .where(and(eq(serviceOrderProducts.orderId, orderId), eq(serviceOrderProducts.productId, productId)))
+    .limit(1);
 
-  let orderProduct;
+  let orderProductId: string;
   if (existing) {
-    orderProduct = await prisma.serviceOrderProduct.update({
-      where: { id: existing.id },
-      data: { quantity: existing.quantity + quantity },
-      include: { product: { select: { id: true, name: true } } },
-    });
+    const [updated] = await db
+      .update(serviceOrderProducts)
+      .set({ quantity: existing.quantity + quantity })
+      .where(eq(serviceOrderProducts.id, existing.id))
+      .returning();
+    orderProductId = updated.id;
   } else {
-    orderProduct = await prisma.serviceOrderProduct.create({
-      data: {
+    const [created] = await db
+      .insert(serviceOrderProducts)
+      .values({
         orderId,
         productId,
         quantity,
         unitPrice: product.usagePrice,
-      },
-      include: { product: { select: { id: true, name: true } } },
-    });
+      })
+      .returning();
+    orderProductId = created.id;
   }
+
+  const orderProduct = await db.query.serviceOrderProducts.findFirst({
+    where: eq(serviceOrderProducts.id, orderProductId),
+    with: { product: { columns: { id: true, name: true } } },
+  });
 
   return NextResponse.json(orderProduct, { status: 201 });
 }
@@ -91,9 +98,7 @@ export async function DELETE(
     return NextResponse.json({ error: "Product item ID is required" }, { status: 400 });
   }
 
-  const order = await prisma.serviceOrder.findUnique({
-    where: { id: orderId },
-  });
+  const [order] = await db.select().from(serviceOrders).where(eq(serviceOrders.id, orderId)).limit(1);
 
   if (!order || order.status !== "IN_PROGRESS") {
     return NextResponse.json(
@@ -102,7 +107,7 @@ export async function DELETE(
     );
   }
 
-  await prisma.serviceOrderProduct.delete({ where: { id: productItemId } });
+  await db.delete(serviceOrderProducts).where(eq(serviceOrderProducts.id, productItemId));
 
   return NextResponse.json({ success: true });
 }

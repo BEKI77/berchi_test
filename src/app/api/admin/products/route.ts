@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { asc, eq } from "drizzle-orm";
+import { db } from "@/db";
+import { products } from "@/db/schema";
 
 export async function GET() {
   const session = await auth();
@@ -9,11 +11,15 @@ export async function GET() {
   }
 
   try {
-    const products = await prisma.product.findMany({
-      include: { category: true },
-      orderBy: [{ category: { name: "asc" } }, { name: "asc" }],
+    const result = await db.query.products.findMany({
+      with: { category: true },
+      orderBy: [asc(products.name)],
     });
-    return NextResponse.json(products);
+    result.sort((a, b) => {
+      const catCmp = (a.category?.name ?? "").localeCompare(b.category?.name ?? "");
+      return catCmp !== 0 ? catCmp : a.name.localeCompare(b.name);
+    });
+    return NextResponse.json(result);
   } catch (error) {
     console.error("Failed to fetch products:", error);
     return NextResponse.json({ error: "Failed to fetch products" }, { status: 500 });
@@ -34,8 +40,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    const product = await prisma.product.create({
-      data: {
+    const [product] = await db
+      .insert(products)
+      .values({
         name,
         sku: sku || null,
         categoryId,
@@ -44,11 +51,15 @@ export async function POST(req: Request) {
         usagePrice: usagePrice || 0,
         quantityOnHand: quantityOnHand || 0,
         reorderLevel: reorderLevel || 5,
-      },
-      include: { category: true },
+      })
+      .returning();
+
+    const fullProduct = await db.query.products.findFirst({
+      where: eq(products.id, product.id),
+      with: { category: true },
     });
 
-    return NextResponse.json(product);
+    return NextResponse.json(fullProduct);
   } catch (error) {
     console.error("Failed to create product:", error);
     return NextResponse.json({ error: "Failed to create product" }, { status: 500 });

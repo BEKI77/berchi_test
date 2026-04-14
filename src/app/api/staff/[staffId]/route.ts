@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { eq } from "drizzle-orm";
+import { db } from "@/db";
+import { staff } from "@/db/schema";
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ staffId: string }> }) {
   const session = await auth();
@@ -28,22 +30,22 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ staffI
       updateData.passwordHash = await bcrypt.hash(password, 10);
     }
 
-    const staff = await prisma.staff.update({
-      where: { id: staffId },
-      data: updateData,
-      select: {
-        id: true,
-        firstName: true,
-        lastName: true,
-        email: true,
-        phone: true,
-        role: true,
-        commissionRate: true,
-        isActive: true,
-      },
-    });
+    const [updated] = await db
+      .update(staff)
+      .set(updateData)
+      .where(eq(staff.id, staffId))
+      .returning({
+        id: staff.id,
+        firstName: staff.firstName,
+        lastName: staff.lastName,
+        email: staff.email,
+        phone: staff.phone,
+        role: staff.role,
+        commissionRate: staff.commissionRate,
+        isActive: staff.isActive,
+      });
 
-    return NextResponse.json(staff);
+    return NextResponse.json(updated);
   } catch (error) {
     console.error("Failed to update staff:", error);
     return NextResponse.json({ error: "Failed to update staff" }, { status: 500 });

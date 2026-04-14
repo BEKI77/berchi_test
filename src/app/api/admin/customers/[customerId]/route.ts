@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { eq, desc } from "drizzle-orm";
+import { db } from "@/db";
+import { customers, serviceOrders, appointments, invoices } from "@/db/schema";
 
 export async function GET(
   _req: Request,
@@ -14,75 +16,64 @@ export async function GET(
   try {
     const { customerId } = await params;
 
-    const customer = await prisma.customer.findUnique({
-      where: { id: customerId },
-    });
+    const [customer] = await db.select().from(customers).where(eq(customers.id, customerId)).limit(1);
 
     if (!customer) {
       return NextResponse.json({ error: "Customer not found" }, { status: 404 });
     }
 
-    const [orders, appointments, invoices] = await Promise.all([
-      prisma.serviceOrder.findMany({
-        where: { customerId },
-        orderBy: { startedAt: "desc" },
-        take: 30,
-        select: {
-          id: true,
-          orderNumber: true,
-          status: true,
-          startedAt: true,
-          completedAt: true,
-          server: { select: { firstName: true, lastName: true } },
+    const [orders, appts, allInvoices] = await Promise.all([
+      db.query.serviceOrders.findMany({
+        where: eq(serviceOrders.customerId, customerId),
+        orderBy: [desc(serviceOrders.startedAt)],
+        limit: 30,
+        columns: { id: true, orderNumber: true, status: true, startedAt: true, completedAt: true },
+        with: {
+          server: { columns: { firstName: true, lastName: true } },
           items: {
-            select: {
-              unitPrice: true,
-              quantity: true,
-              service: { select: { name: true } },
-            },
+            columns: { unitPrice: true, quantity: true },
+            with: { service: { columns: { name: true } } },
           },
           products: {
-            select: {
-              unitPrice: true,
-              quantity: true,
-              product: { select: { name: true } },
-            },
+            columns: { unitPrice: true, quantity: true },
+            with: { product: { columns: { name: true } } },
           },
         },
       }),
-      prisma.appointment.findMany({
-        where: { customerId },
-        orderBy: { startTime: "desc" },
-        take: 20,
-        select: {
-          id: true,
-          startTime: true,
-          status: true,
-          staff: { select: { firstName: true, lastName: true } },
-          service: { select: { name: true } },
+      db.query.appointments.findMany({
+        where: eq(appointments.customerId, customerId),
+        orderBy: [desc(appointments.startTime)],
+        limit: 20,
+        columns: { id: true, startTime: true, status: true },
+        with: {
+          staff: { columns: { firstName: true, lastName: true } },
+          service: { columns: { name: true } },
         },
       }),
-      prisma.invoice.findMany({
-        where: { order: { customerId } },
-        orderBy: { createdAt: "desc" },
-        take: 20,
-        select: {
-          id: true,
-          invoiceNumber: true,
-          totalAmount: true,
-          tipAmount: true,
-          status: true,
-          createdAt: true,
-          payment: { select: { method: true } },
+      db.query.invoices.findMany({
+        orderBy: [desc(invoices.createdAt)],
+        columns: { id: true, invoiceNumber: true, totalAmount: true, tipAmount: true, status: true, createdAt: true },
+        with: {
+          order: { columns: { customerId: true } },
+          payment: { columns: { method: true } },
         },
       }),
     ]);
 
-    const totalSpent = invoices
-      .filter((i) => i.status === "PAID")
+    // Filter invoices by customerId (Drizzle doesn't support nested where on relations easily)
+    const customerInvoices = allInvoices
+      .filter((i) => i.order?.customerId === customerId)
+      .slice(0, 20)
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      .map(({ order, ...rest }) => rest);
+
+    const totalSpent = allInvoices
+      .filter((i) => i.order?.customerId === customerId && i.status === "PAID")
       .reduce((s, i) => s + Number(i.totalAmount), 0);
     const totalVisits = orders.length;
-    const totalTips = invoices.reduce((s, i) => s + Number(i.tipAmount), 0);
+    const totalTips = allInvoices
+      .filter((i) => i.order?.customerId === customerId)
+      .reduce((s, i) => s + Number(i.tipAmount), 0);
 
     // Favorite services
     const serviceMap: Record<string, number> = {};
@@ -101,8 +92,8 @@ export async function GET(
       stats: { totalSpent, totalVisits, totalTips },
       favoriteServices,
       recentOrders: orders,
-      recentAppointments: appointments,
-      recentInvoices: invoices,
+      recentAppointments: appts,
+      recentInvoices: customerInvoices,
     });
   } catch (error) {
     console.error("Failed to fetch customer detail:", error);

@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { eq } from "drizzle-orm";
+import { db } from "@/db";
+import { serviceOrders, services, serviceOrderItems } from "@/db/schema";
 
 // POST: Add a service item to an order
 export async function POST(
@@ -20,9 +22,7 @@ export async function POST(
     return NextResponse.json({ error: "Service is required" }, { status: 400 });
   }
 
-  const order = await prisma.serviceOrder.findUnique({
-    where: { id: orderId },
-  });
+  const [order] = await db.select().from(serviceOrders).where(eq(serviceOrders.id, orderId)).limit(1);
 
   if (!order || order.status !== "IN_PROGRESS") {
     return NextResponse.json(
@@ -31,28 +31,30 @@ export async function POST(
     );
   }
 
-  const service = await prisma.service.findUnique({
-    where: { id: serviceId },
-  });
+  const [service] = await db.select().from(services).where(eq(services.id, serviceId)).limit(1);
 
   if (!service) {
     return NextResponse.json({ error: "Service not found" }, { status: 404 });
   }
 
-  const item = await prisma.serviceOrderItem.create({
-    data: {
+  const [item] = await db
+    .insert(serviceOrderItems)
+    .values({
       orderId,
       serviceId,
       unitPrice: service.basePrice,
       quantity,
       staffId: session.user.id,
-    },
-    include: {
-      service: { select: { id: true, name: true } },
-    },
+    })
+    .returning();
+
+  // Re-fetch with service relation
+  const fullItem = await db.query.serviceOrderItems.findFirst({
+    where: eq(serviceOrderItems.id, item.id),
+    with: { service: { columns: { id: true, name: true } } },
   });
 
-  return NextResponse.json(item, { status: 201 });
+  return NextResponse.json(fullItem, { status: 201 });
 }
 
 // DELETE: Remove a service item from an order
@@ -73,9 +75,7 @@ export async function DELETE(
     return NextResponse.json({ error: "Item ID is required" }, { status: 400 });
   }
 
-  const order = await prisma.serviceOrder.findUnique({
-    where: { id: orderId },
-  });
+  const [order] = await db.select().from(serviceOrders).where(eq(serviceOrders.id, orderId)).limit(1);
 
   if (!order || order.status !== "IN_PROGRESS") {
     return NextResponse.json(
@@ -84,7 +84,7 @@ export async function DELETE(
     );
   }
 
-  await prisma.serviceOrderItem.delete({ where: { id: itemId } });
+  await db.delete(serviceOrderItems).where(eq(serviceOrderItems.id, itemId));
 
   return NextResponse.json({ success: true });
 }

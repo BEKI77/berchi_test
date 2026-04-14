@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { eq } from "drizzle-orm";
+import { db } from "@/db";
+import { salonSettings } from "@/db/schema";
 
 export async function GET() {
   const session = await auth();
@@ -8,8 +10,8 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const settings = await prisma.salonSettings.findFirst();
-  return NextResponse.json(settings);
+  const [settings] = await db.select().from(salonSettings).limit(1);
+  return NextResponse.json(settings ?? null);
 }
 
 export async function PATCH(req: Request) {
@@ -20,17 +22,18 @@ export async function PATCH(req: Request) {
 
   try {
     const body = await req.json();
-    const existing = await prisma.salonSettings.findFirst();
+    const [existing] = await db.select().from(salonSettings).limit(1);
 
     if (!existing) {
-      const settings = await prisma.salonSettings.create({ data: body });
+      const [settings] = await db.insert(salonSettings).values(body).returning();
       return NextResponse.json(settings);
     }
 
-    const settings = await prisma.salonSettings.update({
-      where: { id: existing.id },
-      data: body,
-    });
+    const [settings] = await db
+      .update(salonSettings)
+      .set(body)
+      .where(eq(salonSettings.id, existing.id))
+      .returning();
     return NextResponse.json(settings);
   } catch (error) {
     console.error("Failed to update settings:", error);

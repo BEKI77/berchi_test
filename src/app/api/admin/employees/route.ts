@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { asc } from "drizzle-orm";
+import { db } from "@/db";
+import { staff } from "@/db/schema";
 
 // GET: All employees with their stats for the owner employees overview page
 export async function GET() {
@@ -10,62 +12,43 @@ export async function GET() {
   }
 
   try {
-    const staff = await prisma.staff.findMany({
-      orderBy: { createdAt: "asc" },
-      select: {
-        id: true,
-        firstName: true,
-        lastName: true,
-        email: true,
-        phone: true,
-        role: true,
-        commissionRate: true,
-        isActive: true,
-        createdAt: true,
-      },
-    });
+    const staffList = await db
+      .select({
+        id: staff.id,
+        firstName: staff.firstName,
+        lastName: staff.lastName,
+        email: staff.email,
+        phone: staff.phone,
+        role: staff.role,
+        commissionRate: staff.commissionRate,
+        isActive: staff.isActive,
+        createdAt: staff.createdAt,
+      })
+      .from(staff)
+      .orderBy(asc(staff.createdAt));
 
     // Get all service order items, orders, and commissions in bulk
     const [allOrders, allServiceItems, allCommissions, allAppointments] = await Promise.all([
-      prisma.serviceOrder.findMany({
-        select: {
-          id: true,
-          serverId: true,
-          status: true,
-          startedAt: true,
-          completedAt: true,
-          invoice: {
-            select: {
-              totalAmount: true,
-              tipAmount: true,
-            },
-          },
+      db.query.serviceOrders.findMany({
+        columns: { id: true, serverId: true, status: true, startedAt: true, completedAt: true },
+        with: {
+          invoice: { columns: { totalAmount: true, tipAmount: true } },
         },
       }),
-      prisma.serviceOrderItem.findMany({
-        select: {
-          staffId: true,
-          unitPrice: true,
-          quantity: true,
-          service: { select: { name: true } },
-        },
+      db.query.serviceOrderItems.findMany({
+        columns: { staffId: true, unitPrice: true, quantity: true },
+        with: { service: { columns: { name: true } } },
       }),
-      prisma.commissionLog.findMany({
-        select: {
-          staffId: true,
-          commissionAmount: true,
-        },
+      db.query.commissionLogs.findMany({
+        columns: { staffId: true, commissionAmount: true },
       }),
-      prisma.appointment.findMany({
-        select: {
-          staffId: true,
-          status: true,
-        },
+      db.query.appointments.findMany({
+        columns: { staffId: true, status: true },
       }),
     ]);
 
     // Build per-staff stats
-    const employees = staff.map((s) => {
+    const employees = staffList.map((s) => {
       const orders = allOrders.filter((o) => o.serverId === s.id);
       const items = allServiceItems.filter((i) => i.staffId === s.id);
       const comms = allCommissions.filter((c) => c.staffId === s.id);
@@ -149,8 +132,8 @@ export async function GET() {
 
     // Summary
     const summary = {
-      totalEmployees: staff.length,
-      activeEmployees: staff.filter((s) => s.isActive).length,
+      totalEmployees: staffList.length,
+      activeEmployees: staffList.filter((s) => s.isActive).length,
       totalRevenue: employees.reduce((s, e) => s + e.stats.totalInvoiceRevenue, 0),
       totalCommissions: employees.reduce((s, e) => s + e.stats.totalCommissions, 0),
       totalOrders: employees.reduce((s, e) => s + e.stats.totalOrders, 0),

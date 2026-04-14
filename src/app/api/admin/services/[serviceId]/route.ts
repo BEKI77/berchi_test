@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { eq } from "drizzle-orm";
+import { db } from "@/db";
+import { services } from "@/db/schema";
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ serviceId: string }> }) {
   const session = await auth();
@@ -22,10 +24,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ servic
     if (durationMinutes !== undefined) updateData.durationMinutes = durationMinutes;
     if (isActive !== undefined) updateData.isActive = isActive;
 
-    const service = await prisma.service.update({
-      where: { id: serviceId },
-      data: updateData,
-      include: { category: true },
+    await db.update(services).set(updateData).where(eq(services.id, serviceId));
+
+    const service = await db.query.services.findFirst({
+      where: eq(services.id, serviceId),
+      with: { category: true },
     });
 
     return NextResponse.json(service);

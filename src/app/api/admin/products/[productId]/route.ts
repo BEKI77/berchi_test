@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { eq } from "drizzle-orm";
+import { db } from "@/db";
+import { products } from "@/db/schema";
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ productId: string }> }) {
   const session = await auth();
@@ -25,10 +27,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ produc
     if (reorderLevel !== undefined) updateData.reorderLevel = reorderLevel;
     if (isActive !== undefined) updateData.isActive = isActive;
 
-    const product = await prisma.product.update({
-      where: { id: productId },
-      data: updateData,
-      include: { category: true },
+    await db.update(products).set(updateData).where(eq(products.id, productId));
+
+    const product = await db.query.products.findFirst({
+      where: eq(products.id, productId),
+      with: { category: true },
     });
 
     return NextResponse.json(product);

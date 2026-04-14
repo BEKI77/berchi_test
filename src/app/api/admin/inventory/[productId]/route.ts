@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { eq, desc } from "drizzle-orm";
+import { db } from "@/db";
+import { products, stockMovements, serviceOrderProducts } from "@/db/schema";
 
 export async function GET(
   _req: Request,
@@ -14,45 +16,42 @@ export async function GET(
   try {
     const { productId } = await params;
 
-    const product = await prisma.product.findUnique({
-      where: { id: productId },
-      include: {
-        category: { select: { id: true, name: true } },
-      },
+    const product = await db.query.products.findFirst({
+      where: eq(products.id, productId),
+      with: { category: { columns: { id: true, name: true } } },
     });
 
     if (!product) {
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
 
-    const [stockMovements, orderProducts] = await Promise.all([
-      prisma.stockMovement.findMany({
-        where: { productId },
-        orderBy: { createdAt: "desc" },
-        take: 50,
-        include: {
-          staff: { select: { firstName: true, lastName: true } },
-        },
+    const [movements, orderProducts] = await Promise.all([
+      db.query.stockMovements.findMany({
+        where: eq(stockMovements.productId, productId),
+        orderBy: [desc(stockMovements.createdAt)],
+        limit: 50,
+        with: { staff: { columns: { firstName: true, lastName: true } } },
       }),
-      prisma.serviceOrderProduct.findMany({
-        where: { productId },
-        orderBy: { order: { startedAt: "desc" } },
-        take: 30,
-        select: {
-          id: true,
-          quantity: true,
-          unitPrice: true,
+      db.query.serviceOrderProducts.findMany({
+        where: eq(serviceOrderProducts.productId, productId),
+        limit: 30,
+        columns: { id: true, quantity: true, unitPrice: true },
+        with: {
           order: {
-            select: {
-              orderNumber: true,
-              startedAt: true,
-              customer: { select: { firstName: true, lastName: true } },
-              server: { select: { firstName: true, lastName: true } },
+            columns: { orderNumber: true, startedAt: true },
+            with: {
+              customer: { columns: { firstName: true, lastName: true } },
+              server: { columns: { firstName: true, lastName: true } },
             },
           },
         },
       }),
     ]);
+
+    // Sort orderProducts by order.startedAt desc in JS
+    orderProducts.sort((a, b) =>
+      new Date(b.order.startedAt).getTime() - new Date(a.order.startedAt).getTime()
+    );
 
     const totalUsed = orderProducts.reduce((s, p) => s + p.quantity, 0);
     const totalRevenue = orderProducts.reduce(
@@ -61,12 +60,12 @@ export async function GET(
 
     return NextResponse.json({
       product,
-      stockMovements,
+      stockMovements: movements,
       usageHistory: orderProducts,
       stats: {
         totalUsed,
         totalRevenue,
-        movementCount: stockMovements.length,
+        movementCount: movements.length,
       },
     });
   } catch (error) {

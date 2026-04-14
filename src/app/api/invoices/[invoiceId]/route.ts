@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { eq } from "drizzle-orm";
+import { db } from "@/db";
+import { invoices } from "@/db/schema";
 
 export async function GET(
   _req: Request,
@@ -14,28 +16,21 @@ export async function GET(
   try {
     const { invoiceId } = await params;
 
-    const invoice = await prisma.invoice.findUnique({
-      where: { id: invoiceId },
-      include: {
+    const invoice = await db.query.invoices.findFirst({
+      where: eq(invoices.id, invoiceId),
+      with: {
         order: {
-          select: {
-            orderNumber: true,
-            startedAt: true,
-            customer: { select: { firstName: true, lastName: true, phone: true } },
-            server: { select: { firstName: true, lastName: true } },
+          columns: { orderNumber: true, startedAt: true },
+          with: {
+            customer: { columns: { firstName: true, lastName: true, phone: true } },
+            server: { columns: { firstName: true, lastName: true } },
             items: {
-              select: {
-                unitPrice: true,
-                quantity: true,
-                service: { select: { name: true } },
-              },
+              columns: { unitPrice: true, quantity: true },
+              with: { service: { columns: { name: true } } },
             },
             products: {
-              select: {
-                unitPrice: true,
-                quantity: true,
-                product: { select: { name: true } },
-              },
+              columns: { unitPrice: true, quantity: true },
+              with: { product: { columns: { name: true } } },
             },
           },
         },

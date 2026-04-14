@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { and, eq, gte, count as countFn } from "drizzle-orm";
+import { db } from "@/db";
+import {
+  serviceOrders, invoices, staff, customers,
+  services, products,
+} from "@/db/schema";
 
 export async function GET() {
   const session = await auth();
@@ -15,30 +20,30 @@ export async function GET() {
     const [
       todaysOrders,
       allInvoices,
-      activeStaff,
-      totalCustomers,
-      totalServices,
+      [{ value: activeStaff }],
+      [{ value: totalCustomers }],
+      [{ value: totalServices }],
       allActiveProducts,
     ] = await Promise.all([
-      prisma.serviceOrder.findMany({
-        where: { startedAt: { gte: todayStart } },
-        include: {
+      db.query.serviceOrders.findMany({
+        where: gte(serviceOrders.startedAt, todayStart),
+        with: {
           items: true,
           products: true,
-          server: { select: { firstName: true, lastName: true } },
+          server: { columns: { firstName: true, lastName: true } },
         },
       }),
-      prisma.invoice.findMany({
-        where: { createdAt: { gte: todayStart }, status: "PAID" },
-        select: { totalAmount: true, tipAmount: true },
-      }),
-      prisma.staff.count({ where: { isActive: true } }),
-      prisma.customer.count(),
-      prisma.service.count({ where: { isActive: true } }),
-      prisma.product.findMany({
-        where: { isActive: true },
-        select: { quantityOnHand: true, reorderLevel: true },
-      }),
+      db
+        .select({ totalAmount: invoices.totalAmount, tipAmount: invoices.tipAmount })
+        .from(invoices)
+        .where(and(gte(invoices.createdAt, todayStart), eq(invoices.status, "PAID"))),
+      db.select({ value: countFn() }).from(staff).where(eq(staff.isActive, true)),
+      db.select({ value: countFn() }).from(customers),
+      db.select({ value: countFn() }).from(services).where(eq(services.isActive, true)),
+      db
+        .select({ quantityOnHand: products.quantityOnHand, reorderLevel: products.reorderLevel })
+        .from(products)
+        .where(eq(products.isActive, true)),
     ]);
 
     const lowStockProducts = allActiveProducts.filter(
@@ -84,9 +89,9 @@ export async function GET() {
       todaysTips,
       clientsServed,
       servicesDone,
-      activeStaff,
-      totalCustomers,
-      totalServices,
+      activeStaff: Number(activeStaff),
+      totalCustomers: Number(totalCustomers),
+      totalServices: Number(totalServices),
       lowStockProducts,
       transactionCount: allInvoices.length,
       topServer,

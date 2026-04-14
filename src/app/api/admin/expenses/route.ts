@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { desc, eq } from "drizzle-orm";
+import { db } from "@/db";
+import { expenses } from "@/db/schema";
 
 export async function GET() {
   const session = await auth();
@@ -9,11 +11,11 @@ export async function GET() {
   }
 
   try {
-    const expenses = await prisma.expense.findMany({
-      orderBy: { date: "desc" },
-      include: { staff: { select: { firstName: true, lastName: true } } },
+    const result = await db.query.expenses.findMany({
+      orderBy: [desc(expenses.date)],
+      with: { staff: { columns: { firstName: true, lastName: true } } },
     });
-    return NextResponse.json(expenses);
+    return NextResponse.json(result);
   } catch (error) {
     console.error("Failed to fetch expenses:", error);
     return NextResponse.json({ error: "Failed to fetch expenses" }, { status: 500 });
@@ -34,18 +36,23 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    const expense = await prisma.expense.create({
-      data: {
+    const [expense] = await db
+      .insert(expenses)
+      .values({
         description,
         category,
         amount,
-        date: new Date(date),
+        date: new Date(date).toISOString().split("T")[0],
         loggedBy: session.user.id,
-      },
-      include: { staff: { select: { firstName: true, lastName: true } } },
+      })
+      .returning();
+
+    const fullExpense = await db.query.expenses.findFirst({
+      where: eq(expenses.id, expense.id),
+      with: { staff: { columns: { firstName: true, lastName: true } } },
     });
 
-    return NextResponse.json(expense);
+    return NextResponse.json(fullExpense);
   } catch (error) {
     console.error("Failed to create expense:", error);
     return NextResponse.json({ error: "Failed to create expense" }, { status: 500 });

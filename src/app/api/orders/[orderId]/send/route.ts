@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { eq } from "drizzle-orm";
+import { db } from "@/db";
+import { serviceOrders } from "@/db/schema";
 
 // POST: Send order to cashier
 export async function POST(
@@ -14,9 +16,9 @@ export async function POST(
 
   const { orderId } = await params;
 
-  const order = await prisma.serviceOrder.findUnique({
-    where: { id: orderId },
-    include: { items: true, products: true },
+  const order = await db.query.serviceOrders.findFirst({
+    where: eq(serviceOrders.id, orderId),
+    with: { items: true, products: true },
   });
 
   if (!order) {
@@ -37,24 +39,21 @@ export async function POST(
     );
   }
 
-  const updated = await prisma.serviceOrder.update({
-    where: { id: orderId },
-    data: {
-      status: "SENT_TO_CASHIER",
-      completedAt: new Date(),
-    },
-    include: {
-      customer: {
-        select: { id: true, firstName: true, lastName: true },
-      },
-      server: {
-        select: { id: true, firstName: true, lastName: true },
-      },
+  await db
+    .update(serviceOrders)
+    .set({ status: "SENT_TO_CASHIER", completedAt: new Date() })
+    .where(eq(serviceOrders.id, orderId));
+
+  const updated = await db.query.serviceOrders.findFirst({
+    where: eq(serviceOrders.id, orderId),
+    with: {
+      customer: { columns: { id: true, firstName: true, lastName: true } },
+      server: { columns: { id: true, firstName: true, lastName: true } },
       items: {
-        include: { service: { select: { id: true, name: true } } },
+        with: { service: { columns: { id: true, name: true } } },
       },
       products: {
-        include: { product: { select: { id: true, name: true } } },
+        with: { product: { columns: { id: true, name: true } } },
       },
     },
   });

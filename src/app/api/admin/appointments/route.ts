@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { eq, desc } from "drizzle-orm";
+import { db } from "@/db";
+import { appointments, customers, services } from "@/db/schema";
 
 export async function GET() {
   const session = await auth();
@@ -9,21 +11,23 @@ export async function GET() {
   }
 
   try {
-    const appointments = await prisma.appointment.findMany({
-      orderBy: { startTime: "desc" },
-      select: {
+    const result = await db.query.appointments.findMany({
+      orderBy: [desc(appointments.startTime)],
+      columns: {
         id: true,
         startTime: true,
         endTime: true,
         status: true,
         source: true,
         notes: true,
-        customer: { select: { id: true, firstName: true, lastName: true, phone: true } },
-        staff: { select: { id: true, firstName: true, lastName: true } },
-        service: { select: { id: true, name: true, durationMinutes: true } },
+      },
+      with: {
+        customer: { columns: { id: true, firstName: true, lastName: true, phone: true } },
+        staff: { columns: { id: true, firstName: true, lastName: true } },
+        service: { columns: { id: true, name: true, durationMinutes: true } },
       },
     });
-    return NextResponse.json(appointments);
+    return NextResponse.json(result);
   } catch (error) {
     console.error("Failed to fetch appointments:", error);
     return NextResponse.json({ error: "Failed to fetch appointments" }, { status: 500 });
@@ -48,9 +52,10 @@ export async function POST(req: Request) {
       if (!firstName || !lastName) {
         return NextResponse.json({ error: "New customer first and last name required" }, { status: 400 });
       }
-      const customer = await prisma.customer.create({
-        data: { firstName, lastName, phone: phone || null, email: email || null },
-      });
+      const [customer] = await db
+        .insert(customers)
+        .values({ firstName, lastName, phone: phone || null, email: email || null })
+        .returning();
       resolvedCustomerId = customer.id;
     }
 
@@ -58,13 +63,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Customer, service, and time are required" }, { status: 400 });
     }
 
-    const service = await prisma.service.findUnique({ where: { id: serviceId } });
+    const [service] = await db.select().from(services).where(eq(services.id, serviceId)).limit(1);
     const endTime = service
       ? new Date(new Date(startTime).getTime() + service.durationMinutes * 60000)
       : null;
 
-    const appointment = await prisma.appointment.create({
-      data: {
+    const [appointment] = await db
+      .insert(appointments)
+      .values({
         customerId: resolvedCustomerId,
         staffId: staffId || null,
         serviceId,
@@ -72,21 +78,27 @@ export async function POST(req: Request) {
         endTime,
         source: "MANUAL",
         notes: notes || null,
-      },
-      select: {
+      })
+      .returning();
+
+    const fullAppointment = await db.query.appointments.findFirst({
+      where: eq(appointments.id, appointment.id),
+      columns: {
         id: true,
         startTime: true,
         endTime: true,
         status: true,
         source: true,
         notes: true,
-        customer: { select: { id: true, firstName: true, lastName: true, phone: true } },
-        staff: { select: { id: true, firstName: true, lastName: true } },
-        service: { select: { id: true, name: true, durationMinutes: true } },
+      },
+      with: {
+        customer: { columns: { id: true, firstName: true, lastName: true, phone: true } },
+        staff: { columns: { id: true, firstName: true, lastName: true } },
+        service: { columns: { id: true, name: true, durationMinutes: true } },
       },
     });
 
-    return NextResponse.json(appointment);
+    return NextResponse.json(fullAppointment);
   } catch (error) {
     console.error("Failed to create appointment:", error);
     return NextResponse.json({ error: "Failed to create appointment" }, { status: 500 });

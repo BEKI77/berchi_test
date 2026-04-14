@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { eq, desc } from "drizzle-orm";
+import { db } from "@/db";
+import { staff } from "@/db/schema";
 
 export async function GET() {
   const session = await auth();
@@ -9,21 +11,21 @@ export async function GET() {
   }
 
   try {
-    const staff = await prisma.staff.findMany({
-      orderBy: { createdAt: "desc" },
-      select: {
-        id: true,
-        firstName: true,
-        lastName: true,
-        email: true,
-        phone: true,
-        role: true,
-        commissionRate: true,
-        isActive: true,
-        createdAt: true,
-      },
-    });
-    return NextResponse.json(staff);
+    const result = await db
+      .select({
+        id: staff.id,
+        firstName: staff.firstName,
+        lastName: staff.lastName,
+        email: staff.email,
+        phone: staff.phone,
+        role: staff.role,
+        commissionRate: staff.commissionRate,
+        isActive: staff.isActive,
+        createdAt: staff.createdAt,
+      })
+      .from(staff)
+      .orderBy(desc(staff.createdAt));
+    return NextResponse.json(result);
   } catch (error) {
     console.error("Failed to fetch staff:", error);
     return NextResponse.json({ error: "Failed to fetch staff" }, { status: 500 });
@@ -44,7 +46,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    const existing = await prisma.staff.findUnique({ where: { email } });
+    const [existing] = await db.select().from(staff).where(eq(staff.email, email)).limit(1);
     if (existing) {
       return NextResponse.json({ error: "Email already in use" }, { status: 400 });
     }
@@ -52,8 +54,9 @@ export async function POST(req: Request) {
     const bcrypt = await import("bcryptjs");
     const passwordHash = await bcrypt.hash(password, 10);
 
-    const staff = await prisma.staff.create({
-      data: {
+    const [newStaff] = await db
+      .insert(staff)
+      .values({
         firstName,
         lastName,
         email,
@@ -61,10 +64,10 @@ export async function POST(req: Request) {
         role,
         commissionRate: commissionRate || 0,
         passwordHash,
-      },
-    });
+      })
+      .returning();
 
-    return NextResponse.json({ id: staff.id, firstName: staff.firstName, lastName: staff.lastName });
+    return NextResponse.json({ id: newStaff.id, firstName: newStaff.firstName, lastName: newStaff.lastName });
   } catch (error) {
     console.error("Failed to create staff:", error);
     return NextResponse.json({ error: "Failed to create staff" }, { status: 500 });

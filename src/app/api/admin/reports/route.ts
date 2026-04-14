@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { eq } from "drizzle-orm";
+import { db } from "@/db";
+import { staff } from "@/db/schema";
 
 export async function GET(req: Request) {
   const session = await auth();
@@ -31,59 +33,48 @@ export async function GET(req: Request) {
       staffMembers,
       allServiceItems,
       allProductItems,
-      customers,
-      appointments,
+      customersList,
+      appointmentsList,
     ] = await Promise.all([
-      prisma.invoice.findMany({
-        select: {
-          totalAmount: true,
-          tipAmount: true,
-          taxAmount: true,
-          discountAmount: true,
-          subtotal: true,
-          status: true,
-          createdAt: true,
-          payment: { select: { method: true } },
+      db.query.invoices.findMany({
+        columns: {
+          totalAmount: true, tipAmount: true, taxAmount: true,
+          discountAmount: true, subtotal: true, status: true, createdAt: true,
+        },
+        with: { payment: { columns: { method: true } } },
+      }),
+      db.query.serviceOrders.findMany({
+        columns: { id: true, status: true, startedAt: true, serverId: true, completedAt: true },
+      }),
+      db.query.expenses.findMany({
+        columns: { amount: true, category: true, date: true, description: true },
+      }),
+      db.query.staff.findMany({
+        where: eq(staff.isActive, true),
+        columns: { id: true, firstName: true, lastName: true, role: true, commissionRate: true },
+      }),
+      db.query.serviceOrderItems.findMany({
+        columns: { unitPrice: true, quantity: true, staffId: true },
+        with: {
+          service: {
+            columns: { id: true, name: true },
+            with: { category: { columns: { name: true } } },
+          },
+          order: { columns: { startedAt: true } },
         },
       }),
-      prisma.serviceOrder.findMany({
-        select: {
-          id: true,
-          status: true,
-          startedAt: true,
-          serverId: true,
-          completedAt: true,
+      db.query.serviceOrderProducts.findMany({
+        columns: { unitPrice: true, quantity: true },
+        with: {
+          product: { columns: { id: true, name: true } },
+          order: { columns: { startedAt: true } },
         },
       }),
-      prisma.expense.findMany({
-        select: { amount: true, category: true, date: true, description: true },
+      db.query.customers.findMany({
+        columns: { id: true, createdAt: true },
       }),
-      prisma.staff.findMany({
-        where: { isActive: true },
-        select: { id: true, firstName: true, lastName: true, role: true, commissionRate: true },
-      }),
-      prisma.serviceOrderItem.findMany({
-        select: {
-          unitPrice: true,
-          quantity: true,
-          staffId: true,
-          service: { select: { id: true, name: true, category: { select: { name: true } } } },
-          order: { select: { startedAt: true } },
-        },
-      }),
-      prisma.serviceOrderProduct.findMany({
-        select: {
-          unitPrice: true,
-          quantity: true,
-          product: { select: { id: true, name: true } },
-          order: { select: { startedAt: true } },
-        },
-      }),
-      prisma.customer.findMany({
-        select: { id: true, createdAt: true },
-      }),
-      prisma.appointment.findMany({
-        select: { id: true, status: true, source: true, startTime: true },
+      db.query.appointments.findMany({
+        columns: { id: true, status: true, source: true, startTime: true },
       }),
     ]);
 
@@ -249,14 +240,14 @@ export async function GET(req: Request) {
 
     // === CUSTOMER INSIGHTS ===
     const rangeCustomers = rangeFrom
-      ? customers.filter((c) => inRange(new Date(c.createdAt)))
-      : customers;
-    const newCustomersThisMonth = customers.filter((c) => new Date(c.createdAt) >= thisMonthStart).length;
+      ? customersList.filter((c) => inRange(new Date(c.createdAt)))
+      : customersList;
+    const newCustomersThisMonth = customersList.filter((c) => new Date(c.createdAt) >= thisMonthStart).length;
 
     // === APPOINTMENT INSIGHTS ===
     const rangeAppointments = rangeFrom
-      ? appointments.filter((a) => inRange(new Date(a.startTime)))
-      : appointments;
+      ? appointmentsList.filter((a) => inRange(new Date(a.startTime)))
+      : appointmentsList;
     const appointmentStats = {
       total: rangeAppointments.length,
       confirmed: rangeAppointments.filter((a) => a.status === "CONFIRMED").length,
@@ -292,7 +283,7 @@ export async function GET(req: Request) {
           : 0,
         totalOrders: allOrders.length,
         completedOrders: allOrders.filter((o) => o.status === "CHECKED_OUT").length,
-        totalCustomers: customers.length,
+        totalCustomers: customersList.length,
         newCustomersThisMonth,
         totalInvoices: paidInvoices.length,
       },

@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { desc } from "drizzle-orm";
+import { db } from "@/db";
+import { invoices } from "@/db/schema";
 
 export async function GET() {
   const session = await auth();
@@ -9,36 +11,28 @@ export async function GET() {
   }
 
   try {
-    const invoices = await prisma.invoice.findMany({
-      orderBy: { createdAt: "desc" },
-      include: {
+    const result = await db.query.invoices.findMany({
+      orderBy: [desc(invoices.createdAt)],
+      with: {
         order: {
-          select: {
-            orderNumber: true,
-            customer: { select: { id: true, firstName: true, lastName: true, phone: true } },
-            server: { select: { id: true, firstName: true, lastName: true } },
+          columns: { orderNumber: true },
+          with: {
+            customer: { columns: { id: true, firstName: true, lastName: true, phone: true } },
+            server: { columns: { id: true, firstName: true, lastName: true } },
             items: {
-              select: {
-                id: true,
-                unitPrice: true,
-                quantity: true,
-                service: { select: { name: true } },
-              },
+              columns: { id: true, unitPrice: true, quantity: true },
+              with: { service: { columns: { name: true } } },
             },
             products: {
-              select: {
-                id: true,
-                unitPrice: true,
-                quantity: true,
-                product: { select: { name: true } },
-              },
+              columns: { id: true, unitPrice: true, quantity: true },
+              with: { product: { columns: { name: true } } },
             },
           },
         },
         payment: true,
       },
     });
-    return NextResponse.json(invoices);
+    return NextResponse.json(result);
   } catch (error) {
     console.error("Failed to fetch invoices:", error);
     return NextResponse.json({ error: "Failed to fetch invoices" }, { status: 500 });

@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { eq } from "drizzle-orm";
+import { db } from "@/db";
+import { services, customers, appointments } from "@/db/schema";
 import { withCors, handlePreflight } from "@/lib/cors";
 
 export async function OPTIONS(req: Request) {
@@ -21,25 +23,23 @@ export async function POST(req: Request) {
     }
 
     // Verify service exists
-    const service = await prisma.service.findUnique({ where: { id: serviceId } });
+    const [service] = await db.select().from(services).where(eq(services.id, serviceId)).limit(1);
     if (!service) {
       return withCors(NextResponse.json({ error: "Service not found" }, { status: 400 }), origin);
     }
 
     // Find or create customer by phone number
-    let customer = await prisma.customer.findFirst({
-      where: { phone: phone.trim() },
-    });
-
+    let [customer] = await db.select().from(customers).where(eq(customers.phone, phone.trim())).limit(1);
     if (!customer) {
-      customer = await prisma.customer.create({
-        data: {
+      [customer] = await db
+        .insert(customers)
+        .values({
           firstName: firstName.trim(),
           lastName: lastName.trim(),
           phone: phone.trim(),
           email: email?.trim() || null,
-        },
-      });
+        })
+        .returning();
     }
 
     // Parse date + time
@@ -52,9 +52,9 @@ export async function POST(req: Request) {
     const endTime = new Date(startTime.getTime() + service.durationMinutes * 60000);
 
     // Create appointment with source=ONLINE, no staff assigned yet
-    // Using scalar fields to trigger UncheckedCreateInput (staffId is optional)
-    const appointment = await prisma.appointment.create({
-      data: {
+    const [appointment] = await db
+      .insert(appointments)
+      .values({
         customerId: customer.id,
         serviceId,
         staffId: null,
@@ -63,8 +63,8 @@ export async function POST(req: Request) {
         source: "ONLINE",
         status: "SCHEDULED",
         notes: notes?.trim() || null,
-      },
-    });
+      })
+      .returning();
 
     return withCors(NextResponse.json({ success: true, appointmentId: appointment.id }), origin);
   } catch (error) {

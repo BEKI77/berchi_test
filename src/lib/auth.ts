@@ -1,7 +1,9 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
-import { prisma } from "@/lib/prisma";
+import { eq } from "drizzle-orm";
+import { db } from "@/db";
+import { staff } from "@/db/schema";
 import { authConfig } from "@/lib/auth.config";
 import type { SessionUser } from "@/types";
 
@@ -19,17 +21,19 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           return null;
         }
 
-        const staff = await prisma.staff.findUnique({
-          where: { email: credentials.email as string },
-        });
+        const [staffMember] = await db
+          .select()
+          .from(staff)
+          .where(eq(staff.email, credentials.email as string))
+          .limit(1);
 
-        if (!staff || !staff.isActive) {
+        if (!staffMember || !staffMember.isActive) {
           return null;
         }
 
         const isPasswordValid = await bcrypt.compare(
           credentials.password as string,
-          staff.passwordHash
+          staffMember.passwordHash
         );
 
         if (!isPasswordValid) {
@@ -37,11 +41,11 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         }
 
         return {
-          id: staff.id,
-          email: staff.email,
-          firstName: staff.firstName,
-          lastName: staff.lastName,
-          role: staff.role,
+          id: staffMember.id,
+          email: staffMember.email,
+          firstName: staffMember.firstName,
+          lastName: staffMember.lastName,
+          role: staffMember.role,
         } as SessionUser;
       },
     }),

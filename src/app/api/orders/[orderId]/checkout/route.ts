@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
-import type { DiscountType, PaymentMethod } from "@/generated/prisma/client";
+import { eq, gte, count as countFn, sql } from "drizzle-orm";
+import { db } from "@/db";
+import {
+  serviceOrders, invoices, payments, products,
+  stockMovements, commissionLogs, salonSettings,
+} from "@/db/schema";
+import type { DiscountType, PaymentMethod } from "@/db/schema";
 
 // POST: Checkout an order — create invoice + payment, update stock, log commissions
 export async function POST(
@@ -38,17 +43,14 @@ export async function POST(
     );
   }
 
-  const order = await prisma.serviceOrder.findUnique({
-    where: { id: orderId },
-    include: {
+  const order = await db.query.serviceOrders.findFirst({
+    where: eq(serviceOrders.id, orderId),
+    with: {
       items: {
-        include: {
-          service: true,
-          staff: true,
-        },
+        with: { service: true, staff: true },
       },
       products: {
-        include: { product: true },
+        with: { product: true },
       },
     },
   });
@@ -76,7 +78,7 @@ export async function POST(
   const subtotal = servicesSubtotal + productsSubtotal;
 
   // Get salon settings for tax rate
-  const settings = await prisma.salonSettings.findFirst();
+  const [settings] = await db.select().from(salonSettings).limit(1);
   const taxRate = settings ? Number(settings.taxRate) : 0;
   const taxAmount = subtotal * (taxRate / 100);
 
@@ -93,89 +95,82 @@ export async function POST(
   // Generate invoice number: INV-YYYYMMDD-XXXX
   const today = new Date();
   const dateStr = today.toISOString().slice(0, 10).replace(/-/g, "");
-  const invoiceCount = await prisma.invoice.count({
-    where: {
-      createdAt: {
-        gte: new Date(today.getFullYear(), today.getMonth(), today.getDate()),
-      },
-    },
-  });
-  const invoiceNumber = `INV-${dateStr}-${String(invoiceCount + 1).padStart(4, "0")}`;
+  const [{ value: invoiceCount }] = await db
+    .select({ value: countFn() })
+    .from(invoices)
+    .where(gte(invoices.createdAt, new Date(today.getFullYear(), today.getMonth(), today.getDate())));
+  const invoiceNumber = `INV-${dateStr}-${String(Number(invoiceCount) + 1).padStart(4, "0")}`;
 
   // Use a transaction to ensure atomicity
-  const result = await prisma.$transaction(async (tx) => {
+  const result = await db.transaction(async (tx) => {
     // 1. Create invoice
-    const invoice = await tx.invoice.create({
-      data: {
+    const [invoice] = await tx
+      .insert(invoices)
+      .values({
         invoiceNumber,
         orderId,
-        subtotal,
-        taxRate,
-        taxAmount,
+        subtotal: String(subtotal),
+        taxRate: String(taxRate),
+        taxAmount: String(taxAmount),
         discountType: discountType || null,
-        discountValue,
-        discountAmount,
-        tipAmount,
-        totalAmount,
+        discountValue: String(discountValue),
+        discountAmount: String(discountAmount),
+        tipAmount: String(tipAmount),
+        totalAmount: String(totalAmount),
         status: "PAID",
-      },
-    });
+      })
+      .returning();
 
     // 2. Create payment
-    const payment = await tx.payment.create({
-      data: {
+    const [payment] = await tx
+      .insert(payments)
+      .values({
         invoiceId: invoice.id,
         method: paymentMethod,
-        amount: totalAmount,
-      },
-    });
+        amount: String(totalAmount),
+      })
+      .returning();
 
     // 3. Update order status
-    await tx.serviceOrder.update({
-      where: { id: orderId },
-      data: { status: "CHECKED_OUT" },
-    });
+    await tx
+      .update(serviceOrders)
+      .set({ status: "CHECKED_OUT" })
+      .where(eq(serviceOrders.id, orderId));
 
     // 4. Decrement product stock and create stock movements
     for (const orderProduct of order.products) {
-      await tx.product.update({
-        where: { id: orderProduct.productId },
-        data: {
-          quantityOnHand: {
-            decrement: orderProduct.quantity,
-          },
-        },
-      });
+      await tx
+        .update(products)
+        .set({
+          quantityOnHand: sql`${products.quantityOnHand} - ${orderProduct.quantity}`,
+        })
+        .where(eq(products.id, orderProduct.productId));
 
-      await tx.stockMovement.create({
-        data: {
-          productId: orderProduct.productId,
-          type: "USED_IN_SERVICE",
-          quantityChange: -orderProduct.quantity,
-          referenceId: orderId,
-          note: `Used in order ${order.orderNumber}`,
-          performedBy: session.user!.id,
-        },
+      await tx.insert(stockMovements).values({
+        productId: orderProduct.productId,
+        type: "USED_IN_SERVICE",
+        quantityChange: -orderProduct.quantity,
+        referenceId: orderId,
+        note: `Used in order ${order.orderNumber}`,
+        performedBy: session.user!.id,
       });
     }
 
     // 5. Log commissions for each service item
     for (const item of order.items) {
-      const staff = item.staff;
-      const commissionRate = Number(staff.commissionRate);
+      const staffMember = item.staff;
+      const commRate = Number(staffMember.commissionRate);
       const serviceAmount = Number(item.unitPrice) * item.quantity;
-      const commissionAmount = serviceAmount * (commissionRate / 100);
+      const commissionAmount = serviceAmount * (commRate / 100);
 
       if (commissionAmount > 0) {
-        await tx.commissionLog.create({
-          data: {
-            staffId: item.staffId,
-            invoiceId: invoice.id,
-            serviceOrderItemId: item.id,
-            commissionRate,
-            serviceAmount,
-            commissionAmount,
-          },
+        await tx.insert(commissionLogs).values({
+          staffId: item.staffId,
+          invoiceId: invoice.id,
+          serviceOrderItemId: item.id,
+          commissionRate: String(commRate),
+          serviceAmount: String(serviceAmount),
+          commissionAmount: String(commissionAmount),
         });
       }
     }

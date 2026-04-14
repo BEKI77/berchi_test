@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { and, eq, gt, asc } from "drizzle-orm";
+import { db } from "@/db";
+import { products } from "@/db/schema";
 
 export async function GET() {
   const session = await auth();
@@ -8,11 +10,16 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const products = await prisma.product.findMany({
-    where: { isActive: true, quantityOnHand: { gt: 0 } },
-    include: { category: { select: { id: true, name: true } } },
-    orderBy: [{ category: { name: "asc" } }, { name: "asc" }],
+  const result = await db.query.products.findMany({
+    where: and(eq(products.isActive, true), gt(products.quantityOnHand, 0)),
+    with: { category: { columns: { id: true, name: true } } },
+    orderBy: [asc(products.name)],
   });
 
-  return NextResponse.json(products);
+  result.sort((a, b) => {
+    const catCmp = (a.category?.name ?? "").localeCompare(b.category?.name ?? "");
+    return catCmp !== 0 ? catCmp : a.name.localeCompare(b.name);
+  });
+
+  return NextResponse.json(result);
 }

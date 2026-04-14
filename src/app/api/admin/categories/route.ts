@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { asc } from "drizzle-orm";
+import { db } from "@/db";
+import { serviceCategories, productCategories } from "@/db/schema";
 
 export async function GET(req: Request) {
   const session = await auth();
@@ -13,11 +15,11 @@ export async function GET(req: Request) {
 
   try {
     if (type === "product") {
-      const categories = await prisma.productCategory.findMany({ orderBy: { name: "asc" } });
+      const categories = await db.select().from(productCategories).orderBy(asc(productCategories.name));
       return NextResponse.json(categories);
     }
     // default: service categories
-    const categories = await prisma.serviceCategory.findMany({ orderBy: { name: "asc" } });
+    const categories = await db.select().from(serviceCategories).orderBy(asc(serviceCategories.name));
     return NextResponse.json(categories);
   } catch (error) {
     console.error("Failed to fetch categories:", error);
@@ -40,15 +42,11 @@ export async function POST(req: Request) {
     }
 
     if (type === "product") {
-      const cat = await prisma.productCategory.create({
-        data: { name, description: description || null },
-      });
+      const [cat] = await db.insert(productCategories).values({ name, description: description || null }).returning();
       return NextResponse.json(cat);
     }
 
-    const cat = await prisma.serviceCategory.create({
-      data: { name, description: description || null },
-    });
+    const [cat] = await db.insert(serviceCategories).values({ name, description: description || null }).returning();
     return NextResponse.json(cat);
   } catch (error) {
     console.error("Failed to create category:", error);

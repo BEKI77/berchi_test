@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { eq } from "drizzle-orm";
+import { db } from "@/db";
+import { appointments, services } from "@/db/schema";
 
 export async function PATCH(
   req: Request,
@@ -24,7 +26,7 @@ export async function PATCH(
 
     // If startTime or serviceId changed, recalculate endTime
     if (body.startTime || body.serviceId) {
-      const existing = await prisma.appointment.findUnique({ where: { id: appointmentId } });
+      const [existing] = await db.select().from(appointments).where(eq(appointments.id, appointmentId)).limit(1);
       if (!existing) {
         return NextResponse.json({ error: "Appointment not found" }, { status: 404 });
       }
@@ -32,7 +34,7 @@ export async function PATCH(
       const serviceId = body.serviceId || existing.serviceId;
       const startTime = body.startTime ? new Date(body.startTime) : existing.startTime;
 
-      const service = await prisma.service.findUnique({ where: { id: serviceId } });
+      const [service] = await db.select().from(services).where(eq(services.id, serviceId)).limit(1);
       const endTime = service
         ? new Date(startTime.getTime() + service.durationMinutes * 60000)
         : null;
@@ -42,13 +44,14 @@ export async function PATCH(
       updateData.endTime = endTime;
     }
 
-    const appointment = await prisma.appointment.update({
-      where: { id: appointmentId },
-      data: updateData,
-      include: {
-        customer: { select: { id: true, firstName: true, lastName: true, phone: true } },
-        staff: { select: { id: true, firstName: true, lastName: true } },
-        service: { select: { id: true, name: true, durationMinutes: true } },
+    await db.update(appointments).set(updateData).where(eq(appointments.id, appointmentId));
+
+    const appointment = await db.query.appointments.findFirst({
+      where: eq(appointments.id, appointmentId),
+      with: {
+        customer: { columns: { id: true, firstName: true, lastName: true, phone: true } },
+        staff: { columns: { id: true, firstName: true, lastName: true } },
+        service: { columns: { id: true, name: true, durationMinutes: true } },
       },
     });
 

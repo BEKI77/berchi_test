@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { eq, asc } from "drizzle-orm";
+import { db } from "@/db";
+import { services } from "@/db/schema";
 
 export async function GET() {
   const session = await auth();
@@ -8,11 +10,17 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const services = await prisma.service.findMany({
-    where: { isActive: true },
-    include: { category: { select: { id: true, name: true } } },
-    orderBy: [{ category: { name: "asc" } }, { name: "asc" }],
+  const result = await db.query.services.findMany({
+    where: eq(services.isActive, true),
+    with: { category: { columns: { id: true, name: true } } },
+    orderBy: [asc(services.name)],
   });
 
-  return NextResponse.json(services);
+  // Sort by category name then service name
+  result.sort((a, b) => {
+    const catCmp = (a.category?.name ?? "").localeCompare(b.category?.name ?? "");
+    return catCmp !== 0 ? catCmp : a.name.localeCompare(b.name);
+  });
+
+  return NextResponse.json(result);
 }

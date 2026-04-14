@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { and, eq, gte, lte, notInArray } from "drizzle-orm";
+import { db } from "@/db";
+import { services, salonSettings, appointments } from "@/db/schema";
 import { withCors, handlePreflight } from "@/lib/cors";
 
 export async function OPTIONS(req: Request) {
@@ -36,14 +38,14 @@ export async function GET(req: Request) {
     // Get service duration (default 30 min if not provided)
     let serviceDuration = SLOT_INTERVAL;
     if (serviceId) {
-      const service = await prisma.service.findUnique({ where: { id: serviceId } });
+      const [service] = await db.select().from(services).where(eq(services.id, serviceId)).limit(1);
       if (service) {
         serviceDuration = service.durationMinutes;
       }
     }
 
     // Get working hours from salon settings
-    const settings = await prisma.salonSettings.findFirst();
+    const [settings] = await db.select().from(salonSettings).limit(1);
     let businessHours = DEFAULT_HOURS;
     if (settings?.businessHours) {
       try {
@@ -81,20 +83,18 @@ export async function GET(req: Request) {
     const dayStart = new Date(`${date}T00:00:00`);
     const dayEnd = new Date(`${date}T23:59:59`);
 
-    const appointments = await prisma.appointment.findMany({
-      where: {
-        startTime: { gte: dayStart, lte: dayEnd },
-        status: { notIn: ["CANCELLED", "NO_SHOW"] },
-      },
-      select: {
-        startTime: true,
-        endTime: true,
-        service: { select: { durationMinutes: true } },
-      },
+    const appts = await db.query.appointments.findMany({
+      where: and(
+        gte(appointments.startTime, dayStart),
+        lte(appointments.startTime, dayEnd),
+        notInArray(appointments.status, ["CANCELLED", "NO_SHOW"]),
+      ),
+      columns: { startTime: true, endTime: true },
+      with: { service: { columns: { durationMinutes: true } } },
     });
 
     // Build occupied ranges (in minutes from midnight)
-    const occupied: { start: number; end: number }[] = appointments.map((a) => {
+    const occupied: { start: number; end: number }[] = appts.map((a) => {
       const st = new Date(a.startTime);
       const startMin = st.getHours() * 60 + st.getMinutes();
       let endMin: number;

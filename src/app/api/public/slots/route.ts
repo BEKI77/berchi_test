@@ -25,6 +25,7 @@ const DAY_NAMES = ["sunday", "monday", "tuesday", "wednesday", "thursday", "frid
 const SLOT_INTERVAL = 30;
 
 export async function GET(req: Request) {
+  const origin = req.headers.get("origin");
   
   try {
     const { searchParams } = new URL(req.url);
@@ -149,9 +150,9 @@ export async function GET(req: Request) {
       closeTime: dayHours.close,
       serviceDuration,
       slots,
-    }), '*');
+    }), origin);
   } catch (error) {
     console.error("Failed to get slots:", error);
-    return withCors(NextResponse.json({ error: "Failed to get available slots" }, { status: 500 }), '*');
+    return withCors(NextResponse.json({ error: "Failed to get available slots" }, { status: 500 }), origin);
   }
 }

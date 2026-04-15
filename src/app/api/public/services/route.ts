@@ -9,7 +9,8 @@ export async function OPTIONS(req: Request) {
 }
 
 // Public endpoint — no auth required
-export async function GET(_req: Request) {
+export async function GET(req: Request) {
+  const origin = req.headers.get("origin");
   const result = await db.query.services.findMany({
     where: eq(services.isActive, true),
     with: { category: { columns: { id: true, name: true, isActive: true } } },
@@ -24,5 +25,5 @@ export async function GET(_req: Request) {
       return catCmp !== 0 ? catCmp : a.name.localeCompare(b.name);
     });
 
-  return withCors(NextResponse.json(filtered), "*");
+  return withCors(NextResponse.json(filtered), origin);
 }

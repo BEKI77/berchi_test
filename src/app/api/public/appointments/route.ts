@@ -11,6 +11,7 @@ export async function OPTIONS(req: Request) {
 // Public endpoint — no auth required. Creates customer if needed, then appointment with source=ONLINE
 export async function POST(req: Request) {
   try {
+    const origin = req.headers.get("origin");
     const body = await req.json();
     const { firstName, lastName, phone, email, serviceId, preferredDate, preferredTime, notes } = body;
 

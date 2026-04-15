@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
-
+import dotenv from "dotenv";
+dotenv.config();
 const ALLOWED_ORIGINS = [
   process.env.WEBSITE_URL, // e.g. https://berchi.com
   "http://localhost:3001", // local website dev
   "http://localhost:3002",
+  "*",
 ].filter(Boolean);
 
 export function corsHeaders(origin?: string | null) {

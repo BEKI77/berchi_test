@@ -10,7 +10,6 @@ export async function OPTIONS(req: Request) {
 
 // Public endpoint — no auth required. Creates customer if needed, then appointment with source=ONLINE
 export async function POST(req: Request) {
-  const origin = req.headers.get("origin");
   try {
     const body = await req.json();
     const { firstName, lastName, phone, email, serviceId, preferredDate, preferredTime, notes } = body;
@@ -66,9 +65,9 @@ export async function POST(req: Request) {
       })
       .returning();
 
-    return withCors(NextResponse.json({ success: true, appointmentId: appointment.id }), origin);
+    return withCors(NextResponse.json({ success: true, appointmentId: appointment.id }), '*');
   } catch (error) {
     console.error("Public appointment booking error:", error);
-    return withCors(NextResponse.json({ error: "Failed to book appointment" }, { status: 500 }), origin);
+    return withCors(NextResponse.json({ error: "Failed to book appointment" }, { status: 500 }), '*');
   }
 }

@@ -8,6 +8,13 @@
       "when": 1776178552995,
       "tag": "0000_magenta_inertia",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1776417701339,
+      "tag": "0001_fuzzy_rhino",
+      "breakpoints": true
     }
   ]
 }

@@ -2,7 +2,7 @@ import { pgTable, uuid, varchar, text, timestamp, decimal, integer, date } from 
 import { expenseCategoryEnum, stockMovementTypeEnum } from "./enums";
 import { staff } from "./staff";
 import { products } from "./products";
-import { serviceOrderItems } from "./orders";
+import { serviceOrderItems, serviceOrders } from "./orders";
 
 export const expenses = pgTable("expenses", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -21,9 +21,20 @@ export const stockMovements = pgTable("stock_movements", {
   productId: uuid("product_id").notNull().references(() => products.id),
   type: stockMovementTypeEnum("type").notNull(),
   quantityChange: integer("quantity_change").notNull(),
+  portionsChange: integer("portions_change"),
   referenceId: varchar("reference_id"),
   note: text("note"),
   performedBy: uuid("performed_by").notNull().references(() => staff.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const productUsageLogs = pgTable("product_usage_logs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  productId: uuid("product_id").notNull().references(() => products.id),
+  orderId: uuid("order_id").notNull().references(() => serviceOrders.id),
+  staffId: uuid("staff_id").notNull().references(() => staff.id),
+  portionsUsed: integer("portions_used").notNull(),
+  note: text("note"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

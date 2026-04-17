@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { services } from "@/db/schema";
+import { services, serviceConsumables } from "@/db/schema";
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ serviceId: string }> }) {
   const session = await auth();
@@ -14,24 +14,45 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ servic
 
   try {
     const body = await req.json();
-    const { name, description, categoryId, basePrice, durationMinutes, isActive } = body;
+    const { 
+      name, description, categoryId, basePrice, durationMinutes, isActive,
+      consumables // Array of { productId, portionsRequired }
+    } = body;
 
-    const updateData: Record<string, unknown> = {};
-    if (name !== undefined) updateData.name = name;
-    if (description !== undefined) updateData.description = description || null;
-    if (categoryId !== undefined) updateData.categoryId = categoryId;
-    if (basePrice !== undefined) updateData.basePrice = basePrice;
-    if (durationMinutes !== undefined) updateData.durationMinutes = durationMinutes;
-    if (isActive !== undefined) updateData.isActive = isActive;
+    const result = await db.transaction(async (tx) => {
+      const updateData: Record<string, unknown> = {};
+      if (name !== undefined) updateData.name = name;
+      if (description !== undefined) updateData.description = description || null;
+      if (categoryId !== undefined) updateData.categoryId = categoryId;
+      if (basePrice !== undefined) updateData.basePrice = basePrice;
+      if (durationMinutes !== undefined) updateData.durationMinutes = durationMinutes;
+      if (isActive !== undefined) updateData.isActive = isActive;
 
-    await db.update(services).set(updateData).where(eq(services.id, serviceId));
+      if (Object.keys(updateData).length > 0) {
+        await tx.update(services).set(updateData).where(eq(services.id, serviceId));
+      }
 
-    const service = await db.query.services.findFirst({
-      where: eq(services.id, serviceId),
-      with: { category: true },
+      if (consumables !== undefined) {
+        // Simple approach: delete all and re-insert
+        await tx.delete(serviceConsumables).where(eq(serviceConsumables.serviceId, serviceId));
+        if (consumables.length > 0) {
+          await tx.insert(serviceConsumables).values(
+            consumables.map((c: any) => ({
+              serviceId,
+              productId: c.productId,
+              portionsRequired: c.portionsRequired,
+            }))
+          );
+        }
+      }
+
+      return await tx.query.services.findFirst({
+        where: eq(services.id, serviceId),
+        with: { category: true, consumables: { with: { product: true } } },
+      });
     });
 
-    return NextResponse.json(service);
+    return NextResponse.json(result);
   } catch (error) {
     console.error("Failed to update service:", error);
     return NextResponse.json({ error: "Failed to update service" }, { status: 500 });

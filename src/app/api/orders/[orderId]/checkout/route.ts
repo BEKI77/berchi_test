@@ -5,6 +5,7 @@ import { db } from "@/db";
 import {
   serviceOrders, invoices, payments, products,
   stockMovements, commissionLogs, salonSettings,
+  productUsageLogs,
 } from "@/db/schema";
 import type { DiscountType, PaymentMethod } from "@/db/schema";
 
@@ -47,7 +48,13 @@ export async function POST(
     where: eq(serviceOrders.id, orderId),
     with: {
       items: {
-        with: { service: true, staff: true },
+        with: { 
+          service: {
+            with: { consumables: true }
+          }, 
+          staff: true,
+          consumablesUsed: true 
+        },
       },
       products: {
         with: { product: true },
@@ -156,7 +163,64 @@ export async function POST(
       });
     }
 
-    // 5. Log commissions for each service item
+    // 5. Process service consumables (multi-use products)
+    for (const item of order.items) {
+      // Use dynamic usage if recorded, otherwise use service defaults
+      const consumables = item.consumablesUsed.length > 0 
+        ? item.consumablesUsed.map(c => ({ productId: c.productId, portionsRequired: c.portionsUsed }))
+        : item.service.consumables.map(c => ({ productId: c.productId, portionsRequired: c.portionsRequired }));
+
+      for (const consumable of consumables) {
+        const product = await tx.query.products.findFirst({
+          where: eq(products.id, consumable.productId),
+        });
+
+        if (!product || !product.isConsumable) continue;
+
+        const totalPortionsUsed = consumable.portionsRequired * item.quantity;
+        let newRemainingPortions = (product.remainingPortions || 0) - totalPortionsUsed;
+        let quantityDecrement = 0;
+
+        if (newRemainingPortions <= 0) {
+          const portionsPerUnit = product.portionsPerUnit || 1;
+          // Calculate how many full units need to be "opened"
+          const extraBottlesNeeded = Math.floor(Math.abs(newRemainingPortions) / portionsPerUnit) + 1;
+          quantityDecrement = extraBottlesNeeded;
+          newRemainingPortions = (extraBottlesNeeded * portionsPerUnit) + newRemainingPortions;
+        }
+
+        // Update product stock
+        await tx
+          .update(products)
+          .set({
+            remainingPortions: newRemainingPortions,
+            quantityOnHand: sql`${products.quantityOnHand} - ${quantityDecrement}`,
+          })
+          .where(eq(products.id, consumable.productId));
+
+        // Log detailed usage for analytics
+        await tx.insert(productUsageLogs).values({
+          productId: consumable.productId,
+          orderId: order.id,
+          staffId: item.staffId,
+          portionsUsed: totalPortionsUsed,
+          note: `Consumed during ${item.service.name}`,
+        });
+
+        // Log stock movement
+        await tx.insert(stockMovements).values({
+          productId: consumable.productId,
+          type: "USED_IN_SERVICE",
+          quantityChange: -quantityDecrement,
+          portionsChange: -totalPortionsUsed,
+          referenceId: orderId,
+          note: `Portion usage in order ${order.orderNumber} for ${item.service.name}`,
+          performedBy: session.user!.id,
+        });
+      }
+    }
+
+    // 6. Log commissions for each service item
     for (const item of order.items) {
       const staffMember = item.staff;
       const commRate = Number(staffMember.commissionRate);

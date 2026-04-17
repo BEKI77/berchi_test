@@ -31,7 +31,12 @@ export async function GET(req: Request) {
       customer: { columns: { id: true, firstName: true, lastName: true, phone: true } },
       server: { columns: { id: true, firstName: true, lastName: true } },
       items: {
-        with: { service: { columns: { id: true, name: true } } },
+        with: { 
+          service: {
+            with: { consumables: { with: { product: true } } }
+          },
+          consumablesUsed: { with: { product: true } }
+        },
       },
       products: {
         with: { product: { columns: { id: true, name: true } } },
@@ -93,8 +98,17 @@ export async function POST(req: Request) {
     with: {
       customer: { columns: { id: true, firstName: true, lastName: true, phone: true } },
       server: { columns: { id: true, firstName: true, lastName: true } },
-      items: true,
-      products: true,
+      items: {
+        with: { 
+          service: {
+            with: { consumables: { with: { product: true } } }
+          },
+          consumablesUsed: { with: { product: true } }
+        },
+      },
+      products: {
+        with: { product: { columns: { id: true, name: true } } },
+      },
     },
   });
 

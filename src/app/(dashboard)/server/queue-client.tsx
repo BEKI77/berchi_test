@@ -47,8 +47,8 @@ export function ServerQueueClient({ userId }: { userId: string }) {
   const todayCompleted = orders.filter((o) => o.status === "CHECKED_OUT");
 
   function getOrderTotal(order: Order) {
-    const services = order.items.reduce((s, i) => s + Number(i.unitPrice) * i.quantity, 0);
-    const products = order.products.reduce((s, p) => s + Number(p.unitPrice) * p.quantity, 0);
+    const services = (order.items || []).reduce((s, i) => s + Number(i.unitPrice) * i.quantity, 0);
+    const products = (order.products || []).reduce((s, p) => s + Number(p.unitPrice) * p.quantity, 0);
     return (services + products).toFixed(2);
   }
 
@@ -141,8 +141,8 @@ export function ServerQueueClient({ userId }: { userId: string }) {
                     </div>
                   </div>
                   <div className="flex items-center gap-4 text-xs text-muted-foreground mb-3">
-                    <span>{order.items.length} service(s)</span>
-                    <span>{order.products.length} product(s)</span>
+                    <span>{(order.items || []).length} service(s)</span>
+                    <span>{(order.products || []).length} product(s)</span>
                   </div>
                   <div className="flex items-center justify-between pt-3 border-t border-dashed border-blue-100">
                     <span className="font-bold text-blue-700">ETB {getOrderTotal(order)}</span>
@@ -185,7 +185,7 @@ export function ServerQueueClient({ userId }: { userId: string }) {
                   </div>
                   <div className="flex items-center justify-between pt-2 border-t border-dashed border-amber-100">
                     <span className="font-bold text-amber-700">ETB {getOrderTotal(order)}</span>
-                    <span className="text-xs text-muted-foreground">{order.items.length} service(s)</span>
+                    <span className="text-xs text-muted-foreground">{(order.items || []).length} service(s)</span>
                   </div>
                 </CardContent>
               </Card>

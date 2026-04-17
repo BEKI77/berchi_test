@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import dotenv from "dotenv";
-dotenv.config();
+import "dotenv/config";
+
 const ALLOWED_ORIGINS = [
   process.env.WEBSITE_URL, // e.g. https://berchi.com
   "https://berchi_web.ruhamus.com", // production website

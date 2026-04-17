@@ -14,34 +14,42 @@ import {
   X,
   Check,
   Search,
+  Droplets,
+  ChevronDown,
+  ChevronUp
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
 
-type ServiceOption = {
-  id: string;
-  name: string;
-  basePrice: string;
-  durationMinutes: number;
-  category: { id: string; name: string };
+type Product = { id: string; name: string };
+
+type ServiceConsumable = {
+  productId: string;
+  portionsRequired: number;
+  product: Product;
 };
 
-type ProductOption = {
-  id: string;
-  name: string;
-  usagePrice: string;
-  quantityOnHand: number;
-  category: { id: string; name: string };
+type ConsumableUsed = {
+  productId: string;
+  portionsUsed: number;
+  product: Product;
 };
 
 type OrderItem = {
   id: string;
   unitPrice: string;
   quantity: number;
-  service: { id: string; name: string };
+  service: {
+    id: string;
+    name: string;
+    consumables: ServiceConsumable[];
+  };
+  consumablesUsed: ConsumableUsed[];
 };
 
 type OrderProduct = {
@@ -63,6 +71,23 @@ type Order = {
   products: OrderProduct[];
 };
 
+type ServiceOption = {
+  id: string;
+  name: string;
+  basePrice: string;
+  durationMinutes: number;
+  category: { id: string; name: string };
+};
+
+type ProductOption = {
+  id: string;
+  name: string;
+  usagePrice: string;
+  quantityOnHand: number;
+  isConsumable: boolean;
+  category: { id: string; name: string };
+};
+
 export default function ActiveOrderPage() {
   const router = useRouter();
   const params = useParams();
@@ -75,15 +100,18 @@ export default function ActiveOrderPage() {
   const [sending, setSending] = useState(false);
 
   // Modal state
-  const [modalType, setModalType] = useState<"services" | "products" | null>(null);
+  const [modalType, setModalType] = useState<"services" | "products" | "consumables" | null>(null);
   const [modalSearch, setModalSearch] = useState("");
   const [selectedServiceIds, setSelectedServiceIds] = useState<Set<string>>(new Set());
   const [selectedProductIds, setSelectedProductIds] = useState<Map<string, number>>(new Map());
+  const [activeItemForConsumables, setActiveItemForConsumables] = useState<OrderItem | null>(null);
+  const [tempConsumables, setTempConsumables] = useState<{ productId: string, portionsUsed: number }[]>([]);
   const [addingItems, setAddingItems] = useState(false);
+  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
 
   const fetchOrder = useCallback(async () => {
     try {
-      const res = await fetch(`/api/orders?serverId=&status=`);
+      const res = await fetch(`/api/orders?status=`);
       if (!res.ok) throw new Error();
       const data: Order[] = await res.json();
       const found = data.find((o) => o.id === orderId);
@@ -97,10 +125,67 @@ export default function ActiveOrderPage() {
   useEffect(() => {
     Promise.all([
       fetchOrder(),
-      fetch("/api/services").then((r) => r.json()).then(setServices),
-      fetch("/api/products").then((r) => r.json()).then(setProducts),
+      fetch("/api/admin/services").then((r) => r.json()).then(setServices),
+      fetch("/api/admin/products").then((r) => r.json()).then(setProducts),
     ]).finally(() => setLoading(false));
   }, [fetchOrder]);
+
+  function toggleExpand(itemId: string) {
+    setExpandedItems(prev => {
+      const next = new Set(prev);
+      if (next.has(itemId)) next.delete(itemId);
+      else next.add(itemId);
+      return next;
+    });
+  }
+
+  function openConsumablesModal(item: OrderItem) {
+    setActiveItemForConsumables(item);
+    const existing = item.consumablesUsed.length > 0
+      ? item.consumablesUsed.map(c => ({ productId: c.productId, portionsUsed: c.portionsUsed }))
+      : item.service.consumables.map(c => ({ productId: c.productId, portionsUsed: c.portionsRequired }));
+
+    setTempConsumables(existing);
+    setModalType("consumables");
+  }
+
+  async function saveConsumables() {
+    if (!activeItemForConsumables) return;
+    setAddingItems(true);
+    try {
+      const res = await fetch(`/api/orders/${orderId}/items/${activeItemForConsumables.id}/consumables`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ consumables: tempConsumables }),
+      });
+      if (!res.ok) throw new Error();
+      toast.success("Usage recorded");
+      await fetchOrder();
+      closeModal();
+    } catch {
+      toast.error("Failed to save usage");
+    } finally {
+      setAddingItems(false);
+    }
+  }
+
+  function addTempConsumable() {
+    const consumableProds = products.filter(p => p.isConsumable);
+    if (consumableProds.length === 0) return;
+    setTempConsumables([...tempConsumables, { productId: consumableProds[0].id, portionsUsed: 1 }]);
+  }
+
+  function updateTempConsumable(index: number, field: string, value: any) {
+    const next = [...tempConsumables];
+    next[index] = { ...next[index], [field]: value };
+    setTempConsumables(next);
+  }
+
+  function removeTempConsumable(index: number) {
+    const next = [...tempConsumables];
+    next.splice(index, 1);
+    setTempConsumables(next);
+  }
 
   function openModal(type: "services" | "products") {
     setModalType(type);
@@ -114,6 +199,7 @@ export default function ActiveOrderPage() {
     setModalSearch("");
     setSelectedServiceIds(new Set());
     setSelectedProductIds(new Map());
+    setActiveItemForConsumables(null);
   }
 
   function toggleService(id: string) {
@@ -250,10 +336,10 @@ export default function ActiveOrderPage() {
   }
 
   const isEditable = order.status === "IN_PROGRESS";
-  const servicesTotal = order.items.reduce(
+  const servicesTotal = (order.items || []).reduce(
     (s, i) => s + Number(i.unitPrice) * i.quantity, 0
   );
-  const productsTotal = order.products.reduce(
+  const productsTotal = (order.products || []).reduce(
     (s, p) => s + Number(p.unitPrice) * p.quantity, 0
   );
   const grandTotal = servicesTotal + productsTotal;
@@ -262,7 +348,6 @@ export default function ActiveOrderPage() {
     (Date.now() - new Date(order.startedAt).getTime()) / 60000
   );
 
-  // Filtered + grouped for modal
   const filteredServices = services.filter((s) =>
     s.name.toLowerCase().includes(modalSearch.toLowerCase()) ||
     s.category.name.toLowerCase().includes(modalSearch.toLowerCase())
@@ -282,16 +367,6 @@ export default function ActiveOrderPage() {
     if (!productsByCategory[p.category.name]) productsByCategory[p.category.name] = [];
     productsByCategory[p.category.name].push(p);
   });
-
-  const selectedServicesTotal = [...selectedServiceIds].reduce((sum, id) => {
-    const svc = services.find((s) => s.id === id);
-    return sum + (svc ? Number(svc.basePrice) : 0);
-  }, 0);
-
-  const selectedProductsTotal = [...selectedProductIds].reduce((sum, [id, qty]) => {
-    const prod = products.find((p) => p.id === id);
-    return sum + (prod ? Number(prod.usagePrice) * qty : 0);
-  }, 0);
 
   return (
     <div className="space-y-5 pb-28">
@@ -318,21 +393,16 @@ export default function ActiveOrderPage() {
             In Progress
           </div>
         )}
-        {order.status === "SENT_TO_CASHIER" && (
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-50 border border-amber-200/60 text-xs font-semibold text-amber-600">
-            Sent to Cashier
-          </div>
-        )}
       </div>
 
       {/* Services Section */}
-      <Card className="rounded-xl overflow-hidden border-pink-100">
+      <Card className="rounded-xl overflow-hidden border-pink-100 shadow-sm">
         <div className="h-1 bg-gradient-to-r from-pink-400 to-rose-400" />
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="text-sm font-semibold flex items-center gap-2 uppercase tracking-wider text-pink-600">
               <Scissors className="h-4 w-4" />
-              Services ({order.items.length})
+              Services ({(order.items || []).length})
             </CardTitle>
             {isEditable && (
               <Button
@@ -347,49 +417,94 @@ export default function ActiveOrderPage() {
             )}
           </div>
         </CardHeader>
-        <CardContent className="space-y-1">
-          {order.items.length === 0 && (
+        <CardContent className="space-y-2">
+          {(order.items || []).length === 0 && (
             <div className="text-center py-6">
               <Scissors className="h-8 w-8 text-pink-200 mx-auto mb-2" />
-              <p className="text-sm text-muted-foreground">
-                No services yet. Tap &quot;Add Services&quot; to begin.
-              </p>
+              <p className="text-sm text-muted-foreground">No services yet.</p>
             </div>
           )}
-          {order.items.map((item) => (
-            <div key={item.id} className="flex items-center justify-between py-2.5 px-2 rounded-lg hover:bg-pink-50/50 transition-colors">
-              <div>
-                <p className="text-sm font-medium">{item.service.name}</p>
-                <p className="text-xs text-muted-foreground">
-                  ETB {Number(item.unitPrice).toFixed(2)} x {item.quantity}
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-semibold text-pink-700">
-                  ETB {(Number(item.unitPrice) * item.quantity).toFixed(2)}
-                </span>
-                {isEditable && (
-                  <button
-                    onClick={() => removeItem(item.id)}
-                    className="p-1 rounded-md text-red-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
+          {(order.items || []).map((item) => {
+            const isExpanded = expandedItems.has(item.id);
+            const consumables = item.consumablesUsed.length > 0 ? item.consumablesUsed : item.service.consumables;
+            const hasCustomUsage = item.consumablesUsed.length > 0;
+
+            return (
+              <div key={item.id} className="rounded-xl border border-pink-50 overflow-hidden bg-white">
+                <div className="flex items-center justify-between p-3">
+                  <div className="flex-1 cursor-pointer" onClick={() => toggleExpand(item.id)}>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium">{item.service.name}</p>
+                      {isExpanded ? <ChevronUp className="h-3.5 w-3.5 text-pink-300" /> : <ChevronDown className="h-3.5 w-3.5 text-pink-300" />}
+                    </div>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-tight">
+                        ETB {Number(item.unitPrice).toFixed(2)} x {item.quantity}
+                      </p>
+                      {consumables.length > 0 && (
+                        <Badge variant="secondary" className="bg-teal-50 text-teal-600 border-teal-100 text-[9px] h-4 py-0">
+                          {hasCustomUsage ? "Custom Usage" : `${consumables.length} product(s)`}
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-semibold text-pink-700">
+                      ETB {(Number(item.unitPrice) * item.quantity).toFixed(2)}
+                    </span>
+                    {isEditable && (
+                      <button onClick={() => removeItem(item.id)} className="p-1.5 rounded-lg text-rose-300 hover:text-rose-500 hover:bg-rose-50">
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {isExpanded && (
+                  <div className="bg-pink-50/30 p-3 border-t border-pink-50/50 space-y-2 animate-in slide-in-from-top-2 duration-200">
+                    <div className="flex items-center justify-between">
+                      <p className="text-[10px] font-bold text-pink-400 uppercase tracking-widest flex items-center gap-1">
+                        <Droplets className="h-3 w-3" />
+                        Products Used
+                      </p>
+                      {isEditable && (
+                        <button
+                          onClick={() => openConsumablesModal(item)}
+                          className="text-[10px] text-pink-600 font-semibold hover:underline"
+                        >
+                          Adjust Usage
+                        </button>
+                      )}
+                    </div>
+                    <div className="space-y-1">
+                      {consumables.map((c, idx) => (
+                        <div key={idx} className="flex justify-between items-center text-xs">
+                          <span className="text-muted-foreground">{c.product.name}</span>
+                          <span className="font-medium text-pink-600">
+                            {'portionsUsed' in c ? c.portionsUsed : c.portionsRequired} portion(s)
+                          </span>
+                        </div>
+                      ))}
+                      {consumables.length === 0 && (
+                        <p className="text-[10px] text-muted-foreground italic">No products recorded for this service.</p>
+                      )}
+                    </div>
+                  </div>
                 )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </CardContent>
       </Card>
 
-      {/* Products Section */}
-      <Card className="rounded-xl overflow-hidden border-violet-100">
+      {/* Products Section (Retail/Extra) */}
+      <Card className="rounded-xl overflow-hidden border-violet-100 shadow-sm">
         <div className="h-1 bg-gradient-to-r from-violet-400 to-purple-400" />
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="text-sm font-semibold flex items-center gap-2 uppercase tracking-wider text-violet-600">
               <Package className="h-4 w-4" />
-              Products ({order.products.length})
+              Extra Products ({(order.products || []).length})
             </CardTitle>
             {isEditable && (
               <Button
@@ -399,23 +514,22 @@ export default function ActiveOrderPage() {
                 className="rounded-lg border-violet-200 text-violet-600 hover:bg-violet-50 hover:border-violet-300"
               >
                 <Plus className="h-4 w-4 mr-1" />
-                Add Products
+                Add
               </Button>
             )}
           </div>
         </CardHeader>
         <CardContent className="space-y-1">
-          {order.products.length === 0 && (
+          {(order.products || []).length === 0 && (
             <div className="text-center py-5">
-              <Package className="h-7 w-7 text-violet-200 mx-auto mb-2" />
-              <p className="text-xs text-muted-foreground">No products used yet.</p>
+              <p className="text-[11px] text-muted-foreground italic">No extra products sold.</p>
             </div>
           )}
-          {order.products.map((p) => (
-            <div key={p.id} className="flex items-center justify-between py-2.5 px-2 rounded-lg hover:bg-violet-50/50 transition-colors">
+          {(order.products || []).map((p) => (
+            <div key={p.id} className="flex items-center justify-between py-2.5 px-3 rounded-xl bg-violet-50/30 border border-violet-50/50">
               <div>
                 <p className="text-sm font-medium">{p.product.name}</p>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-[10px] text-muted-foreground">
                   ETB {Number(p.unitPrice).toFixed(2)} x {p.quantity}
                 </p>
               </div>
@@ -424,10 +538,7 @@ export default function ActiveOrderPage() {
                   ETB {(Number(p.unitPrice) * p.quantity).toFixed(2)}
                 </span>
                 {isEditable && (
-                  <button
-                    onClick={() => removeProduct(p.id)}
-                    className="p-1 rounded-md text-red-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-                  >
+                  <button onClick={() => removeProduct(p.id)} className="p-1.5 rounded-lg text-rose-300 hover:text-rose-500 hover:bg-rose-50">
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
                 )}
@@ -438,260 +549,159 @@ export default function ActiveOrderPage() {
       </Card>
 
       {/* Order Summary */}
-      <Card className="rounded-xl border-pink-100 overflow-hidden">
-        <CardHeader className="pb-3 bg-gradient-to-r from-pink-50/50 to-rose-50/50">
-          <CardTitle className="text-sm font-semibold flex items-center gap-2 uppercase tracking-wider text-pink-600">
-            <StickyNote className="h-4 w-4" />
-            Order Summary
-          </CardTitle>
-        </CardHeader>
+      <Card className="rounded-xl border-pink-100 overflow-hidden shadow-sm">
         <CardContent className="space-y-2 pt-4">
-          <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">Services</span>
-            <span className="font-medium">ETB {servicesTotal.toFixed(2)}</span>
+          <div className="flex justify-between text-xs">
+            <span className="text-muted-foreground uppercase tracking-tight">Services Total</span>
+            <span className="font-semibold text-pink-700">ETB {servicesTotal.toFixed(2)}</span>
           </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">Products</span>
-            <span className="font-medium">ETB {productsTotal.toFixed(2)}</span>
+          <div className="flex justify-between text-xs">
+            <span className="text-muted-foreground uppercase tracking-tight">Products Total</span>
+            <span className="font-semibold text-pink-700">ETB {productsTotal.toFixed(2)}</span>
           </div>
-          <Separator className="my-2" />
-          <div className="flex justify-between text-base">
-            <span className="font-semibold">Estimated Total</span>
-            <span className="font-bold text-lg bg-gradient-to-r from-pink-600 to-rose-600 bg-clip-text text-transparent">ETB {grandTotal.toFixed(2)}</span>
+          <Separator className="my-2 bg-pink-100/50" />
+          <div className="flex justify-between items-center">
+            <span className="text-sm font-bold uppercase tracking-wider">Estimated Total</span>
+            <span className="text-2xl font-black bg-gradient-to-r from-pink-600 via-rose-600 to-fuchsia-600 bg-clip-text text-transparent">
+              ETB {grandTotal.toFixed(2)}
+            </span>
           </div>
         </CardContent>
       </Card>
 
       {/* Send to Cashier */}
       {isEditable && (
-        <div className="fixed bottom-0 left-0 right-0 md:left-64 p-4 bg-white/80 backdrop-blur-lg border-t border-pink-100/50">
+        <div className="fixed bottom-0 left-0 right-0 md:left-64 p-4 bg-white/80 backdrop-blur-lg border-t border-pink-100/50 z-40">
           <Button
             onClick={sendToCashier}
-            disabled={sending || order.items.length === 0}
-            className="w-full h-14 text-lg font-semibold rounded-xl bg-gradient-to-r from-pink-500 via-rose-500 to-fuchsia-500 hover:from-pink-600 hover:via-rose-600 hover:to-fuchsia-600 shadow-lg shadow-pink-300/30 hover:shadow-pink-400/40 transition-all duration-300 hover:-translate-y-0.5"
+            disabled={sending || (order.items || []).length === 0}
+            className="w-full h-14 text-lg font-bold rounded-2xl bg-gradient-to-r from-pink-500 via-rose-500 to-fuchsia-500 hover:shadow-xl hover:shadow-pink-300/40 active:scale-[0.98] transition-all"
           >
             <Send className="h-5 w-5 mr-2" />
-            {sending ? "Sending..." : "Send to Cashier"}
+            {sending ? "Processing..." : "Finish & Send to Cashier"}
           </Button>
         </div>
       )}
 
-      {/* ===== MULTI-SELECT POPUP MODAL ===== */}
+      {/* ===== MODAL POPUPS ===== */}
       {modalType && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
-          {/* Backdrop */}
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={closeModal} />
 
-          {/* Modal */}
-          <div className="relative w-full max-w-lg mx-4 mb-0 sm:mb-0 bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-hidden max-h-[85vh] flex flex-col animate-in slide-in-from-bottom duration-300">
-            {/* Modal Header */}
-            <div className={`p-4 border-b ${modalType === "services" ? "bg-gradient-to-r from-pink-50 to-rose-50 border-pink-100" : "bg-gradient-to-r from-violet-50 to-purple-50 border-violet-100"}`}>
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  {modalType === "services" ? (
-                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-pink-100">
-                      <Scissors className="h-4 w-4 text-pink-600" />
-                    </div>
-                  ) : (
-                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-100">
-                      <Package className="h-4 w-4 text-violet-600" />
-                    </div>
-                  )}
-                  <div>
-                    <h3 className="font-semibold text-base">
-                      {modalType === "services" ? "Select Services" : "Select Products"}
-                    </h3>
-                    <p className="text-xs text-muted-foreground">
-                      Tap items to select, then confirm
-                    </p>
-                  </div>
-                </div>
-                <button onClick={closeModal} className="p-2 rounded-xl hover:bg-white/60 transition-colors">
-                  <X className="h-5 w-5" />
-                </button>
+          <Card className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden max-h-[85vh] flex flex-col animate-in slide-in-from-bottom duration-300">
+            <div className={`p-4 border-b flex items-center justify-between ${modalType === "consumables" ? "bg-teal-50 border-teal-100" :
+              modalType === "services" ? "bg-pink-50 border-pink-100" : "bg-violet-50 border-violet-100"
+              }`}>
+              <div className="flex items-center gap-2">
+                <h3 className="font-bold text-sm uppercase tracking-wider">
+                  {modalType === "consumables" ? "Adjust Product Usage" :
+                    modalType === "services" ? "Add Services" : "Add Extra Products"}
+                </h3>
               </div>
-
-              {/* Search */}
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder={modalType === "services" ? "Search services..." : "Search products..."}
-                  value={modalSearch}
-                  onChange={(e) => setModalSearch(e.target.value)}
-                  className={`pl-9 rounded-xl ${modalType === "services" ? "border-pink-200 focus:border-pink-400" : "border-violet-200 focus:border-violet-400"}`}
-                  autoFocus
-                />
-              </div>
+              <button onClick={closeModal} className="p-1 rounded-lg hover:bg-black/5"><X className="h-5 w-5" /></button>
             </div>
 
-            {/* Modal Body - Scrollable */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
-              {modalType === "services" && (
-                <>
-                  {Object.entries(servicesByCategory).map(([category, items]) => (
-                    <div key={category}>
-                      <p className="text-[10px] font-bold text-pink-400 uppercase tracking-widest mb-2 px-1">
-                        {category}
-                      </p>
-                      <div className="space-y-1">
-                        {items.map((s) => {
-                          const selected = selectedServiceIds.has(s.id);
-                          return (
-                            <button
-                              key={s.id}
-                              onClick={() => toggleService(s.id)}
-                              className={`w-full flex items-center gap-3 py-3 px-3 rounded-xl text-left text-sm transition-all ${
-                                selected
-                                  ? "bg-pink-50 border-2 border-pink-300 shadow-sm"
-                                  : "bg-white border-2 border-transparent hover:bg-pink-25 hover:border-pink-100"
-                              }`}
-                            >
-                              <div className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-lg transition-colors ${
-                                selected ? "bg-pink-500" : "bg-gray-100"
-                              }`}>
-                                {selected && <Check className="h-4 w-4 text-white" />}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="font-medium truncate">{s.name}</p>
-                                <p className="text-xs text-muted-foreground">{s.durationMinutes} min</p>
-                              </div>
-                              <span className="font-semibold text-pink-600 shrink-0">
-                                ETB {Number(s.basePrice).toFixed(2)}
-                              </span>
-                            </button>
-                          );
-                        })}
+              {modalType === "consumables" && activeItemForConsumables && (
+                <div className="space-y-4">
+                  <p className="text-xs text-muted-foreground">
+                    Record exact usage for <strong>{activeItemForConsumables.service.name}</strong>.
+                  </p>
+                  <div className="space-y-3">
+                    {tempConsumables.map((c, i) => (
+                      <div key={i} className="flex gap-2 items-end">
+                        <div className="flex-1 space-y-1">
+                          <Label className="text-[10px] text-muted-foreground ml-1">Product</Label>
+                          <select
+                            value={c.productId}
+                            onChange={(e) => updateTempConsumable(i, "productId", e.target.value)}
+                            className="w-full h-10 rounded-xl border border-teal-100 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/20"
+                          >
+                            {products.filter(p => p.isConsumable).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                          </select>
+                        </div>
+                        <div className="w-24 space-y-1">
+                          <Label className="text-[10px] text-muted-foreground ml-1">Portions (ml)</Label>
+                          <Input
+                            type="number"
+                            min={1}
+                            value={c.portionsUsed}
+                            onChange={(e) => updateTempConsumable(i, "portionsUsed", Number(e.target.value) || 1)}
+                            className="h-10 rounded-xl border-teal-100"
+                          />
+                        </div>
+                        <Button variant="ghost" size="icon" onClick={() => removeTempConsumable(i)} className="h-10 w-10 text-rose-400 hover:bg-rose-50 rounded-xl">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
-                    </div>
-                  ))}
-                  {filteredServices.length === 0 && (
-                    <div className="text-center py-8">
-                      <Search className="h-8 w-8 text-pink-200 mx-auto mb-2" />
-                      <p className="text-sm text-muted-foreground">No services found.</p>
-                    </div>
-                  )}
-                </>
+                    ))}
+                    <Button variant="outline" size="sm" onClick={addTempConsumable} className="w-full border-dashed border-teal-300 text-teal-600 hover:bg-teal-50 rounded-xl">
+                      <Plus className="h-4 w-4 mr-2" /> Add Another Product
+                    </Button>
+                  </div>
+                  <Button onClick={saveConsumables} disabled={addingItems} className="w-full h-12 bg-teal-600 hover:bg-teal-700 text-white rounded-xl shadow-lg shadow-teal-200">
+                    {addingItems ? "Saving..." : "Save Usage Details"}
+                  </Button>
+                </div>
+              )}
+
+              {modalType === "services" && (
+                <div className="space-y-4">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input placeholder="Search services..." value={modalSearch} onChange={(e) => setModalSearch(e.target.value)} className="pl-9 rounded-xl border-pink-100" />
+                  </div>
+                  <div className="overflow-y-auto h-120">
+                    {Object.entries(servicesByCategory).map(([category, items]) => (
+                      <div key={category} className="space-y-1.5">
+                        <p className="text-[10px] font-bold text-pink-400 uppercase tracking-widest px-1">{category}</p>
+                        {items.map(s => (
+                          <button key={s.id} onClick={() => toggleService(s.id)} className={`w-full flex items-center justify-between p-3 rounded-xl border-2 transition-all ${selectedServiceIds.has(s.id) ? "bg-pink-50 border-pink-300" : "bg-white border-transparent hover:bg-pink-25"}`}>
+                            <span className="text-sm font-medium">{s.name}</span>
+                            <span className="text-xs font-bold text-pink-600">ETB {Number(s.basePrice).toFixed(2)}</span>
+                          </button>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                  <Button onClick={addSelectedServices} disabled={addingItems || selectedServiceIds.size === 0} className="w-full h-12 bg-pink-600 hover:bg-pink-700 text-white rounded-xl shadow-lg shadow-pink-200">
+                    {addingItems ? "Adding..." : `Add ${selectedServiceIds.size} Services`}
+                  </Button>
+                </div>
               )}
 
               {modalType === "products" && (
-                <>
+                <div className="space-y-4">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input placeholder="Search extra products..." value={modalSearch} onChange={(e) => setModalSearch(e.target.value)} className="pl-9 rounded-xl border-violet-100" />
+                  </div>
                   {Object.entries(productsByCategory).map(([category, items]) => (
-                    <div key={category}>
-                      <p className="text-[10px] font-bold text-violet-400 uppercase tracking-widest mb-2 px-1">
-                        {category}
-                      </p>
-                      <div className="space-y-1">
-                        {items.map((p) => {
-                          const selected = selectedProductIds.has(p.id);
-                          const qty = selectedProductIds.get(p.id) || 1;
-                          return (
-                            <div
-                              key={p.id}
-                              className={`flex items-center gap-3 py-3 px-3 rounded-xl text-sm transition-all ${
-                                selected
-                                  ? "bg-violet-50 border-2 border-violet-300 shadow-sm"
-                                  : "bg-white border-2 border-transparent hover:bg-violet-25 hover:border-violet-100"
-                              }`}
-                            >
-                              <button
-                                onClick={() => toggleProduct(p.id)}
-                                className="shrink-0"
-                              >
-                                <div className={`flex h-6 w-6 items-center justify-center rounded-lg transition-colors ${
-                                  selected ? "bg-violet-500" : "bg-gray-100"
-                                }`}>
-                                  {selected && <Check className="h-4 w-4 text-white" />}
-                                </div>
-                              </button>
-                              <button onClick={() => toggleProduct(p.id)} className="flex-1 min-w-0 text-left">
-                                <p className="font-medium truncate">{p.name}</p>
-                                <p className="text-xs text-muted-foreground">{p.quantityOnHand} in stock</p>
-                              </button>
-                              {selected && (
-                                <div className="flex items-center gap-1 shrink-0">
-                                  <button
-                                    onClick={(e) => { e.stopPropagation(); updateProductQty(p.id, qty - 1); }}
-                                    className="h-7 w-7 rounded-lg bg-violet-100 text-violet-600 flex items-center justify-center font-bold hover:bg-violet-200 transition-colors"
-                                  >
-                                    −
-                                  </button>
-                                  <span className="w-8 text-center font-semibold text-sm">{qty}</span>
-                                  <button
-                                    onClick={(e) => { e.stopPropagation(); updateProductQty(p.id, qty + 1); }}
-                                    className="h-7 w-7 rounded-lg bg-violet-100 text-violet-600 flex items-center justify-center font-bold hover:bg-violet-200 transition-colors"
-                                  >
-                                    +
-                                  </button>
-                                </div>
-                              )}
-                              <span className="font-semibold text-violet-600 shrink-0">
-                                ETB {Number(p.usagePrice).toFixed(2)}
-                              </span>
+                    <div key={category} className="space-y-1.5">
+                      <p className="text-[10px] font-bold text-violet-400 uppercase tracking-widest px-1">{category}</p>
+                      {items.map(p => (
+                        <div key={p.id} className={`w-full flex items-center justify-between p-3 rounded-xl border-2 transition-all ${selectedProductIds.has(p.id) ? "bg-violet-50 border-violet-300" : "bg-white border-transparent hover:bg-violet-25"}`}>
+                          <button onClick={() => toggleProduct(p.id)} className="flex-1 text-left">
+                            <span className="text-sm font-medium">{p.name}</span>
+                          </button>
+                          {selectedProductIds.has(p.id) && (
+                            <div className="flex items-center gap-2">
+                              <button onClick={() => updateProductQty(p.id, (selectedProductIds.get(p.id) || 1) - 1)} className="h-6 w-6 bg-violet-100 rounded flex items-center justify-center font-bold">−</button>
+                              <span className="w-4 text-center text-xs">{selectedProductIds.get(p.id)}</span>
+                              <button onClick={() => updateProductQty(p.id, (selectedProductIds.get(p.id) || 1) + 1)} className="h-6 w-6 bg-violet-100 rounded flex items-center justify-center font-bold">+</button>
                             </div>
-                          );
-                        })}
-                      </div>
+                          )}
+                        </div>
+                      ))}
                     </div>
                   ))}
-                  {filteredProducts.length === 0 && (
-                    <div className="text-center py-8">
-                      <Search className="h-8 w-8 text-violet-200 mx-auto mb-2" />
-                      <p className="text-sm text-muted-foreground">No products found.</p>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-
-            {/* Modal Footer - Confirm */}
-            <div className={`p-4 border-t ${modalType === "services" ? "border-pink-100 bg-pink-50/50" : "border-violet-100 bg-violet-50/50"}`}>
-              {modalType === "services" ? (
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-sm text-muted-foreground">
-                    {selectedServiceIds.size} selected
-                  </span>
-                  <span className="text-sm font-semibold text-pink-600">
-                    ETB {selectedServicesTotal.toFixed(2)}
-                  </span>
-                </div>
-              ) : (
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-sm text-muted-foreground">
-                    {selectedProductIds.size} selected
-                  </span>
-                  <span className="text-sm font-semibold text-violet-600">
-                    ETB {selectedProductsTotal.toFixed(2)}
-                  </span>
+                  <Button onClick={addSelectedProducts} disabled={addingItems || selectedProductIds.size === 0} className="w-full h-12 bg-violet-600 hover:bg-violet-700 text-white rounded-xl shadow-lg shadow-violet-200">
+                    {addingItems ? "Adding..." : `Add ${selectedProductIds.size} Products`}
+                  </Button>
                 </div>
               )}
-              <Button
-                onClick={modalType === "services" ? addSelectedServices : addSelectedProducts}
-                disabled={
-                  addingItems ||
-                  (modalType === "services" ? selectedServiceIds.size === 0 : selectedProductIds.size === 0)
-                }
-                className={`w-full h-12 rounded-xl text-base font-semibold shadow-md transition-all ${
-                  modalType === "services"
-                    ? "bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 shadow-pink-200/40"
-                    : "bg-gradient-to-r from-violet-500 to-purple-500 hover:from-violet-600 hover:to-purple-600 shadow-violet-200/40"
-                }`}
-              >
-                {addingItems ? (
-                  <span className="flex items-center gap-2">
-                    <span className="h-4 w-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
-                    Adding...
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-2">
-                    <Check className="h-5 w-5" />
-                    {modalType === "services"
-                      ? `Add ${selectedServiceIds.size} Service(s)`
-                      : `Add ${selectedProductIds.size} Product(s)`}
-                  </span>
-                )}
-              </Button>
             </div>
-          </div>
+          </Card>
         </div>
       )}
     </div>

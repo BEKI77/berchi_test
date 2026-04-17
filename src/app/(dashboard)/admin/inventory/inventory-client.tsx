@@ -2,12 +2,26 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Package, Plus, Search, Edit2, ToggleLeft, ToggleRight, X, AlertTriangle } from "lucide-react";
+import { Package, Plus, Search, Edit2, ToggleLeft, ToggleRight, X, AlertTriangle, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { Switch } from "@/components/ui/switch";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 type Category = { id: string; name: string; description: string | null };
 type Product = {
@@ -21,6 +35,9 @@ type Product = {
   reorderLevel: number;
   isActive: boolean;
   category: Category;
+  isConsumable: boolean;
+  portionsPerUnit: number;
+  remainingPortions: number;
 };
 
 type FormData = {
@@ -32,9 +49,24 @@ type FormData = {
   usagePrice: number;
   quantityOnHand: number;
   reorderLevel: number;
+  isConsumable: boolean;
+  portionsPerUnit: number;
+  remainingPortions: number;
 };
 
-const emptyForm: FormData = { name: "", sku: "", categoryId: "", costPrice: 0, sellPrice: 0, usagePrice: 0, quantityOnHand: 0, reorderLevel: 5 };
+const emptyForm: FormData = {
+  name: "",
+  sku: "",
+  categoryId: "",
+  costPrice: 0,
+  sellPrice: 0,
+  usagePrice: 0,
+  quantityOnHand: 0,
+  reorderLevel: 5,
+  isConsumable: false,
+  portionsPerUnit: 1,
+  remainingPortions: 0
+};
 
 export function InventoryClient() {
   const router = useRouter();
@@ -83,6 +115,9 @@ export function InventoryClient() {
       usagePrice: Number(p.usagePrice),
       quantityOnHand: p.quantityOnHand,
       reorderLevel: p.reorderLevel,
+      isConsumable: p.isConsumable,
+      portionsPerUnit: p.portionsPerUnit,
+      remainingPortions: p.remainingPortions,
     });
     setShowForm(true);
   }
@@ -183,94 +218,184 @@ export function InventoryClient() {
         </div>
       )}
 
-      {showForm && (
-        <Card className="rounded-xl border-teal-200 overflow-hidden">
-          <div className="h-1 bg-gradient-to-r from-teal-400 to-emerald-400" />
-          <CardContent className="pt-5 space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="font-semibold text-sm">{editingId ? "Edit Product" : "New Product"}</h3>
-              <button onClick={() => setShowForm(false)} className="p-1 rounded-md hover:bg-muted"><X className="h-4 w-4" /></button>
+      <Dialog open={showForm} onOpenChange={setShowForm}>
+        <DialogContent className="sm:max-w-[500px] p-0 overflow-hidden border-none shadow-2xl rounded-3xl">
+          <div className="h-1.5 bg-gradient-to-r from-teal-400 via-emerald-400 to-teal-500" />
+          <DialogHeader className="px-6 pt-6 pb-2">
+            <DialogTitle className="text-xl font-bold flex items-center gap-2">
+              <div className="p-2 rounded-xl bg-teal-50 text-teal-600">
+                <Package className="h-5 w-5" />
+              </div>
+              {editingId ? "Edit Product" : "New Product"}
+            </DialogTitle>
+          </DialogHeader>
+
+          <ScrollArea className="max-h-[80vh] px-6 pb-6">
+            <div className="space-y-5 pt-2">
+              <div className="flex items-center justify-between p-4 bg-teal-50/50 rounded-2xl border border-teal-100/50 transition-all hover:bg-teal-50">
+                <div className="space-y-0.5">
+                  <Label className="text-sm font-bold flex items-center gap-1.5 text-teal-900">
+                    Multi-Use (Consumable)
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger>
+                          <Info className="h-3.5 w-3.5 text-teal-400 cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent className="bg-slate-900 text-white border-none rounded-xl p-3 shadow-xl">
+                          <p className="w-64 text-xs leading-relaxed">Enable this for products like shampoo or hair dye that are used in small amounts across multiple clients. This enables portion tracking.</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </Label>
+                  <p className="text-[11px] text-teal-600/70 font-medium tracking-tight">Track portions and yields per person</p>
+                </div>
+                <Switch
+                  checked={form.isConsumable}
+                  onCheckedChange={(val) => setForm({ ...form, isConsumable: val })}
+                  className="data-[state=checked]:bg-teal-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest ml-1">Product Name *</Label>
+                  <Input 
+                    value={form.name} 
+                    onChange={(e) => setForm({ ...form, name: e.target.value })} 
+                    placeholder="e.g. Premium Silk Shampoo"
+                    className="h-11 rounded-xl border-slate-200 focus:border-teal-400 focus:ring-teal-400/10 transition-all" 
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest ml-1">Category *</Label>
+                  <select 
+                    value={form.categoryId} 
+                    onChange={(e) => setForm({ ...form, categoryId: e.target.value })} 
+                    className="w-full h-11 rounded-xl border border-slate-200 px-4 text-sm bg-white focus:outline-none focus:ring-4 focus:ring-teal-500/10 focus:border-teal-400 transition-all appearance-none cursor-pointer"
+                  >
+                    {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              {form.isConsumable && (
+                <div className="grid grid-cols-2 gap-4 p-4 bg-emerald-50/30 rounded-2xl border border-emerald-100/30 animate-in fade-in zoom-in-95 duration-300">
+                  <div className="space-y-2">
+                    <Label className="text-[11px] font-bold text-emerald-700 uppercase tracking-widest ml-1">Portions Per Unit</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={form.portionsPerUnit || ""}
+                      onChange={(e) => setForm({ ...form, portionsPerUnit: Number(e.target.value) || 1 })}
+                      placeholder="e.g. 1000 for ml"
+                      className="h-11 rounded-xl border-emerald-100 bg-white focus:border-emerald-400"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-[11px] font-bold text-emerald-700 uppercase tracking-widest ml-1">Rem. Portions</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={form.remainingPortions || ""}
+                      onChange={(e) => setForm({ ...form, remainingPortions: Number(e.target.value) || 0 })}
+                      placeholder="Remaining ml"
+                      className="h-11 rounded-xl border-emerald-100 bg-white focus:border-emerald-400"
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-3 gap-3">
+                <div className="space-y-2">
+                  <Label className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest ml-1">Cost</Label>
+                  <Input type="number" min={0} value={form.costPrice || ""} onChange={(e) => setForm({ ...form, costPrice: Number(e.target.value) || 0 })} className="h-11 rounded-xl border-slate-200" />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest ml-1">Sell</Label>
+                  <Input type="number" min={0} value={form.sellPrice || ""} onChange={(e) => setForm({ ...form, sellPrice: Number(e.target.value) || 0 })} className="h-11 rounded-xl border-slate-200" />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest ml-1">Usage</Label>
+                  <Input type="number" min={0} value={form.usagePrice || ""} onChange={(e) => setForm({ ...form, usagePrice: Number(e.target.value) || 0 })} className="h-11 rounded-xl border-slate-200" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest ml-1">SKU / Code</Label>
+                  <Input value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} placeholder="Optional SKU" className="h-11 rounded-xl border-slate-200" />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-2">
+                    <Label className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest ml-1">Stock</Label>
+                    <Input type="number" min={0} value={form.quantityOnHand || ""} onChange={(e) => setForm({ ...form, quantityOnHand: Number(e.target.value) || 0 })} className="h-11 rounded-xl border-slate-200" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest ml-1">Reorder</Label>
+                    <Input type="number" min={0} value={form.reorderLevel || ""} onChange={(e) => setForm({ ...form, reorderLevel: Number(e.target.value) || 5 })} className="h-11 rounded-xl border-slate-200" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <Button onClick={handleSubmit} disabled={saving} className="w-full h-12 rounded-2xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 shadow-lg shadow-teal-200 font-bold text-base transition-all active:scale-[0.98]">
+                  {saving ? "Processing..." : editingId ? "Update Product" : "Create Product"}
+                </Button>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 flex items-center gap-2">
+                <Input 
+                  placeholder="New category..." 
+                  value={newCatName} 
+                  onChange={(e) => setNewCatName(e.target.value)} 
+                  className="rounded-xl border-slate-200 text-xs h-9 bg-white" 
+                />
+                <Button size="sm" variant="ghost" onClick={addCategory} className="rounded-lg text-teal-600 text-xs font-bold hover:bg-teal-50 transition-colors">
+                  Quick Add
+                </Button>
+              </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Name *</Label>
-                <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="rounded-xl border-teal-100" />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Category *</Label>
-                <select value={form.categoryId} onChange={(e) => setForm({ ...form, categoryId: e.target.value })} className="w-full h-10 rounded-xl border border-teal-100 px-3 text-sm bg-white">
-                  {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
-              </div>
-            </div>
-            <div className="grid grid-cols-3 gap-3">
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Cost Price</Label>
-                <Input type="number" min={0} value={form.costPrice || ""} onChange={(e) => setForm({ ...form, costPrice: Number(e.target.value) || 0 })} className="rounded-xl border-teal-100" />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Sell Price</Label>
-                <Input type="number" min={0} value={form.sellPrice || ""} onChange={(e) => setForm({ ...form, sellPrice: Number(e.target.value) || 0 })} className="rounded-xl border-teal-100" />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Usage Price</Label>
-                <Input type="number" min={0} value={form.usagePrice || ""} onChange={(e) => setForm({ ...form, usagePrice: Number(e.target.value) || 0 })} className="rounded-xl border-teal-100" />
-              </div>
-            </div>
-            <div className="grid grid-cols-3 gap-3">
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">SKU</Label>
-                <Input value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} className="rounded-xl border-teal-100" />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Qty on Hand</Label>
-                <Input type="number" min={0} value={form.quantityOnHand || ""} onChange={(e) => setForm({ ...form, quantityOnHand: Number(e.target.value) || 0 })} className="rounded-xl border-teal-100" />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Reorder Level</Label>
-                <Input type="number" min={0} value={form.reorderLevel || ""} onChange={(e) => setForm({ ...form, reorderLevel: Number(e.target.value) || 5 })} className="rounded-xl border-teal-100" />
-              </div>
-            </div>
-            <Button onClick={handleSubmit} disabled={saving} className="w-full h-11 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-600 hover:to-emerald-600 shadow-md shadow-teal-200/30">
-              {saving ? "Saving..." : editingId ? "Update Product" : "Create Product"}
-            </Button>
-            <div className="flex items-center gap-2 pt-2 border-t">
-              <Input placeholder="New category name..." value={newCatName} onChange={(e) => setNewCatName(e.target.value)} className="rounded-xl border-teal-100 text-xs h-9" />
-              <Button size="sm" variant="outline" onClick={addCategory} className="rounded-lg border-teal-200 text-teal-600 text-xs shrink-0">Add Category</Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
 
       <div className="grid gap-2.5">
         {filtered.map((p) => (
-          <Card key={p.id} className={`rounded-xl transition-colors ${p.isActive ? (p.quantityOnHand <= p.reorderLevel ? "border-red-100" : "border-teal-50 hover:border-teal-100") : "border-gray-100 opacity-50"}`}>
+          <Card key={p.id} className={`rounded-xl transition-all duration-200 ${p.isActive ? (p.quantityOnHand <= p.reorderLevel ? "border-red-100 shadow-sm" : "border-teal-50 hover:border-teal-100 hover:shadow-sm") : "border-gray-100 opacity-60"}`}>
             <CardContent className="py-3 flex items-center justify-between">
               <div className="flex-1">
                 <div className="flex items-center gap-2">
                   <p className="font-medium text-sm cursor-pointer hover:text-teal-600 transition-colors" onClick={() => router.push(`/admin/inventory/${p.id}`)}>{p.name}</p>
+                  {p.isConsumable && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-teal-100 text-teal-700 font-medium">Multi-Use</span>
+                  )}
                   {p.quantityOnHand <= p.reorderLevel && p.isActive && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-red-100 text-red-600 font-semibold">Low</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-red-100 text-red-600 font-semibold uppercase tracking-tight text-[9px]">Low Stock</span>
                   )}
                 </div>
                 <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
                   <span className="text-teal-600 font-semibold">{p.category.name}</span>
-                  <span>Stock: {p.quantityOnHand}</span>
-                  <span>ETB {Number(p.usagePrice).toFixed(2)}</span>
+                  <span>Stock: {p.quantityOnHand} unit(s)</span>
+                  {p.isConsumable && (
+                    <span className="text-teal-600/70">{p.remainingPortions} / {p.portionsPerUnit} portions left</span>
+                  )}
                   {p.sku && <span className="text-muted-foreground/60">{p.sku}</span>}
                 </div>
               </div>
               <div className="flex items-center gap-1.5">
-                <button onClick={() => openEdit(p)} className="p-1.5 rounded-lg hover:bg-teal-50 text-teal-500"><Edit2 className="h-3.5 w-3.5" /></button>
-                <button onClick={() => toggleActive(p)} className={`p-1.5 rounded-lg ${p.isActive ? "hover:bg-red-50 text-red-400" : "hover:bg-emerald-50 text-emerald-500"}`}>
-                  {p.isActive ? <ToggleRight className="h-4 w-4" /> : <ToggleLeft className="h-4 w-4" />}
+                <button onClick={() => openEdit(p)} className="p-2 rounded-xl hover:bg-teal-50 text-teal-500 transition-colors"><Edit2 className="h-4 w-4" /></button>
+                <button onClick={() => toggleActive(p)} className={`p-2 rounded-xl transition-colors ${p.isActive ? "hover:bg-red-50 text-red-400" : "hover:bg-emerald-50 text-emerald-500"}`}>
+                  {p.isActive ? <ToggleRight className="h-4.5 w-4.5" /> : <ToggleLeft className="h-4.5 w-4.5" />}
                 </button>
               </div>
             </CardContent>
           </Card>
         ))}
         {filtered.length === 0 && (
-          <div className="text-center py-10 text-sm text-muted-foreground">No products found.</div>
+          <div className="text-center py-20 bg-gray-50/50 rounded-2xl border border-dashed">
+            <Package className="h-10 w-10 text-gray-300 mx-auto mb-3" />
+            <p className="text-sm text-muted-foreground">No products found matching your search.</p>
+          </div>
         )}
       </div>
     </div>

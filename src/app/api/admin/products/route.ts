@@ -34,7 +34,11 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json();
-    const { name, sku, categoryId, costPrice, sellPrice, usagePrice, quantityOnHand, reorderLevel } = body;
+    const { 
+      name, sku, categoryId, costPrice, sellPrice, 
+      usagePrice, quantityOnHand, reorderLevel,
+      isConsumable, portionsPerUnit, remainingPortions 
+    } = body;
 
     if (!name || !categoryId || costPrice === undefined || sellPrice === undefined) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
@@ -51,6 +55,9 @@ export async function POST(req: Request) {
         usagePrice: usagePrice || 0,
         quantityOnHand: quantityOnHand || 0,
         reorderLevel: reorderLevel || 5,
+        isConsumable: isConsumable || false,
+        portionsPerUnit: portionsPerUnit || 1,
+        remainingPortions: remainingPortions || 0,
       })
       .returning();
 

@@ -50,6 +50,7 @@ const adminNav: NavItem[] = [
   { title: "Invoices", href: "/admin/invoices", icon: Receipt },
   { title: "Employees", href: "/admin/employees", icon: Award },
   { title: "Reports", href: "/admin/reports", icon: BarChart3 },
+  { title: "Product Usage", href: "/admin/analytics", icon: Sparkles },
   { title: "Settings", href: "/admin/settings", icon: Settings },
 ];
 

@@ -1,14 +1,28 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Scissors, Plus, Search, Edit2, ToggleLeft, ToggleRight, X, Clock } from "lucide-react";
+import { Scissors, Plus, Search, Edit2, ToggleLeft, ToggleRight, X, Clock, Droplets, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 type Category = { id: string; name: string; description: string | null; isActive?: boolean };
+type Product = { id: string; name: string; isConsumable: boolean };
+type ServiceConsumable = { 
+  id: string; 
+  productId: string; 
+  portionsRequired: number; 
+  product?: Product 
+};
 type Service = {
   id: string;
   name: string;
@@ -17,6 +31,7 @@ type Service = {
   durationMinutes: number;
   isActive: boolean;
   category: Category;
+  consumables?: ServiceConsumable[];
 };
 
 type FormData = {
@@ -25,13 +40,15 @@ type FormData = {
   categoryId: string;
   basePrice: number;
   durationMinutes: number;
+  consumables: { productId: string; portionsRequired: number }[];
 };
 
-const emptyForm: FormData = { name: "", description: "", categoryId: "", basePrice: 0, durationMinutes: 30 };
+const emptyForm: FormData = { name: "", description: "", categoryId: "", basePrice: 0, durationMinutes: 30, consumables: [] };
 
 export function ServicesClient() {
   const [services, setServices] = useState<Service[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [consumableProducts, setConsumableProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
@@ -42,13 +59,17 @@ export function ServicesClient() {
 
   const fetchData = useCallback(async () => {
     try {
-      const [sRes, cRes] = await Promise.all([
+      const [sRes, cRes, pRes] = await Promise.all([
         fetch("/api/admin/services"),
         fetch("/api/admin/categories?type=service"),
+        fetch("/api/admin/products"),
       ]);
-      if (!sRes.ok || !cRes.ok) throw new Error();
+      if (!sRes.ok || !cRes.ok || !pRes.ok) throw new Error();
+      
+      const allProducts: Product[] = await pRes.json();
       setServices(await sRes.json());
       setCategories(await cRes.json());
+      setConsumableProducts(allProducts.filter(p => p.isConsumable));
     } catch {
       toast.error("Failed to load data");
     } finally {
@@ -72,8 +93,35 @@ export function ServicesClient() {
       categoryId: s.category.id,
       basePrice: Number(s.basePrice),
       durationMinutes: s.durationMinutes,
+      consumables: s.consumables?.map(c => ({ 
+        productId: c.productId, 
+        portionsRequired: c.portionsRequired 
+      })) || [],
     });
     setShowForm(true);
+  }
+
+  function addConsumable() {
+    if (consumableProducts.length === 0) {
+      toast.error("No consumable products available. Create one in Inventory first.");
+      return;
+    }
+    setForm({
+      ...form,
+      consumables: [...form.consumables, { productId: consumableProducts[0].id, portionsRequired: 1 }]
+    });
+  }
+
+  function removeConsumable(index: number) {
+    const next = [...form.consumables];
+    next.splice(index, 1);
+    setForm({ ...form, consumables: next });
+  }
+
+  function updateConsumable(index: number, field: string, value: any) {
+    const next = [...form.consumables];
+    next[index] = { ...next[index], [field]: value };
+    setForm({ ...form, consumables: next });
   }
 
   async function handleSubmit() {
@@ -130,7 +178,6 @@ export function ServicesClient() {
     return s.name.toLowerCase().includes(q) || s.category.name.toLowerCase().includes(q);
   });
 
-  // Group by category
   const grouped: Record<string, Service[]> = {};
   filtered.forEach((s) => {
     if (!grouped[s.category.name]) grouped[s.category.name] = [];
@@ -167,80 +214,199 @@ export function ServicesClient() {
         <Input placeholder="Search services..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-11 h-11 rounded-xl border-pink-100 focus:border-pink-300" />
       </div>
 
-      {showForm && (
-        <Card className="rounded-xl border-pink-200 overflow-hidden">
-          <div className="h-1 bg-gradient-to-r from-pink-400 to-rose-400" />
-          <CardContent className="pt-5 space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="font-semibold text-sm">{editingId ? "Edit Service" : "New Service"}</h3>
-              <button onClick={() => setShowForm(false)} className="p-1 rounded-md hover:bg-muted"><X className="h-4 w-4" /></button>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Name *</Label>
-                <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="rounded-xl border-pink-100" />
+      <Dialog open={showForm} onOpenChange={setShowForm}>
+        <DialogContent className="sm:max-w-[550px] p-0 overflow-hidden border-none shadow-2xl rounded-3xl">
+          <div className="h-1.5 bg-gradient-to-r from-pink-400 via-rose-400 to-pink-500" />
+          <DialogHeader className="px-6 pt-6 pb-2">
+            <DialogTitle className="text-xl font-bold flex items-center gap-2">
+              <div className="p-2 rounded-xl bg-pink-50 text-pink-600">
+                <Scissors className="h-5 w-5" />
               </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Category *</Label>
-                <select value={form.categoryId} onChange={(e) => setForm({ ...form, categoryId: e.target.value })} className="w-full h-10 rounded-xl border border-pink-100 px-3 text-sm bg-white">
-                  {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Price (ETB) *</Label>
-                <Input type="number" min={0} value={form.basePrice || ""} onChange={(e) => setForm({ ...form, basePrice: Number(e.target.value) || 0 })} className="rounded-xl border-pink-100" />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Duration (min) *</Label>
-                <Input type="number" min={1} value={form.durationMinutes || ""} onChange={(e) => setForm({ ...form, durationMinutes: Number(e.target.value) || 30 })} className="rounded-xl border-pink-100" />
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Description</Label>
-              <Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="rounded-xl border-pink-100" />
-            </div>
-            <Button onClick={handleSubmit} disabled={saving} className="w-full h-11 rounded-xl bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 shadow-md shadow-pink-200/30">
-              {saving ? "Saving..." : editingId ? "Update Service" : "Create Service"}
-            </Button>
+              {editingId ? "Edit Service" : "New Service"}
+            </DialogTitle>
+          </DialogHeader>
 
-            {/* Quick add category */}
-            <div className="flex items-center gap-2 pt-2 border-t">
-              <Input placeholder="New category name..." value={newCatName} onChange={(e) => setNewCatName(e.target.value)} className="rounded-xl border-pink-100 text-xs h-9" />
-              <Button size="sm" variant="outline" onClick={addCategory} className="rounded-lg border-pink-200 text-pink-600 text-xs shrink-0">Add Category</Button>
+          <ScrollArea className="max-h-[85vh] px-6 pb-6">
+            <div className="space-y-5 pt-2">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest ml-1">Service Name *</Label>
+                  <Input 
+                    value={form.name} 
+                    onChange={(e) => setForm({ ...form, name: e.target.value })} 
+                    placeholder="e.g. Bridal Makeup"
+                    className="h-11 rounded-xl border-slate-200 focus:border-pink-400 focus:ring-pink-400/10 transition-all" 
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest ml-1">Category *</Label>
+                  <select 
+                    value={form.categoryId} 
+                    onChange={(e) => setForm({ ...form, categoryId: e.target.value })} 
+                    className="w-full h-11 rounded-xl border border-slate-200 px-4 text-sm bg-white focus:outline-none focus:ring-4 focus:ring-pink-500/10 focus:border-pink-400 transition-all appearance-none cursor-pointer"
+                  >
+                    {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest ml-1">Price (ETB) *</Label>
+                  <Input 
+                    type="number" 
+                    min={0} 
+                    value={form.basePrice || ""} 
+                    onChange={(e) => setForm({ ...form, basePrice: Number(e.target.value) || 0 })} 
+                    className="h-11 rounded-xl border-slate-200" 
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest ml-1">Duration (min) *</Label>
+                  <div className="relative">
+                    <Input 
+                      type="number" 
+                      min={1} 
+                      value={form.durationMinutes || ""} 
+                      onChange={(e) => setForm({ ...form, durationMinutes: Number(e.target.value) || 30 })} 
+                      className="h-11 rounded-xl border-slate-200 pl-9" 
+                    />
+                    <Clock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest ml-1">Description</Label>
+                <Input 
+                  value={form.description} 
+                  onChange={(e) => setForm({ ...form, description: e.target.value })} 
+                  placeholder="What does this service include?"
+                  className="h-11 rounded-xl border-slate-200" 
+                />
+              </div>
+
+              {/* Consumables Section */}
+              <div className="space-y-3 p-4 bg-pink-50/30 rounded-2xl border border-pink-100/50">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label className="text-sm font-bold text-pink-700 flex items-center gap-1.5">
+                      <Droplets className="h-4 w-4" />
+                      Product Consumables
+                    </Label>
+                    <p className="text-[10px] text-pink-600/70 font-medium tracking-tight">Products used during this service</p>
+                  </div>
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={addConsumable} 
+                    className="h-8 rounded-lg border-pink-200 bg-white text-pink-600 hover:bg-pink-50 text-[10px] font-bold"
+                  >
+                    <Plus className="h-3 w-3 mr-1" /> Add Product
+                  </Button>
+                </div>
+                
+                <div className="space-y-2">
+                  {form.consumables.map((c, i) => (
+                    <div key={i} className="flex gap-2 items-end bg-white/60 p-2 rounded-xl border border-pink-50 animate-in fade-in slide-in-from-top-1">
+                      <div className="flex-1 space-y-1">
+                        <Label className="text-[10px] font-bold text-slate-500 ml-1">Select Product</Label>
+                        <select 
+                          value={c.productId} 
+                          onChange={(e) => updateConsumable(i, "productId", e.target.value)}
+                          className="w-full h-9 rounded-lg border border-slate-100 px-3 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-pink-500/10"
+                        >
+                          {consumableProducts.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                        </select>
+                      </div>
+                      <div className="w-20 space-y-1">
+                        <Label className="text-[10px] font-bold text-slate-500 ml-1">Qty (ml)</Label>
+                        <Input 
+                          type="number" 
+                          min={1} 
+                          value={c.portionsRequired} 
+                          onChange={(e) => updateConsumable(i, "portionsRequired", Number(e.target.value) || 1)}
+                          className="h-9 rounded-lg border-slate-100 text-xs text-center"
+                        />
+                      </div>
+                      <Button 
+                        type="button" 
+                        variant="ghost" 
+                        size="icon" 
+                        onClick={() => removeConsumable(i)}
+                        className="h-9 w-9 rounded-lg text-rose-400 hover:bg-rose-50 hover:text-rose-500 transition-colors"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                  {form.consumables.length === 0 && (
+                    <div className="text-center py-6 rounded-xl border border-dashed border-pink-200 bg-white/40">
+                      <Droplets className="h-8 w-8 text-pink-200 mx-auto mb-2 opacity-50" />
+                      <p className="text-[11px] text-pink-400 font-medium">No products linked yet.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <Button onClick={handleSubmit} disabled={saving} className="w-full h-12 rounded-2xl bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-700 hover:to-rose-700 shadow-lg shadow-pink-200 font-bold text-base transition-all active:scale-[0.98]">
+                  {saving ? "Processing..." : editingId ? "Update Service" : "Create Service"}
+                </Button>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 flex items-center gap-2">
+                <Input 
+                  placeholder="Quick category..." 
+                  value={newCatName} 
+                  onChange={(e) => setNewCatName(e.target.value)} 
+                  className="rounded-xl border-slate-200 text-xs h-9 bg-white" 
+                />
+                <Button size="sm" variant="ghost" onClick={addCategory} className="rounded-lg text-pink-600 text-xs font-bold hover:bg-pink-50 transition-colors">
+                  Add Category
+                </Button>
+              </div>
             </div>
-          </CardContent>
-        </Card>
-      )}
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
 
       {Object.entries(grouped).map(([catName, items]) => (
         <div key={catName} className="space-y-2">
-          <h3 className="text-xs font-semibold text-pink-400 uppercase tracking-widest">{catName}</h3>
-          {items.map((s) => (
-            <Card key={s.id} className={`rounded-xl transition-colors ${s.isActive ? "border-pink-50 hover:border-pink-100" : "border-red-50 opacity-50"}`}>
-              <CardContent className="py-3 flex items-center justify-between">
-                <div>
-                  <p className="font-medium text-sm">{s.name}</p>
-                  <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
-                    <span className="font-semibold text-pink-600">ETB {Number(s.basePrice).toFixed(2)}</span>
-                    <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {s.durationMinutes}m</span>
+          <h3 className="text-xs font-semibold text-pink-400 uppercase tracking-widest pl-1">{catName}</h3>
+          <div className="grid gap-2.5">
+            {items.map((s) => (
+              <Card key={s.id} className={`rounded-xl transition-all duration-200 ${s.isActive ? "border-pink-50 hover:border-pink-100 hover:shadow-sm" : "border-red-50 opacity-60"}`}>
+                <CardContent className="py-3 flex items-center justify-between">
+                  <div className="flex-1">
+                    <p className="font-medium text-sm">{s.name}</p>
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
+                      <span className="font-semibold text-pink-600">ETB {Number(s.basePrice).toFixed(2)}</span>
+                      <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {s.durationMinutes}m</span>
+                      {s.consumables && s.consumables.length > 0 && (
+                        <span className="flex items-center gap-1 text-teal-600"><Droplets className="h-3 w-3" /> {s.consumables.length} product(s)</span>
+                      )}
+                    </div>
                   </div>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <button onClick={() => openEdit(s)} className="p-1.5 rounded-lg hover:bg-pink-50 text-pink-500"><Edit2 className="h-3.5 w-3.5" /></button>
-                  <button onClick={() => toggleActive(s)} className={`p-1.5 rounded-lg ${s.isActive ? "hover:bg-red-50 text-red-400" : "hover:bg-emerald-50 text-emerald-500"}`}>
-                    {s.isActive ? <ToggleRight className="h-4 w-4" /> : <ToggleLeft className="h-4 w-4" />}
-                  </button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                  <div className="flex items-center gap-1.5">
+                    <button onClick={() => openEdit(s)} className="p-2 rounded-xl hover:bg-pink-50 text-pink-500 transition-colors"><Edit2 className="h-4 w-4" /></button>
+                    <button onClick={() => toggleActive(s)} className={`p-2 rounded-xl transition-colors ${s.isActive ? "hover:bg-red-50 text-red-400" : "hover:bg-emerald-50 text-emerald-500"}`}>
+                      {s.isActive ? <ToggleRight className="h-4.5 w-4.5" /> : <ToggleLeft className="h-4.5 w-4.5" />}
+                    </button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         </div>
       ))}
 
       {filtered.length === 0 && (
-        <div className="text-center py-10 text-sm text-muted-foreground">No services found.</div>
+        <div className="text-center py-20 bg-gray-50/50 rounded-2xl border border-dashed">
+          <Scissors className="h-10 w-10 text-gray-300 mx-auto mb-3" />
+          <p className="text-sm text-muted-foreground">No services found matching your search.</p>
+        </div>
       )}
     </div>
   );

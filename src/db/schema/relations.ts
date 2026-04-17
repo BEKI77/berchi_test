@@ -1,12 +1,12 @@
 import { relations } from "drizzle-orm";
 import { customers } from "./customers";
 import { staff } from "./staff";
-import { serviceCategories, services } from "./services";
+import { serviceCategories, services, serviceConsumables } from "./services";
 import { productCategories, products } from "./products";
 import { appointments } from "./appointments";
-import { serviceOrders, serviceOrderItems, serviceOrderProducts } from "./orders";
+import { serviceOrders, serviceOrderItems, serviceOrderProducts, orderItemConsumables } from "./orders";
 import { invoices, payments } from "./billing";
-import { expenses, stockMovements, commissionLogs } from "./operations";
+import { expenses, stockMovements, commissionLogs, productUsageLogs } from "./operations";
 
 // ── Customers ──────────────────────────────────────────────
 export const customersRelations = relations(customers, ({ many }) => ({
@@ -22,6 +22,7 @@ export const staffRelations = relations(staff, ({ many }) => ({
   expenses: many(expenses),
   stockMovements: many(stockMovements),
   commissionLogs: many(commissionLogs),
+  productUsageLogs: many(productUsageLogs),
 }));
 
 // ── Service Categories ─────────────────────────────────────
@@ -37,6 +38,19 @@ export const servicesRelations = relations(services, ({ one, many }) => ({
   }),
   appointments: many(appointments),
   serviceOrderItems: many(serviceOrderItems),
+  consumables: many(serviceConsumables),
+}));
+
+// ── Service Consumables ─────────────────────────────────────
+export const serviceConsumablesRelations = relations(serviceConsumables, ({ one }) => ({
+  service: one(services, {
+    fields: [serviceConsumables.serviceId],
+    references: [services.id],
+  }),
+  product: one(products, {
+    fields: [serviceConsumables.productId],
+    references: [products.id],
+  }),
 }));
 
 // ── Product Categories ─────────────────────────────────────
@@ -52,6 +66,9 @@ export const productsRelations = relations(products, ({ one, many }) => ({
   }),
   serviceOrderProducts: many(serviceOrderProducts),
   stockMovements: many(stockMovements),
+  consumables: many(serviceConsumables),
+  usageLogs: many(productUsageLogs),
+  orderItemConsumables: many(orderItemConsumables),
 }));
 
 // ── Appointments ───────────────────────────────────────────
@@ -88,6 +105,7 @@ export const serviceOrdersRelations = relations(serviceOrders, ({ one, many }) =
   items: many(serviceOrderItems),
   products: many(serviceOrderProducts),
   invoice: one(invoices),
+  productUsageLogs: many(productUsageLogs),
 }));
 
 // ── Service Order Items ────────────────────────────────────
@@ -105,6 +123,7 @@ export const serviceOrderItemsRelations = relations(serviceOrderItems, ({ one, m
     references: [staff.id],
   }),
   commissionLogs: many(commissionLogs),
+  consumablesUsed: many(orderItemConsumables),
 }));
 
 // ── Service Order Products ─────────────────────────────────
@@ -115,6 +134,18 @@ export const serviceOrderProductsRelations = relations(serviceOrderProducts, ({ 
   }),
   product: one(products, {
     fields: [serviceOrderProducts.productId],
+    references: [products.id],
+  }),
+}));
+
+// ── Order Item Consumables ─────────────────────────────────
+export const orderItemConsumablesRelations = relations(orderItemConsumables, ({ one }) => ({
+  orderItem: one(serviceOrderItems, {
+    fields: [orderItemConsumables.orderItemId],
+    references: [serviceOrderItems.id],
+  }),
+  product: one(products, {
+    fields: [orderItemConsumables.productId],
     references: [products.id],
   }),
 }));
@@ -152,6 +183,22 @@ export const stockMovementsRelations = relations(stockMovements, ({ one }) => ({
   }),
   staff: one(staff, {
     fields: [stockMovements.performedBy],
+    references: [staff.id],
+  }),
+}));
+
+// ── Product Usage Logs ─────────────────────────────────────
+export const productUsageLogsRelations = relations(productUsageLogs, ({ one }) => ({
+  product: one(products, {
+    fields: [productUsageLogs.productId],
+    references: [products.id],
+  }),
+  order: one(serviceOrders, {
+    fields: [productUsageLogs.orderId],
+    references: [serviceOrders.id],
+  }),
+  staff: one(staff, {
+    fields: [productUsageLogs.staffId],
     references: [staff.id],
   }),
 }));

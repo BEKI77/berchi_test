@@ -14,7 +14,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ produc
 
   try {
     const body = await req.json();
-    const { name, sku, categoryId, costPrice, sellPrice, usagePrice, quantityOnHand, reorderLevel, isActive } = body;
+    const { 
+      name, sku, categoryId, costPrice, sellPrice, 
+      usagePrice, quantityOnHand, reorderLevel, isActive,
+      isConsumable, portionsPerUnit, remainingPortions
+    } = body;
 
     const updateData: Record<string, unknown> = {};
     if (name !== undefined) updateData.name = name;
@@ -26,6 +30,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ produc
     if (quantityOnHand !== undefined) updateData.quantityOnHand = quantityOnHand;
     if (reorderLevel !== undefined) updateData.reorderLevel = reorderLevel;
     if (isActive !== undefined) updateData.isActive = isActive;
+    if (isConsumable !== undefined) updateData.isConsumable = isConsumable;
+    if (portionsPerUnit !== undefined) updateData.portionsPerUnit = portionsPerUnit;
+    if (remainingPortions !== undefined) updateData.remainingPortions = remainingPortions;
 
     await db.update(products).set(updateData).where(eq(products.id, productId));
 

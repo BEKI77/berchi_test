@@ -3,7 +3,7 @@ import { pgEnum } from "drizzle-orm/pg-core";
 export const staffRoleEnum = pgEnum("StaffRole", ["SERVER", "CASHIER", "OWNER"]);
 
 export const appointmentStatusEnum = pgEnum("AppointmentStatus", [
-  "SCHEDULED", "CONFIRMED", "IN_PROGRESS", "COMPLETED", "NO_SHOW", "CANCELLED",
+  "SCHEDULED", "CONFIRMED", "IN_PROGRESS", "COMPLETED", "NO_SHOW", "CANCELLED", "BLOCKED",
 ]);
 
 export const appointmentSourceEnum = pgEnum("AppointmentSource", ["MANUAL", "ONLINE"]);

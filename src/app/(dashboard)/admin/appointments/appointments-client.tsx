@@ -80,6 +80,7 @@ export function AppointmentsClient() {
   const [slots, setSlots] = useState<SlotInfo[]>([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [selectedSlots, setSelectedSlots] = useState<string[]>([]);
+  const [selectedToUnblock, setSelectedToUnblock] = useState<string[]>([]);
   const [blockingMode, setBlockingMode] = useState<"specific" | "range">("specific");
   const [blockRange, setBlockRange] = useState({ start: "09:00", end: "10:00" });
   const [blockReason, setBlockReason] = useState("");
@@ -284,6 +285,26 @@ export function AppointmentsClient() {
       await fetchAppointments();
     } catch {
       toast.error("Failed to update availability");
+    } finally {
+      setBlockingSaving(false);
+    }
+  }
+
+  async function handleUnblock() {
+    if (selectedToUnblock.length === 0) return;
+    setBlockingSaving(true);
+    try {
+      const res = await fetch(`/api/admin/appointments/slots/block?date=${blockingDate}&slotTimes=${selectedToUnblock.join(",")}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error();
+      
+      toast.success("Slots unblocked");
+      setSelectedToUnblock([]);
+      await fetchSlots(blockingDate);
+      await fetchAppointments();
+    } catch {
+      toast.error("Failed to unblock slots");
     } finally {
       setBlockingSaving(false);
     }
@@ -655,13 +676,26 @@ export function AppointmentsClient() {
                     />
                   </div>
 
-                  <Button 
-                    onClick={handleBlock} 
-                    disabled={blockingSaving || (blockingMode === "specific" && selectedSlots.length === 0)}
-                    className="w-full rounded-xl bg-blue-600 hover:bg-blue-700 text-sm h-10 shadow-lg shadow-blue-200"
-                  >
-                    {blockingSaving ? "Blocking..." : "Apply Block"}
-                  </Button>
+                  <div className="flex flex-col gap-2">
+                    <Button 
+                      onClick={handleBlock} 
+                      disabled={blockingSaving || (blockingMode === "specific" && selectedSlots.length === 0) || (blockingMode === "range" && !blockRange.start)}
+                      className="w-full rounded-xl bg-blue-600 hover:bg-blue-700 text-sm h-10 shadow-lg shadow-blue-200"
+                    >
+                      {blockingSaving ? "Processing..." : "Apply Block"}
+                    </Button>
+
+                    {selectedToUnblock.length > 0 && (
+                      <Button 
+                        onClick={handleUnblock} 
+                        disabled={blockingSaving}
+                        variant="outline"
+                        className="w-full rounded-xl border-red-200 text-red-600 hover:bg-red-50 text-sm h-10"
+                      >
+                        {blockingSaving ? "Processing..." : `Unblock ${selectedToUnblock.length} Slots`}
+                      </Button>
+                    )}
+                  </div>
                 </div>
 
                 {/* Right side: Slots Grid */}
@@ -691,6 +725,7 @@ export function AppointmentsClient() {
                         const isBooked = slot.status === "BOOKED";
                         const isBlocked = slot.status === "BLOCKED";
                         const isSelected = selectedSlots.includes(slot.time);
+                        const isSelectedToUnblock = selectedToUnblock.includes(slot.time);
                         
                         return (
                           <button
@@ -698,8 +733,11 @@ export function AppointmentsClient() {
                             disabled={isBooked || (blockingMode === "range" && !isBlocked)}
                             onClick={() => {
                               if (isBlocked) {
-                                // Maybe handle unblocking here later
-                                toast.info("Slot already blocked");
+                                if (selectedToUnblock.includes(slot.time)) {
+                                  setSelectedToUnblock(selectedToUnblock.filter(s => s !== slot.time));
+                                } else {
+                                  setSelectedToUnblock([...selectedToUnblock, slot.time]);
+                                }
                                 return;
                               }
                               if (selectedSlots.includes(slot.time)) {
@@ -711,18 +749,20 @@ export function AppointmentsClient() {
                             className={`group relative p-2.5 rounded-xl border text-left transition-all ${
                               isBooked 
                                 ? "bg-blue-50 border-blue-100 opacity-80 cursor-not-allowed" 
+                                : isSelectedToUnblock
+                                ? "bg-red-50 border-red-500 shadow-md shadow-red-100"
                                 : isBlocked 
-                                ? "bg-gray-100 border-gray-200 cursor-not-allowed" 
+                                ? "bg-gray-100 border-gray-200" 
                                 : isSelected 
                                 ? "bg-blue-600 border-blue-600 shadow-md shadow-blue-200" 
                                 : "bg-white border-gray-100 hover:border-blue-300 hover:bg-blue-50/30"
                             }`}
                           >
                             <div className="flex flex-col">
-                              <span className={`text-[10px] font-bold ${isSelected ? "text-blue-100" : isBooked ? "text-blue-600" : isBlocked ? "text-gray-400" : "text-gray-400"}`}>
+                              <span className={`text-[10px] font-bold ${isSelected ? "text-blue-100" : isSelectedToUnblock ? "text-red-400" : isBooked ? "text-blue-600" : isBlocked ? "text-gray-400" : "text-gray-400"}`}>
                                 {slot.label.split(" ")[1]}
                               </span>
-                              <span className={`text-sm font-black ${isSelected ? "text-white" : isBooked ? "text-blue-700" : isBlocked ? "text-gray-600" : "text-gray-900"}`}>
+                              <span className={`text-sm font-black ${isSelected ? "text-white" : isSelectedToUnblock ? "text-red-700" : isBooked ? "text-blue-700" : isBlocked ? "text-gray-600" : "text-gray-900"}`}>
                                 {slot.label.split(" ")[0]}
                               </span>
                             </div>
@@ -734,7 +774,7 @@ export function AppointmentsClient() {
                             )}
                             {isBlocked && (
                               <div className="absolute top-2 right-2">
-                                <ShieldAlert className="h-3 w-3 text-gray-400" />
+                                {isSelectedToUnblock ? <Unlock className="h-3 w-3 text-red-500" /> : <ShieldAlert className="h-3 w-3 text-gray-400" />}
                               </div>
                             )}
 

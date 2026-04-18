@@ -78,7 +78,7 @@ export async function GET(req: Request) {
     const closeMinutes = closeH * 60 + closeM;
 
     // Generate all possible slots
-    const slots: { time: string; label: string; available: boolean }[] = [];
+    const slots: { time: string; label: string; available: boolean; status: string }[] = [];
 
     // Get all appointments for this date (not cancelled)
     const dayStart = new Date(`${date}T00:00:00`);
@@ -139,6 +139,7 @@ export async function GET(req: Request) {
         time,
         label,
         available: !isOccupied && !isPast,
+        status: isOccupied ? "UNAVAILABLE" : (isPast ? "PAST" : "AVAILABLE"),
       });
     }
 

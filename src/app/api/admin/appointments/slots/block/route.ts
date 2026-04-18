@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { db } from "@/db";
 import { appointments, customers, services, serviceCategories } from "@/db/schema";
 import { auth } from "@/lib/auth";
@@ -89,6 +89,49 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: true, count: appointmentsToCreate.length });
   } catch (error) {
     console.error("Failed to block slots:", error);
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+  }
+}
+
+export async function DELETE(req: Request) {
+  const session = await auth();
+  if (session?.user?.role !== "OWNER" && session?.user?.role !== "CASHIER") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  try {
+    const { searchParams } = new URL(req.url);
+    const appointmentId = searchParams.get("appointmentId");
+    const date = searchParams.get("date");
+    const slotTimes = searchParams.get("slotTimes")?.split(",");
+
+    if (appointmentId) {
+      // Unblock by ID
+      await db.delete(appointments)
+        .where(and(
+          eq(appointments.id, appointmentId),
+          eq(appointments.status, "BLOCKED")
+        ));
+      return NextResponse.json({ success: true });
+    }
+
+    if (date && slotTimes && slotTimes.length > 0) {
+      // Unblock by slots
+      const deletePromises = slotTimes.map(time => {
+        const start = new Date(`${date}T${time}:00`);
+        return db.delete(appointments)
+          .where(and(
+            eq(appointments.startTime, start),
+            eq(appointments.status, "BLOCKED")
+          ));
+      });
+      await Promise.all(deletePromises);
+      return NextResponse.json({ success: true });
+    }
+
+    return NextResponse.json({ error: "Missing required parameters" }, { status: 400 });
+  } catch (error) {
+    console.error("Failed to unblock slots:", error);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }

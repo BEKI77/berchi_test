@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Calendar, Plus, X, Clock, User, Scissors, Search, Globe, UserPlus, Pencil, Phone, Check, Ban } from "lucide-react";
+import { Calendar, Plus, X, Clock, User, Scissors, Search, Globe, UserPlus, Pencil, Phone, Check, Ban, ShieldAlert, Lock, Unlock, CalendarClock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -24,6 +24,19 @@ type Appointment = {
 type StaffOption = { id: string; firstName: string; lastName: string };
 type CustomerOption = { id: string; firstName: string; lastName: string; phone: string | null };
 type ServiceOption = { id: string; name: string; durationMinutes: number };
+
+type SlotInfo = {
+  time: string;
+  label: string;
+  available: boolean;
+  status: "AVAILABLE" | "BOOKED" | "BLOCKED";
+  appointment: {
+    id: string;
+    customerName: string;
+    serviceName: string;
+    status: string;
+  } | null;
+};
 
 const statusColors: Record<string, string> = {
   SCHEDULED: "bg-blue-50 text-blue-600 border-blue-200",
@@ -61,6 +74,17 @@ export function AppointmentsClient() {
   const [editForm, setEditForm] = useState({ staffId: "", serviceId: "", startTime: "", notes: "", status: "" });
   const [editSaving, setEditSaving] = useState(false);
 
+  // Blocking state
+  const [showAvailability, setShowAvailability] = useState(false);
+  const [blockingDate, setBlockingDate] = useState(new Date().toISOString().split("T")[0]);
+  const [slots, setSlots] = useState<SlotInfo[]>([]);
+  const [loadingSlots, setLoadingSlots] = useState(false);
+  const [selectedSlots, setSelectedSlots] = useState<string[]>([]);
+  const [blockingMode, setBlockingMode] = useState<"specific" | "range">("specific");
+  const [blockRange, setBlockRange] = useState({ start: "09:00", end: "10:00" });
+  const [blockReason, setBlockReason] = useState("");
+  const [blockingSaving, setBlockingSaving] = useState(false);
+
   const fetchAppointments = useCallback(async () => {
     try {
       const res = await fetch("/api/admin/appointments");
@@ -72,6 +96,26 @@ export function AppointmentsClient() {
       setLoading(false);
     }
   }, []);
+
+  const fetchSlots = useCallback(async (date: string) => {
+    setLoadingSlots(true);
+    try {
+      const res = await fetch(`/api/admin/appointments/slots?date=${date}`);
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      setSlots(data.slots || []);
+    } catch {
+      toast.error("Failed to load availability");
+    } finally {
+      setLoadingSlots(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (showAvailability) {
+      fetchSlots(blockingDate);
+    }
+  }, [showAvailability, blockingDate, fetchSlots]);
 
   useEffect(() => {
     Promise.all([
@@ -205,6 +249,43 @@ export function AppointmentsClient() {
       toast.error("Failed to update appointment");
     } finally {
       setEditSaving(false);
+    }
+  }
+
+  async function handleBlock() {
+    if (blockingMode === "specific" && selectedSlots.length === 0) {
+      toast.error("Please select at least one slot to block");
+      return;
+    }
+    setBlockingSaving(true);
+    try {
+      const payload: any = {
+        date: blockingDate,
+        reason: blockReason || "Administrative Block",
+      };
+      if (blockingMode === "specific") {
+        payload.slotTimes = selectedSlots;
+      } else {
+        payload.startTime = blockRange.start;
+        payload.endTime = blockRange.end;
+      }
+
+      const res = await fetch("/api/admin/appointments/slots/block", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error();
+      
+      toast.success("Availability updated");
+      setSelectedSlots([]);
+      setBlockReason("");
+      await fetchSlots(blockingDate);
+      await fetchAppointments();
+    } catch {
+      toast.error("Failed to update availability");
+    } finally {
+      setBlockingSaving(false);
     }
   }
 
@@ -474,11 +555,215 @@ export function AppointmentsClient() {
             )}
           </p>
         </div>
-        <Button onClick={() => setShowForm(true)} className="rounded-xl bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 shadow-md shadow-blue-200/40">
-          <Plus className="h-4 w-4 mr-2" />
-          New Appointment
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="outline" 
+            onClick={() => setShowAvailability(true)} 
+            className="rounded-xl border-blue-200 text-blue-600 hover:bg-blue-50"
+          >
+            <CalendarClock className="h-4 w-4 mr-2" />
+            Manage Availability
+          </Button>
+          <Button onClick={() => setShowForm(true)} className="rounded-xl bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 shadow-md shadow-blue-200/40">
+            <Plus className="h-4 w-4 mr-2" />
+            New Appointment
+          </Button>
+        </div>
       </div>
+
+      {/* Availability Management Modal */}
+      {showAvailability && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
+          <Card className="w-full max-w-4xl max-h-[90vh] overflow-hidden rounded-2xl shadow-2xl border-blue-100 flex flex-col">
+            <div className="h-1.5 bg-gradient-to-r from-blue-500 via-indigo-500 to-blue-500" />
+            <div className="flex items-center justify-between p-6 border-b">
+              <div>
+                <h2 className="text-xl font-bold flex items-center gap-2">
+                  <ShieldAlert className="h-5 w-5 text-blue-500" />
+                  Manage Availability
+                </h2>
+                <p className="text-xs text-muted-foreground mt-0.5">Block or unblock specific time slots</p>
+              </div>
+              <button onClick={() => setShowAvailability(false)} className="p-2 rounded-full hover:bg-gray-100 transition-colors">
+                <X className="h-5 w-5 text-gray-400" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              <div className="flex flex-col md:flex-row gap-6">
+                {/* Left side: Date and Mode Selection */}
+                <div className="w-full md:w-64 space-y-5">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Select Date</Label>
+                    <Input 
+                      type="date" 
+                      value={blockingDate} 
+                      onChange={(e) => setBlockingDate(e.target.value)}
+                      className="rounded-xl border-blue-100"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Blocking Mode</Label>
+                    <div className="grid grid-cols-2 gap-1 p-1 bg-gray-100 rounded-xl">
+                      <button
+                        onClick={() => setBlockingMode("specific")}
+                        className={`py-1.5 px-2 rounded-lg text-[10px] font-bold transition-all ${blockingMode === "specific" ? "bg-white text-blue-600 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
+                      >
+                        Specific Slots
+                      </button>
+                      <button
+                        onClick={() => setBlockingMode("range")}
+                        className={`py-1.5 px-2 rounded-lg text-[10px] font-bold transition-all ${blockingMode === "range" ? "bg-white text-blue-600 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
+                      >
+                        Time Range
+                      </button>
+                    </div>
+                  </div>
+
+                  {blockingMode === "range" ? (
+                    <div className="space-y-3 p-4 rounded-2xl bg-blue-50/50 border border-blue-100 animate-in slide-in-from-left-2">
+                      <div className="space-y-1">
+                        <Label className="text-[10px] font-bold text-blue-600 uppercase">Start Time</Label>
+                        <Input type="time" value={blockRange.start} onChange={(e) => setBlockRange({...blockRange, start: e.target.value})} className="h-9 text-sm rounded-lg border-blue-100 bg-white" />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[10px] font-bold text-blue-600 uppercase">End Time</Label>
+                        <Input type="time" value={blockRange.end} onChange={(e) => setBlockRange({...blockRange, end: e.target.value})} className="h-9 text-sm rounded-lg border-blue-100 bg-white" />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-4 rounded-2xl bg-indigo-50/50 border border-indigo-100 animate-in slide-in-from-left-2">
+                      <p className="text-[10px] text-indigo-700 leading-relaxed font-medium">
+                        Click on the time slots in the grid to select specific chunks you want to block.
+                      </p>
+                      {selectedSlots.length > 0 && (
+                        <p className="text-[10px] font-bold text-indigo-800 mt-2">
+                          {selectedSlots.length} slots selected
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Reason / Note</Label>
+                    <Input 
+                      placeholder="e.g. Lunch break, Training..." 
+                      value={blockReason}
+                      onChange={(e) => setBlockReason(e.target.value)}
+                      className="rounded-xl border-blue-100 h-9 text-sm"
+                    />
+                  </div>
+
+                  <Button 
+                    onClick={handleBlock} 
+                    disabled={blockingSaving || (blockingMode === "specific" && selectedSlots.length === 0)}
+                    className="w-full rounded-xl bg-blue-600 hover:bg-blue-700 text-sm h-10 shadow-lg shadow-blue-200"
+                  >
+                    {blockingSaving ? "Blocking..." : "Apply Block"}
+                  </Button>
+                </div>
+
+                {/* Right side: Slots Grid */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between mb-4">
+                    <Label className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Availability Grid</Label>
+                    <div className="flex gap-3 text-[10px] font-medium">
+                      <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-emerald-500" /> Free</span>
+                      <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-blue-500" /> Booked</span>
+                      <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-gray-400" /> Blocked</span>
+                    </div>
+                  </div>
+
+                  {loadingSlots ? (
+                    <div className="h-64 flex flex-col items-center justify-center gap-3">
+                      <div className="h-8 w-8 rounded-full border-2 border-blue-100 border-t-blue-500 animate-spin" />
+                      <p className="text-xs text-muted-foreground">Refreshing slots...</p>
+                    </div>
+                  ) : slots.length === 0 ? (
+                    <div className="h-64 flex flex-col items-center justify-center border-2 border-dashed rounded-2xl bg-gray-50 text-center p-6">
+                      <Calendar className="h-8 w-8 text-gray-300 mb-2" />
+                      <p className="text-sm font-medium text-gray-500">No slots available or shop is closed</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-2">
+                      {slots.map((slot) => {
+                        const isBooked = slot.status === "BOOKED";
+                        const isBlocked = slot.status === "BLOCKED";
+                        const isSelected = selectedSlots.includes(slot.time);
+                        
+                        return (
+                          <button
+                            key={slot.time}
+                            disabled={isBooked || (blockingMode === "range" && !isBlocked)}
+                            onClick={() => {
+                              if (isBlocked) {
+                                // Maybe handle unblocking here later
+                                toast.info("Slot already blocked");
+                                return;
+                              }
+                              if (selectedSlots.includes(slot.time)) {
+                                setSelectedSlots(selectedSlots.filter(s => s !== slot.time));
+                              } else {
+                                setSelectedSlots([...selectedSlots, slot.time]);
+                              }
+                            }}
+                            className={`group relative p-2.5 rounded-xl border text-left transition-all ${
+                              isBooked 
+                                ? "bg-blue-50 border-blue-100 opacity-80 cursor-not-allowed" 
+                                : isBlocked 
+                                ? "bg-gray-100 border-gray-200 cursor-not-allowed" 
+                                : isSelected 
+                                ? "bg-blue-600 border-blue-600 shadow-md shadow-blue-200" 
+                                : "bg-white border-gray-100 hover:border-blue-300 hover:bg-blue-50/30"
+                            }`}
+                          >
+                            <div className="flex flex-col">
+                              <span className={`text-[10px] font-bold ${isSelected ? "text-blue-100" : isBooked ? "text-blue-600" : isBlocked ? "text-gray-400" : "text-gray-400"}`}>
+                                {slot.label.split(" ")[1]}
+                              </span>
+                              <span className={`text-sm font-black ${isSelected ? "text-white" : isBooked ? "text-blue-700" : isBlocked ? "text-gray-600" : "text-gray-900"}`}>
+                                {slot.label.split(" ")[0]}
+                              </span>
+                            </div>
+                            
+                            {isBooked && (
+                              <div className="absolute top-2 right-2">
+                                <Lock className="h-3 w-3 text-blue-400" />
+                              </div>
+                            )}
+                            {isBlocked && (
+                              <div className="absolute top-2 right-2">
+                                <ShieldAlert className="h-3 w-3 text-gray-400" />
+                              </div>
+                            )}
+
+                            {/* Hover info for booked slots */}
+                            {isBooked && slot.appointment && (
+                              <div className="absolute bottom-full left-0 mb-2 w-48 p-2 bg-gray-900 text-white rounded-lg text-[9px] font-medium opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-10 shadow-xl">
+                                <p className="font-bold text-blue-400">{slot.appointment.serviceName}</p>
+                                <p>{slot.appointment.customerName}</p>
+                              </div>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4 bg-gray-50 border-t flex items-center justify-between text-[10px] text-muted-foreground font-medium">
+              <div className="flex gap-4">
+                <span className="flex items-center gap-1.5"><Lock className="h-3 w-3" /> Booked by Customer</span>
+                <span className="flex items-center gap-1.5"><ShieldAlert className="h-3 w-3" /> Blocked by Admin</span>
+              </div>
+              <p>Tip: Use range mode for bulk blocking</p>
+            </div>
+          </Card>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="flex items-center gap-3 flex-wrap">

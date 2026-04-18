@@ -139,7 +139,7 @@ export async function GET(req: Request) {
         time,
         label,
         available: !isOccupied && !isPast,
-        status: isOccupied ? "UNAVAILABLE" : (isPast ? "PAST" : "AVAILABLE"),
+        status: isPast ? "PAST" : (isOccupied ? "UNAVAILABLE" : "AVAILABLE"),
       });
     }
 

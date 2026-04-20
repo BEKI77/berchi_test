@@ -98,6 +98,17 @@ export function InventoryClient() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
+  // Auto-calculate usagePrice for consumables
+  useEffect(() => {
+    if (form.isConsumable && form.portionsPerUnit > 0) {
+      const calculatedUsage = Number((form.costPrice / form.portionsPerUnit).toFixed(2));
+      // Only update if it actually changed to avoid infinite loops
+      if (calculatedUsage !== form.usagePrice) {
+        setForm(prev => ({ ...prev, usagePrice: calculatedUsage }));
+      }
+    }
+  }, [form.costPrice, form.portionsPerUnit, form.isConsumable, form.usagePrice]);
+
   function openAdd() {
     setEditingId(null);
     setForm({ ...emptyForm, categoryId: categories[0]?.id || "" });

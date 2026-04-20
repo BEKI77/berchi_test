@@ -124,6 +124,7 @@ export const serviceOrderItemsRelations = relations(serviceOrderItems, ({ one, m
   }),
   commissionLogs: many(commissionLogs),
   consumablesUsed: many(orderItemConsumables),
+  products: many(serviceOrderProducts),
 }));
 
 // ── Service Order Products ─────────────────────────────────
@@ -135,6 +136,10 @@ export const serviceOrderProductsRelations = relations(serviceOrderProducts, ({ 
   product: one(products, {
     fields: [serviceOrderProducts.productId],
     references: [products.id],
+  }),
+  orderItem: one(serviceOrderItems, {
+    fields: [serviceOrderProducts.orderItemId],
+    references: [serviceOrderItems.id],
   }),
 }));
 

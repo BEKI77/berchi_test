@@ -3,23 +3,11 @@ import { and, eq, gte, lte, notInArray } from "drizzle-orm";
 import { db } from "@/db";
 import { services, salonSettings, appointments } from "@/db/schema";
 import { withCors, handlePreflight } from "@/lib/cors";
+import { DEFAULT_BUSINESS_HOURS, DAY_NAMES } from "@/lib/constants";
 
 export async function OPTIONS(req: Request) {
   return handlePreflight(req);
 }
-
-// Default working hours if none configured
-const DEFAULT_HOURS: Record<string, { open: string; close: string }> = {
-  monday: { open: "09:00", close: "20:00" },
-  tuesday: { open: "09:00", close: "20:00" },
-  wednesday: { open: "09:00", close: "20:00" },
-  thursday: { open: "09:00", close: "20:00" },
-  friday: { open: "09:00", close: "20:00" },
-  saturday: { open: "09:00", close: "18:00" },
-  sunday: { open: "closed", close: "closed" },
-};
-
-const DAY_NAMES = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
 
 // Slot interval in minutes
 const SLOT_INTERVAL = 30;
@@ -47,7 +35,7 @@ export async function GET(req: Request) {
 
     // Get working hours from salon settings
     const [settings] = await db.select().from(salonSettings).limit(1);
-    let businessHours = DEFAULT_HOURS;
+    let businessHours = DEFAULT_BUSINESS_HOURS;
     if (settings?.businessHours) {
       try {
         businessHours = JSON.parse(settings.businessHours);

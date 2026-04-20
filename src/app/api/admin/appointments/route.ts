@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, not, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { appointments, customers, services } from "@/db/schema";
 
@@ -11,7 +11,16 @@ export async function GET() {
   }
 
   try {
+    // Get SYSTEM_BLOCK customer IDs to exclude
+    const systemBlockCustomers = await db.select({ id: customers.id })
+      .from(customers)
+      .where(eq(customers.lastName, "SYSTEM_BLOCK"));
+    
+    const systemBlockCustomerIds = systemBlockCustomers.map(c => c.id);
+
     const result = await db.query.appointments.findMany({
+      where: systemBlockCustomerIds.length > 0 ? 
+        not(inArray(appointments.customerId, systemBlockCustomerIds)) : undefined,
       orderBy: [desc(appointments.startTime)],
       columns: {
         id: true,

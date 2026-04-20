@@ -7,6 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { DEFAULT_BUSINESS_HOURS } from "@/lib/constants";
 
 export function SettingsClient() {
   const [loading, setLoading] = useState(true);
@@ -19,7 +20,10 @@ export function SettingsClient() {
     currency: "ETB",
     commissionDefault: 0,
     receiptsEnabled: true,
+    businessHours: {} as Record<string, { open: string; close: string }>,
   });
+
+  const DAY_NAMES = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
 
   useEffect(() => {
     fetch("/api/settings")
@@ -34,6 +38,7 @@ export function SettingsClient() {
             currency: data.currency || "ETB",
             commissionDefault: Number(data.commissionDefault) || 0,
             receiptsEnabled: data.receiptsEnabled ?? true,
+            businessHours: data.businessHours ? JSON.parse(data.businessHours) : DEFAULT_BUSINESS_HOURS,
           });
         }
       })
@@ -44,10 +49,15 @@ export function SettingsClient() {
   async function handleSave() {
     setSaving(true);
     try {
+      const payload = {
+        ...form,
+        businessHours: JSON.stringify(form.businessHours),
+      };
+
       const res = await fetch("/api/settings", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) throw new Error();
       toast.success("Settings saved!");
@@ -58,6 +68,32 @@ export function SettingsClient() {
       setSaving(false);
     }
   }
+
+  const handleHourChange = (day: string, field: "open" | "close", value: string) => {
+    setForm(prev => ({
+      ...prev,
+      businessHours: {
+        ...prev.businessHours,
+        [day]: {
+          ...prev.businessHours[day],
+          [field]: value
+        }
+      }
+    }));
+  };
+
+  const toggleClosed = (day: string) => {
+    const isClosed = form.businessHours[day]?.open === "closed";
+    setForm(prev => ({
+      ...prev,
+      businessHours: {
+        ...prev.businessHours,
+        [day]: isClosed 
+          ? { open: "09:00", close: "18:00" } 
+          : { open: "closed", close: "closed" }
+      }
+    }));
+  };
 
   if (loading) {
     return (
@@ -104,6 +140,61 @@ export function SettingsClient() {
         </CardContent>
       </Card>
 
+      {/* Business Hours */}
+      <Card className="rounded-xl border-gray-200 overflow-hidden">
+        <div className="h-1 bg-gradient-to-r from-blue-400 to-indigo-400" />
+        <CardContent className="pt-5 space-y-4">
+          <h3 className="text-sm font-semibold uppercase tracking-wider text-blue-600">Business Hours</h3>
+          <div className="space-y-3">
+            {DAY_NAMES.map((day) => {
+              const hours = form.businessHours[day] || { open: "closed", close: "closed" };
+              const isClosed = hours.open === "closed";
+              
+              return (
+                <div key={day} className="flex items-center justify-between p-3 rounded-xl border border-gray-100 bg-gray-50/50">
+                  <div className="w-24">
+                    <span className="text-sm font-medium capitalize">{day}</span>
+                  </div>
+                  
+                  <div className="flex items-center gap-3">
+                    {!isClosed ? (
+                      <div className="flex items-center gap-2">
+                        <Input 
+                          type="time" 
+                          value={hours.open} 
+                          onChange={(e) => handleHourChange(day, "open", e.target.value)}
+                          className="w-32 h-9 rounded-lg"
+                        />
+                        <span className="text-xs text-muted-foreground">to</span>
+                        <Input 
+                          type="time" 
+                          value={hours.close} 
+                          onChange={(e) => handleHourChange(day, "close", e.target.value)}
+                          className="w-32 h-9 rounded-lg"
+                        />
+                      </div>
+                    ) : (
+                      <span className="text-sm text-muted-foreground italic w-[280px] text-center">Closed</span>
+                    )}
+                    
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => toggleClosed(day)}
+                      className={`h-9 px-3 rounded-lg text-xs font-semibold uppercase tracking-wider ${
+                        isClosed ? "text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50" : "text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+                      }`}
+                    >
+                      {isClosed ? "Open" : "Close"}
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Financial */}
       <Card className="rounded-xl border-gray-200 overflow-hidden">
         <div className="h-1 bg-gradient-to-r from-emerald-400 to-teal-400" />
@@ -144,5 +235,6 @@ export function SettingsClient() {
         {saving ? "Saving..." : "Save Settings"}
       </Button>
     </div>
+
   );
 }

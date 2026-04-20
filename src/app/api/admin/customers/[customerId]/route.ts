@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, not, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { customers, serviceOrders, appointments, invoices } from "@/db/schema";
 
@@ -22,6 +22,13 @@ export async function GET(
       return NextResponse.json({ error: "Customer not found" }, { status: 404 });
     }
 
+    // Get SYSTEM_BLOCK customer IDs to exclude
+    const systemBlockCustomers = await db.select({ id: customers.id })
+      .from(customers)
+      .where(eq(customers.lastName, "SYSTEM_BLOCK"));
+    
+    const systemBlockCustomerIds = systemBlockCustomers.map(c => c.id);
+
     const [orders, appts, allInvoices] = await Promise.all([
       db.query.serviceOrders.findMany({
         where: eq(serviceOrders.customerId, customerId),
@@ -41,7 +48,8 @@ export async function GET(
         },
       }),
       db.query.appointments.findMany({
-        where: eq(appointments.customerId, customerId),
+        where: systemBlockCustomerIds.length > 0 ? 
+          not(inArray(appointments.customerId, systemBlockCustomerIds)) : undefined,
         orderBy: [desc(appointments.startTime)],
         limit: 20,
         columns: { id: true, startTime: true, status: true },

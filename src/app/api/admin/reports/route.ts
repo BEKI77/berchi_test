@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { eq } from "drizzle-orm";
+import { eq, not, inArray } from "drizzle-orm";
 import { db } from "@/db";
-import { staff } from "@/db/schema";
+import { staff, customers, appointments } from "@/db/schema";
 
 export async function GET(req: Request) {
   const session = await auth();
@@ -24,6 +24,13 @@ export async function GET(req: Request) {
     // Custom date range
     const rangeFrom = fromParam ? new Date(fromParam + "T00:00:00") : null;
     const rangeTo = toParam ? new Date(toParam + "T23:59:59") : null;
+
+    // Get SYSTEM_BLOCK customer IDs to exclude
+    const systemBlockCustomers = await db.select({ id: customers.id })
+      .from(customers)
+      .where(eq(customers.lastName, "SYSTEM_BLOCK"));
+    
+    const systemBlockCustomerIds = systemBlockCustomers.map(c => c.id);
 
     // Parallel queries
     const [
@@ -74,6 +81,8 @@ export async function GET(req: Request) {
         columns: { id: true, createdAt: true },
       }),
       db.query.appointments.findMany({
+        where: systemBlockCustomerIds.length > 0 ? 
+          not(inArray(appointments.customerId, systemBlockCustomerIds)) : undefined,
         columns: { id: true, status: true, source: true, startTime: true },
       }),
     ]);

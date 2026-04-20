@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { asc } from "drizzle-orm";
+import { asc, not, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { customers } from "@/db/schema";
 
@@ -20,6 +20,7 @@ export async function GET() {
       notes: customers.notes,
     })
     .from(customers)
+    .where(not(eq(customers.lastName, "SYSTEM_BLOCK")))
     .orderBy(asc(customers.firstName));
 
   return NextResponse.json(result);

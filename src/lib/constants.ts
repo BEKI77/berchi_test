@@ -44,3 +44,15 @@ export const APPOINTMENT_STATUSES = {
   NO_SHOW: "NO_SHOW",
   CANCELLED: "CANCELLED",
 } as const;
+
+export const DEFAULT_BUSINESS_HOURS: Record<string, { open: string; close: string }> = {
+  monday: { open: "09:00", close: "20:00" },
+  tuesday: { open: "09:00", close: "20:00" },
+  wednesday: { open: "09:00", close: "20:00" },
+  thursday: { open: "09:00", close: "20:00" },
+  friday: { open: "09:00", close: "20:00" },
+  saturday: { open: "09:00", close: "18:00" },
+  sunday: { open: "closed", close: "closed" },
+};
+
+export const DAY_NAMES = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];

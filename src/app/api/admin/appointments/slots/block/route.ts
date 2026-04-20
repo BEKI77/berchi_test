@@ -17,6 +17,7 @@ export async function POST(req: Request) {
     if (!date || (!slotTimes && (!startTime || !endTime))) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
+    console.log('body', body);
 
     // 1. Get or create "System" category
     let [systemCat] = await db.select().from(serviceCategories).where(eq(serviceCategories.name, "System")).limit(1);

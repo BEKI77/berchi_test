@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { asc } from "drizzle-orm";
+import { asc, eq, not, inArray } from "drizzle-orm";
 import { db } from "@/db";
-import { staff } from "@/db/schema";
+import { staff, customers, appointments } from "@/db/schema";
 
 // GET: All employees with their stats for the owner employees overview page
 export async function GET() {
@@ -27,6 +27,13 @@ export async function GET() {
       .from(staff)
       .orderBy(asc(staff.createdAt));
 
+    // Get SYSTEM_BLOCK customer IDs to exclude
+    const systemBlockCustomers = await db.select({ id: customers.id })
+      .from(customers)
+      .where(eq(customers.lastName, "SYSTEM_BLOCK"));
+    
+    const systemBlockCustomerIds = systemBlockCustomers.map(c => c.id);
+
     // Get all service order items, orders, and commissions in bulk
     const [allOrders, allServiceItems, allCommissions, allAppointments] = await Promise.all([
       db.query.serviceOrders.findMany({
@@ -43,6 +50,8 @@ export async function GET() {
         columns: { staffId: true, commissionAmount: true },
       }),
       db.query.appointments.findMany({
+        where: systemBlockCustomerIds.length > 0 ? 
+          not(inArray(appointments.customerId, systemBlockCustomerIds)) : undefined,
         columns: { staffId: true, status: true },
       }),
     ]);

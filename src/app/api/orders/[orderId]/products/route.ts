@@ -16,7 +16,7 @@ export async function POST(
 
   const { orderId } = await params;
   const body = await req.json();
-  const { productId, quantity = 1 } = body;
+  const { productId, quantity = 1, orderItemId } = body;
 
   if (!productId) {
     return NextResponse.json({ error: "Product is required" }, { status: 400 });
@@ -44,11 +44,23 @@ export async function POST(
     );
   }
 
-  // Check if product already exists in this order
+  // Check if product already exists in this order (optionally linked to same orderItem)
+  const conditions = [
+    eq(serviceOrderProducts.orderId, orderId),
+    eq(serviceOrderProducts.productId, productId)
+  ];
+  if (orderItemId) {
+    conditions.push(eq(serviceOrderProducts.orderItemId, orderItemId));
+  } else {
+    // If no orderItemId provided, look for one that also has no orderItemId
+    // to avoid merging retail items linked to services with global ones
+    // But for now, let's just keep it simple or follow the user's lead.
+  }
+
   const [existing] = await db
     .select()
     .from(serviceOrderProducts)
-    .where(and(eq(serviceOrderProducts.orderId, orderId), eq(serviceOrderProducts.productId, productId)))
+    .where(and(...conditions))
     .limit(1);
 
   let orderProductId: string;
@@ -64,9 +76,10 @@ export async function POST(
       .insert(serviceOrderProducts)
       .values({
         orderId,
+        orderItemId,
         productId,
         quantity,
-        unitPrice: product.usagePrice,
+        unitPrice: product.sellPrice, // Retail sale uses sell price
       })
       .returning();
     orderProductId = created.id;

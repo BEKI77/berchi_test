@@ -32,6 +32,7 @@ export const serviceOrderItems = pgTable("service_order_items", {
 export const serviceOrderProducts = pgTable("service_order_products", {
   id: uuid("id").primaryKey().defaultRandom(),
   orderId: uuid("order_id").notNull().references(() => serviceOrders.id, { onDelete: "cascade" }),
+  orderItemId: uuid("order_item_id").references(() => serviceOrderItems.id, { onDelete: "cascade" }),
   productId: uuid("product_id").notNull().references(() => products.id),
   quantity: integer("quantity").notNull(),
   unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),

@@ -39,7 +39,7 @@ export async function GET(req: Request) {
         },
       },
       products: {
-        with: { product: { columns: { id: true, name: true } } },
+        with: { product: true },
       },
       invoice: {
         with: { payment: true },
@@ -107,7 +107,7 @@ export async function POST(req: Request) {
         },
       },
       products: {
-        with: { product: { columns: { id: true, name: true } } },
+        with: { product: true },
       },
     },
   });

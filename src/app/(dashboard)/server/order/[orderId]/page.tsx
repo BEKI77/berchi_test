@@ -26,18 +26,16 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 
-type Product = { id: string; name: string };
-
 type ServiceConsumable = {
   productId: string;
   portionsRequired: number;
-  product: Product;
+  product: { id: string; name: string; usagePrice: string; sellPrice: string };
 };
 
 type ConsumableUsed = {
   productId: string;
   portionsUsed: number;
-  product: Product;
+  product: { id: string; name: string; usagePrice: string; sellPrice: string };
 };
 
 type OrderItem = {
@@ -56,7 +54,8 @@ type OrderProduct = {
   id: string;
   unitPrice: string;
   quantity: number;
-  product: { id: string; name: string };
+  orderItemId?: string | null;
+  product: { id: string; name: string; sellPrice: string; usagePrice: string };
 };
 
 type Order = {
@@ -83,6 +82,7 @@ type ProductOption = {
   id: string;
   name: string;
   usagePrice: string;
+  sellPrice: string;
   quantityOnHand: number;
   isConsumable: boolean;
   category: { id: string; name: string };
@@ -100,7 +100,8 @@ export default function ActiveOrderPage() {
   const [sending, setSending] = useState(false);
 
   // Modal state
-  const [modalType, setModalType] = useState<"services" | "products" | "consumables" | null>(null);
+  const [modalType, setModalType] = useState<"services" | "products" | "manage-service" | null>(null);
+  const [modalTab, setModalTab] = useState<"usage" | "purchase">("usage");
   const [modalSearch, setModalSearch] = useState("");
   const [selectedServiceIds, setSelectedServiceIds] = useState<Set<string>>(new Set());
   const [selectedProductIds, setSelectedProductIds] = useState<Map<string, number>>(new Map());
@@ -139,14 +140,15 @@ export default function ActiveOrderPage() {
     });
   }
 
-  function openConsumablesModal(item: OrderItem) {
+  function openManageModal(item: OrderItem) {
     setActiveItemForConsumables(item);
     const existing = item.consumablesUsed.length > 0
       ? item.consumablesUsed.map(c => ({ productId: c.productId, portionsUsed: c.portionsUsed }))
       : item.service.consumables.map(c => ({ productId: c.productId, portionsUsed: c.portionsRequired }));
 
     setTempConsumables(existing);
-    setModalType("consumables");
+    setModalTab("usage");
+    setModalType("manage-service");
   }
 
   async function saveConsumables() {
@@ -254,7 +256,7 @@ export default function ActiveOrderPage() {
     closeModal();
   }
 
-  async function addSelectedProducts() {
+  async function addSelectedProducts(targetOrderItemId?: string) {
     if (selectedProductIds.size === 0) return;
     setAddingItems(true);
     let added = 0;
@@ -264,7 +266,7 @@ export default function ActiveOrderPage() {
         const res = await fetch(`/api/orders/${orderId}/products`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ productId, quantity }),
+          body: JSON.stringify({ productId, quantity, orderItemId: targetOrderItemId }),
         });
         if (!res.ok) throw new Error();
         added++;
@@ -276,7 +278,12 @@ export default function ActiveOrderPage() {
     if (failed > 0) toast.error(`${failed} product(s) failed to add`);
     await fetchOrder();
     setAddingItems(false);
-    closeModal();
+    if (!targetOrderItemId) closeModal(); // Only close if added from global modal
+    else {
+      // If added from service modal, maybe clear selection but stay in modal?
+      // Or close it. Let's close for now to be safe.
+      closeModal();
+    }
   }
 
   async function removeItem(itemId: string) {
@@ -461,7 +468,7 @@ export default function ActiveOrderPage() {
                 </div>
 
                 {isExpanded && (
-                  <div className="bg-pink-50/30 p-3 border-t border-pink-50/50 space-y-2 animate-in slide-in-from-top-2 duration-200">
+                  <div className="bg-pink-50/30 p-3 border-t border-pink-50/50 space-y-3 animate-in slide-in-from-top-2 duration-200">
                     <div className="flex items-center justify-between">
                       <p className="text-[10px] font-bold text-pink-400 uppercase tracking-widest flex items-center gap-1">
                         <Droplets className="h-3 w-3" />
@@ -469,26 +476,62 @@ export default function ActiveOrderPage() {
                       </p>
                       {isEditable && (
                         <button
-                          onClick={() => openConsumablesModal(item)}
-                          className="text-[10px] text-pink-600 font-semibold hover:underline"
+                          onClick={() => openManageModal(item)}
+                          className="text-[10px] text-pink-600 font-semibold hover:underline flex items-center gap-1"
                         >
-                          Adjust Usage
+                          <Plus className="h-3 w-3" /> Manage Products
                         </button>
                       )}
                     </div>
-                    <div className="space-y-1">
+                    <div className="space-y-1.5">
                       {consumables.map((c, idx) => (
                         <div key={idx} className="flex justify-between items-center text-xs">
-                          <span className="text-muted-foreground">{c.product.name}</span>
-                          <span className="font-medium text-pink-600">
-                            {'portionsUsed' in c ? c.portionsUsed : c.portionsRequired} portion(s)
-                          </span>
+                          <div className="flex flex-col">
+                            <span className="text-muted-foreground">{c.product.name}</span>
+                            <span className="text-[10px] text-pink-400 font-medium">
+                              ETB {Number(c.product.usagePrice).toFixed(2)} / portion
+                            </span>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-medium text-pink-600">
+                              {'portionsUsed' in c ? c.portionsUsed : c.portionsRequired} portion(s)
+                            </p>
+                            <p className="text-[10px] font-bold text-pink-700">
+                              ETB {(Number(c.product.usagePrice) * ('portionsUsed' in c ? c.portionsUsed : c.portionsRequired)).toFixed(2)}
+                            </p>
+                          </div>
                         </div>
                       ))}
                       {consumables.length === 0 && (
-                        <p className="text-[10px] text-muted-foreground italic">No products recorded for this service.</p>
+                        <p className="text-[10px] text-muted-foreground italic">No products recorded for usage.</p>
                       )}
                     </div>
+
+                    {/* Linked Retail Products */}
+                    {order.products.filter(p => p.orderItemId === item.id).length > 0 && (
+                      <div className="pt-2 border-t border-pink-100/30 space-y-2">
+                        <p className="text-[10px] font-bold text-violet-400 uppercase tracking-widest flex items-center gap-1">
+                          <Package className="h-3 w-3" />
+                          Purchased with Service
+                        </p>
+                        {order.products.filter(p => p.orderItemId === item.id).map(p => (
+                          <div key={p.id} className="flex justify-between items-center text-xs bg-violet-50/40 p-1.5 rounded-lg border border-violet-100/30">
+                            <div>
+                              <p className="font-medium text-violet-700">{p.product.name}</p>
+                              <p className="text-[9px] text-violet-500">ETB {Number(p.unitPrice).toFixed(2)} x {p.quantity}</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-violet-700">ETB {(Number(p.unitPrice) * p.quantity).toFixed(2)}</span>
+                              {isEditable && (
+                                <button onClick={() => removeProduct(p.id)} className="p-1 text-rose-300 hover:text-rose-500">
+                                  <Trash2 className="h-3 w-3" />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -504,7 +547,7 @@ export default function ActiveOrderPage() {
           <div className="flex items-center justify-between">
             <CardTitle className="text-sm font-semibold flex items-center gap-2 uppercase tracking-wider text-violet-600">
               <Package className="h-4 w-4" />
-              Extra Products ({(order.products || []).length})
+              Extra Products ({(order.products || []).filter(p => !p.orderItemId).length})
             </CardTitle>
             {isEditable && (
               <Button
@@ -520,12 +563,12 @@ export default function ActiveOrderPage() {
           </div>
         </CardHeader>
         <CardContent className="space-y-1">
-          {(order.products || []).length === 0 && (
+          {(order.products || []).filter(p => !p.orderItemId).length === 0 && (
             <div className="text-center py-5">
               <p className="text-[11px] text-muted-foreground italic">No extra products sold.</p>
             </div>
           )}
-          {(order.products || []).map((p) => (
+          {(order.products || []).filter(p => !p.orderItemId).map((p) => (
             <div key={p.id} className="flex items-center justify-between py-2.5 px-3 rounded-xl bg-violet-50/30 border border-violet-50/50">
               <div>
                 <p className="text-sm font-medium">{p.product.name}</p>
@@ -589,12 +632,12 @@ export default function ActiveOrderPage() {
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={closeModal} />
 
           <Card className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden max-h-[85vh] flex flex-col animate-in slide-in-from-bottom duration-300">
-            <div className={`p-4 border-b flex items-center justify-between ${modalType === "consumables" ? "bg-teal-50 border-teal-100" :
-              modalType === "services" ? "bg-pink-50 border-pink-100" : "bg-violet-50 border-violet-100"
+            <div className={`p-4 border-b flex items-center justify-between ${modalType === "manage-service" ? "bg-slate-50 border-slate-100" :
+                modalType === "services" ? "bg-pink-50 border-pink-100" : "bg-violet-50 border-violet-100"
               }`}>
               <div className="flex items-center gap-2">
                 <h3 className="font-bold text-sm uppercase tracking-wider">
-                  {modalType === "consumables" ? "Adjust Product Usage" :
+                  {modalType === "manage-service" ? `Manage Products: ${activeItemForConsumables?.service.name}` :
                     modalType === "services" ? "Add Services" : "Add Extra Products"}
                 </h3>
               </div>
@@ -602,46 +645,123 @@ export default function ActiveOrderPage() {
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
-              {modalType === "consumables" && activeItemForConsumables && (
+              {modalType === "manage-service" && activeItemForConsumables && (
                 <div className="space-y-4">
-                  <p className="text-xs text-muted-foreground">
-                    Record exact usage for <strong>{activeItemForConsumables.service.name}</strong>.
-                  </p>
-                  <div className="space-y-3">
-                    {tempConsumables.map((c, i) => (
-                      <div key={i} className="flex gap-2 items-end">
-                        <div className="flex-1 space-y-1">
-                          <Label className="text-[10px] text-muted-foreground ml-1">Product</Label>
-                          <select
-                            value={c.productId}
-                            onChange={(e) => updateTempConsumable(i, "productId", e.target.value)}
-                            className="w-full h-10 rounded-xl border border-teal-100 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/20"
-                          >
-                            {products.filter(p => p.isConsumable).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                          </select>
-                        </div>
-                        <div className="w-24 space-y-1">
-                          <Label className="text-[10px] text-muted-foreground ml-1">Portions (ml)</Label>
-                          <Input
-                            type="number"
-                            min={1}
-                            value={c.portionsUsed}
-                            onChange={(e) => updateTempConsumable(i, "portionsUsed", Number(e.target.value) || 1)}
-                            className="h-10 rounded-xl border-teal-100"
-                          />
-                        </div>
-                        <Button variant="ghost" size="icon" onClick={() => removeTempConsumable(i)} className="h-10 w-10 text-rose-400 hover:bg-rose-50 rounded-xl">
-                          <Trash2 className="h-4 w-4" />
+                  {/* Tabs */}
+                  <div className="flex p-1 bg-slate-100 rounded-xl">
+                    <button
+                      onClick={() => setModalTab("usage")}
+                      className={`flex-1 flex items-center justify-center gap-2 py-2 text-xs font-bold rounded-lg transition-all ${modalTab === "usage" ? "bg-white text-pink-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                        }`}
+                    >
+                      <Droplets className="h-3.5 w-3.5" /> Usage Details
+                    </button>
+                    <button
+                      onClick={() => setModalTab("purchase")}
+                      className={`flex-1 flex items-center justify-center gap-2 py-2 text-xs font-bold rounded-lg transition-all ${modalTab === "purchase" ? "bg-white text-violet-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                        }`}
+                    >
+                      <Package className="h-3.5 w-3.5" /> Customer Purchase
+                    </button>
+                  </div>
+
+                  {modalTab === "usage" ? (
+                    <div className="space-y-4">
+                      <p className="text-[11px] text-muted-foreground bg-pink-50/50 p-2 rounded-lg border border-pink-100/50">
+                        Record products used during the service. Prices shown are internal <strong>usage costs</strong>.
+                      </p>
+                      <div className="space-y-3">
+                        {tempConsumables.map((c, i) => {
+                          const prod = products.find(p => p.id === c.productId);
+                          return (
+                            <div key={i} className="flex gap-2 items-end p-3 rounded-xl border border-pink-100/40 bg-pink-50/10">
+                              <div className="flex-1 space-y-1">
+                                <Label className="text-[10px] text-muted-foreground ml-1">Product</Label>
+                                <select
+                                  value={c.productId}
+                                  onChange={(e) => updateTempConsumable(i, "productId", e.target.value)}
+                                  className="w-full h-10 rounded-xl border border-pink-100 px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-pink-500/20"
+                                >
+                                  {products.filter(p => p.isConsumable).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                                </select>
+                              </div>
+                              <div className="w-24 space-y-1">
+                                <div className="flex justify-between px-1">
+                                  <Label className="text-[10px] text-muted-foreground">Portions</Label>
+                                  {prod && <span className="text-[9px] font-bold text-pink-500">ETB {prod.usagePrice}</span>}
+                                </div>
+                                <Input
+                                  type="number"
+                                  min={1}
+                                  value={c.portionsUsed}
+                                  onChange={(e) => updateTempConsumable(i, "portionsUsed", Number(e.target.value) || 1)}
+                                  className="h-10 rounded-xl border-pink-100 focus-visible:ring-pink-500/20"
+                                />
+                              </div>
+                              <Button variant="ghost" size="icon" onClick={() => removeTempConsumable(i)} className="h-10 w-10 text-rose-400 hover:bg-rose-50 rounded-xl">
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          );
+                        })}
+                        <Button variant="outline" size="sm" onClick={addTempConsumable} className="w-full border-dashed border-pink-300 text-pink-600 hover:bg-pink-50 rounded-xl h-10">
+                          <Plus className="h-4 w-4 mr-2" /> Add Another Product
                         </Button>
                       </div>
-                    ))}
-                    <Button variant="outline" size="sm" onClick={addTempConsumable} className="w-full border-dashed border-teal-300 text-teal-600 hover:bg-teal-50 rounded-xl">
-                      <Plus className="h-4 w-4 mr-2" /> Add Another Product
-                    </Button>
-                  </div>
-                  <Button onClick={saveConsumables} disabled={addingItems} className="w-full h-12 bg-teal-600 hover:bg-teal-700 text-white rounded-xl shadow-lg shadow-teal-200">
-                    {addingItems ? "Saving..." : "Save Usage Details"}
-                  </Button>
+                      <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+                        <div className="text-xs">
+                          <span className="text-muted-foreground">Total Usage Cost:</span>
+                          <span className="ml-2 font-bold text-pink-600">
+                            ETB {tempConsumables.reduce((acc, c) => {
+                              const p = products.find(prod => prod.id === c.productId);
+                              return acc + (Number(p?.usagePrice || 0) * c.portionsUsed);
+                            }, 0).toFixed(2)}
+                          </span>
+                        </div>
+                        <Button onClick={saveConsumables} disabled={addingItems} className="bg-pink-600 hover:bg-pink-700 text-white rounded-xl px-6 h-11">
+                          {addingItems ? "Saving..." : "Save Usage"}
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <p className="text-[11px] text-muted-foreground bg-violet-50/50 p-2 rounded-lg border border-violet-100/50">
+                        Select retail products the customer is <strong>buying</strong> alongside this service.
+                      </p>
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input placeholder="Search retail products..." value={modalSearch} onChange={(e) => setModalSearch(e.target.value)} className="pl-9 rounded-xl border-violet-100" />
+                      </div>
+                      <div className="space-y-1.5 max-h-[300px] overflow-y-auto pr-1">
+                        {filteredProducts.filter(p => !p.isConsumable || p.sellPrice !== "0.00").map(p => (
+                          <div key={p.id} className={`w-full flex items-center justify-between p-3 rounded-xl border-2 transition-all ${selectedProductIds.has(p.id) ? "bg-violet-50 border-violet-300" : "bg-white border-transparent hover:bg-violet-50/50"}`}>
+                            <button onClick={() => toggleProduct(p.id)} className="flex-1 text-left">
+                              <span className="text-sm font-medium">{p.name}</span>
+                              <p className="text-[10px] text-violet-500 font-bold">ETB {Number(p.sellPrice).toFixed(2)} retail price</p>
+                            </button>
+                            {selectedProductIds.has(p.id) ? (
+                              <div className="flex items-center gap-2">
+                                <button onClick={() => updateProductQty(p.id, (selectedProductIds.get(p.id) || 1) - 1)} className="h-7 w-7 bg-violet-100 text-violet-600 rounded-lg flex items-center justify-center font-bold transition-colors hover:bg-violet-200">−</button>
+                                <span className="w-5 text-center text-xs font-bold">{selectedProductIds.get(p.id)}</span>
+                                <button onClick={() => updateProductQty(p.id, (selectedProductIds.get(p.id) || 1) + 1)} className="h-7 w-7 bg-violet-100 text-violet-600 rounded-lg flex items-center justify-center font-bold transition-colors hover:bg-violet-200">+</button>
+                              </div>
+                            ) : (
+                              <Button variant="ghost" size="sm" onClick={() => toggleProduct(p.id)} className="text-violet-600 hover:bg-violet-100 rounded-lg h-8">
+                                Add
+                              </Button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                      <Button
+                        onClick={() => addSelectedProducts(activeItemForConsumables.id)}
+                        disabled={addingItems || selectedProductIds.size === 0}
+                        className="w-full h-12 bg-violet-600 hover:bg-violet-700 text-white rounded-xl shadow-lg shadow-violet-200 font-bold"
+                      >
+                        {addingItems ? "Adding..." : `Add ${selectedProductIds.size} Items to Purchase`}
+                      </Button>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -651,7 +771,7 @@ export default function ActiveOrderPage() {
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input placeholder="Search services..." value={modalSearch} onChange={(e) => setModalSearch(e.target.value)} className="pl-9 rounded-xl border-pink-100" />
                   </div>
-                  <div className="overflow-y-auto h-120">
+                  <div className="overflow-y-auto max-h-[400px] space-y-4 pr-1">
                     {Object.entries(servicesByCategory).map(([category, items]) => (
                       <div key={category} className="space-y-1.5">
                         <p className="text-[10px] font-bold text-pink-400 uppercase tracking-widest px-1">{category}</p>
@@ -664,7 +784,7 @@ export default function ActiveOrderPage() {
                       </div>
                     ))}
                   </div>
-                  <Button onClick={addSelectedServices} disabled={addingItems || selectedServiceIds.size === 0} className="w-full h-12 bg-pink-600 hover:bg-pink-700 text-white rounded-xl shadow-lg shadow-pink-200">
+                  <Button onClick={addSelectedServices} disabled={addingItems || selectedServiceIds.size === 0} className="w-full h-12 bg-pink-600 hover:bg-pink-700 text-white rounded-xl shadow-lg shadow-pink-200 font-bold">
                     {addingItems ? "Adding..." : `Add ${selectedServiceIds.size} Services`}
                   </Button>
                 </div>
@@ -674,28 +794,35 @@ export default function ActiveOrderPage() {
                 <div className="space-y-4">
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input placeholder="Search extra products..." value={modalSearch} onChange={(e) => setModalSearch(e.target.value)} className="pl-9 rounded-xl border-violet-100" />
+                    <Input placeholder="Search products..." value={modalSearch} onChange={(e) => setModalSearch(e.target.value)} className="pl-9 rounded-xl border-violet-100" />
                   </div>
-                  {Object.entries(productsByCategory).map(([category, items]) => (
-                    <div key={category} className="space-y-1.5">
-                      <p className="text-[10px] font-bold text-violet-400 uppercase tracking-widest px-1">{category}</p>
-                      {items.map(p => (
-                        <div key={p.id} className={`w-full flex items-center justify-between p-3 rounded-xl border-2 transition-all ${selectedProductIds.has(p.id) ? "bg-violet-50 border-violet-300" : "bg-white border-transparent hover:bg-violet-25"}`}>
-                          <button onClick={() => toggleProduct(p.id)} className="flex-1 text-left">
-                            <span className="text-sm font-medium">{p.name}</span>
-                          </button>
-                          {selectedProductIds.has(p.id) && (
-                            <div className="flex items-center gap-2">
-                              <button onClick={() => updateProductQty(p.id, (selectedProductIds.get(p.id) || 1) - 1)} className="h-6 w-6 bg-violet-100 rounded flex items-center justify-center font-bold">−</button>
-                              <span className="w-4 text-center text-xs">{selectedProductIds.get(p.id)}</span>
-                              <button onClick={() => updateProductQty(p.id, (selectedProductIds.get(p.id) || 1) + 1)} className="h-6 w-6 bg-violet-100 rounded flex items-center justify-center font-bold">+</button>
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  ))}
-                  <Button onClick={addSelectedProducts} disabled={addingItems || selectedProductIds.size === 0} className="w-full h-12 bg-violet-600 hover:bg-violet-700 text-white rounded-xl shadow-lg shadow-violet-200">
+                  <div className="overflow-y-auto max-h-[400px] space-y-4 pr-1">
+                    {Object.entries(productsByCategory).map(([category, items]) => (
+                      <div key={category} className="space-y-1.5">
+                        <p className="text-[10px] font-bold text-violet-400 uppercase tracking-widest px-1">{category}</p>
+                        {items.map(p => (
+                          <div key={p.id} className={`w-full flex items-center justify-between p-3 rounded-xl border-2 transition-all ${selectedProductIds.has(p.id) ? "bg-violet-50 border-violet-300" : "bg-white border-transparent hover:bg-violet-25"}`}>
+                            <button onClick={() => toggleProduct(p.id)} className="flex-1 text-left">
+                              <span className="text-sm font-medium">{p.name}</span>
+                              <p className="text-[10px] text-violet-500 font-bold">ETB {Number(p.sellPrice).toFixed(2)}</p>
+                            </button>
+                            {selectedProductIds.has(p.id) ? (
+                              <div className="flex items-center gap-2">
+                                <button onClick={() => updateProductQty(p.id, (selectedProductIds.get(p.id) || 1) - 1)} className="h-7 w-7 bg-violet-100 text-violet-600 rounded-lg flex items-center justify-center font-bold">−</button>
+                                <span className="w-5 text-center text-xs font-bold">{selectedProductIds.get(p.id)}</span>
+                                <button onClick={() => updateProductQty(p.id, (selectedProductIds.get(p.id) || 1) + 1)} className="h-7 w-7 bg-violet-100 text-violet-600 rounded-lg flex items-center justify-center font-bold">+</button>
+                              </div>
+                            ) : (
+                              <Button variant="ghost" size="sm" onClick={() => toggleProduct(p.id)} className="text-violet-600 hover:bg-violet-100 rounded-lg h-8">
+                                Add
+                              </Button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                  <Button onClick={() => addSelectedProducts()} disabled={addingItems || selectedProductIds.size === 0} className="w-full h-12 bg-violet-600 hover:bg-violet-700 text-white rounded-xl shadow-lg shadow-violet-200 font-bold">
                     {addingItems ? "Adding..." : `Add ${selectedProductIds.size} Products`}
                   </Button>
                 </div>

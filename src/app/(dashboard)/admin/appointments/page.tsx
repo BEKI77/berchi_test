@@ -1,10 +1,18 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
+import { hasPermission } from "@/lib/permissions";
 import { AppointmentsClient } from "./appointments-client";
 
 export default async function AppointmentsPage() {
   const session = await auth();
-  if (session?.user?.role !== "OWNER") redirect("/");
+  if (!session?.user) {
+    redirect("/login");
+  }
+
+  const canViewAppointments = await hasPermission(session.user.id, "appointments.view");
+  if (!canViewAppointments) {
+    redirect("/");
+  }
 
   return <AppointmentsClient />;
 }

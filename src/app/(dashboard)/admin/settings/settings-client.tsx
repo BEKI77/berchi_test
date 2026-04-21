@@ -98,163 +98,262 @@ export function SettingsClient() {
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-20 gap-3">
-        <div className="h-10 w-10 rounded-full border-3 border-gray-200 border-t-gray-500 animate-spin" />
+        <div className="h-10 w-10 rounded-full border-2 border-border border-t-foreground/80 animate-spin" />
         <p className="text-sm text-muted-foreground">Loading settings...</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 max-w-2xl">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-          <Settings className="h-6 w-6 text-gray-500" />
-          Settings
-        </h1>
-        <p className="text-muted-foreground mt-1">Configure your salon system</p>
+    <div className="mx-auto flex max-w-5xl flex-col gap-8">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-[11px] font-medium uppercase tracking-[0.25em] text-muted-foreground">Admin</p>
+          <h1 className="mt-2 flex items-center gap-2 text-2xl font-semibold tracking-tight">
+            <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <Settings className="h-4 w-4" />
+            </span>
+            <span>Settings</span>
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Fine-tune how your salon operates across locations, hours, and finance.
+          </p>
+        </div>
+        <Button
+          onClick={handleSave}
+          disabled={saving}
+          className="hidden h-10 items-center gap-2 rounded-full px-5 text-sm font-medium shadow-sm md:inline-flex"
+        >
+          <Save className="h-4 w-4" />
+          {saving ? "Saving..." : "Save changes"}
+        </Button>
       </div>
 
-      {/* Salon Info */}
-      <Card className="rounded-xl border-gray-200 overflow-hidden">
-        <div className="h-1 bg-gradient-to-r from-pink-400 to-rose-400" />
-        <CardContent className="pt-5 space-y-4">
-          <h3 className="text-sm font-semibold uppercase tracking-wider text-pink-600">Salon Profile</h3>
-          <div className="space-y-1.5">
-            <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Salon Name</Label>
-            <Input value={form.salonName} onChange={(e) => setForm({ ...form, salonName: e.target.value })} className="rounded-xl" />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Phone</Label>
-              <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="rounded-xl" />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Currency</Label>
-              <Input value={form.currency} onChange={(e) => setForm({ ...form, currency: e.target.value })} className="rounded-xl" />
-            </div>
-          </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Address</Label>
-            <Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} className="rounded-xl" />
-          </div>
-        </CardContent>
-      </Card>
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1.3fr)]">
+        <div className="space-y-6">
+          {/* Salon Info */}
+          <Card className="border border-border/60 bg-gradient-to-b from-background to-muted/40 shadow-sm">
+            <CardContent className="space-y-6 p-6">
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <h3 className="text-sm font-medium text-foreground">Salon profile</h3>
+                  <p className="text-xs text-muted-foreground">Details shown on invoices, receipts and client messages.</p>
+                </div>
+              </div>
 
-      {/* Business Hours */}
-      <Card className="rounded-xl border-gray-200 overflow-hidden">
-        <div className="h-1 bg-gradient-to-r from-blue-400 to-indigo-400" />
-        <CardContent className="pt-5 space-y-4">
-          <h3 className="text-sm font-semibold uppercase tracking-wider text-blue-600">Business Hours</h3>
-          <div className="space-y-3">
-            {DAY_NAMES.map((day) => {
-              const hours = form.businessHours[day] || { open: "closed", close: "closed" };
-              const isClosed = hours.open === "closed";
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium text-muted-foreground">Salon name</Label>
+                  <Input
+                    value={form.salonName}
+                    onChange={(e) => setForm({ ...form, salonName: e.target.value })}
+                    className="h-9 rounded-xl border-input bg-background/80 text-sm"
+                  />
+                </div>
 
-              return (
-                <div key={day} className="flex items-center justify-between p-3 rounded-xl border border-gray-100 bg-gray-50/50">
-                  <div className="w-24">
-                    <span className="text-sm font-medium capitalize">{day}</span>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-medium text-muted-foreground">Phone number</Label>
+                    <Input
+                      value={form.phone}
+                      onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                      className="h-9 rounded-xl border-input bg-background/80 text-sm"
+                    />
                   </div>
-
-                  <div className="flex items-center gap-3">
-                    {!isClosed ? (
-                      <div className="flex items-center gap-2">
-                        <Input
-                          type="time"
-                          value={hours.open}
-                          onChange={(e) => handleHourChange(day, "open", e.target.value)}
-                          className="w-32 h-9 rounded-lg"
-                        />
-                        <span className="text-xs text-muted-foreground">to</span>
-                        <Input
-                          type="time"
-                          value={hours.close}
-                          onChange={(e) => handleHourChange(day, "close", e.target.value)}
-                          className="w-32 h-9 rounded-lg"
-                        />
-                      </div>
-                    ) : (
-                      <span className="text-sm text-muted-foreground italic w-[280px] text-center">Closed</span>
-                    )}
-
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => toggleClosed(day)}
-                      className={`h-9 px-3 rounded-lg text-xs font-semibold uppercase tracking-wider ${isClosed ? "text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50" : "text-rose-600 hover:text-rose-700 hover:bg-rose-50"
-                        }`}
-                    >
-                      {isClosed ? "Open" : "Close"}
-                    </Button>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-medium text-muted-foreground">Currency</Label>
+                    <Input
+                      value={form.currency}
+                      onChange={(e) => setForm({ ...form, currency: e.target.value })}
+                      className="h-9 rounded-xl border-input bg-background/80 text-sm"
+                    />
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
 
-      {/* Financial */}
-      <Card className="rounded-xl border-gray-200 overflow-hidden">
-        <div className="h-1 bg-gradient-to-r from-emerald-400 to-teal-400" />
-        <CardContent className="pt-5 space-y-4">
-          <h3 className="text-sm font-semibold uppercase tracking-wider text-emerald-600">Financial Settings</h3>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Tax Rate (%)</Label>
-              <Input type="number" min={0} max={100} value={form.taxRate || ""} onChange={(e) => setForm({ ...form, taxRate: Number(e.target.value) || 0 })} className="rounded-xl" />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Default Commission (%)</Label>
-              <Input type="number" min={0} max={100} value={form.commissionDefault || ""} onChange={(e) => setForm({ ...form, commissionDefault: Number(e.target.value) || 0 })} className="rounded-xl" />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium text-muted-foreground">Address</Label>
+                  <Input
+                    value={form.address}
+                    onChange={(e) => setForm({ ...form, address: e.target.value })}
+                    className="h-9 rounded-xl border-input bg-background/80 text-sm"
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
-      {/* Receipt */}
-      <Card className="rounded-xl border-gray-200 overflow-hidden">
-        <div className="h-1 bg-gradient-to-r from-amber-400 to-orange-400" />
-        <CardContent className="pt-5 space-y-4">
-          <h3 className="text-sm font-semibold uppercase tracking-wider text-amber-600">Receipt Settings</h3>
-          <label className="flex items-center gap-3 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={form.receiptsEnabled}
-              onChange={(e) => setForm({ ...form, receiptsEnabled: e.target.checked })}
-              className="h-5 w-5 rounded border-gray-300 text-amber-500 focus:ring-amber-400"
-            />
-            <span className="text-sm font-medium">Enable receipt generation after payment</span>
-          </label>
-        </CardContent>
-      </Card>
+          {/* Business Hours */}
+          <Card className="border border-border/60 bg-card shadow-sm">
+            <CardContent className="space-y-5 p-6">
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <h3 className="text-sm font-medium text-foreground">Business hours</h3>
+                  <p className="text-xs text-muted-foreground">Control when bookings and walk-ins are allowed.</p>
+                </div>
+              </div>
 
-      {/* Permissions Management */}
-      <Card className="rounded-xl border-gray-200 overflow-hidden">
-        <div className="h-1 bg-gradient-to-r from-purple-400 to-indigo-400" />
-        <CardContent className="pt-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-sm font-semibold uppercase tracking-wider text-purple-600">Permission Management</h3>
-              <p className="text-xs text-muted-foreground mt-1">Manage user roles and access permissions</p>
-            </div>
-            <Button
-              variant="outline"
-              onClick={() => window.location.href = "/admin/settings/permissions"}
-              className="flex items-center gap-2 rounded-lg"
-            >
-              <Shield className="h-4 w-4" />
-              Manage Permissions
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+              <div className="space-y-2 text-[11px] text-muted-foreground">
+                <p>Use the toggle to quickly set a day as closed.</p>
+              </div>
 
-      <Button onClick={handleSave} disabled={saving} className="w-full h-12 rounded-xl bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 shadow-md shadow-pink-200/30 text-base font-semibold">
-        <Save className="h-5 w-5 mr-2" />
-        {saving ? "Saving..." : "Save Settings"}
-      </Button>
+              <div className="space-y-3">
+                {DAY_NAMES.map((day) => {
+                  const hours = form.businessHours[day] || { open: "closed", close: "closed" };
+                  const isClosed = hours.open === "closed";
+
+                  return (
+                    <div
+                      key={day}
+                      className="flex flex-col gap-3 rounded-xl border border-border/70 bg-muted/40 px-3 py-3 sm:flex-row sm:items-center sm:justify-between"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium capitalize">{day}</span>
+                        {isClosed && (
+                          <span className="rounded-full bg-background px-2 py-[2px] text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                            Closed
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex flex-1 flex-col items-stretch justify-end gap-2 sm:flex-row sm:items-center sm:gap-3">
+                        {!isClosed ? (
+                          <div className="flex flex-1 items-center gap-2">
+                            <Input
+                              type="time"
+                              value={hours.open}
+                              onChange={(e) => handleHourChange(day, "open", e.target.value)}
+                              className="h-9 w-full rounded-lg border-input bg-background text-xs sm:w-28"
+                            />
+                            <span className="text-xs text-muted-foreground">to</span>
+                            <Input
+                              type="time"
+                              value={hours.close}
+                              onChange={(e) => handleHourChange(day, "close", e.target.value)}
+                              className="h-9 w-full rounded-lg border-input bg-background text-xs sm:w-28"
+                            />
+                          </div>
+                        ) : (
+                          <span className="text-xs italic text-muted-foreground sm:w-[220px] sm:text-right">
+                            This day is currently marked as closed.
+                          </span>
+                        )}
+
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => toggleClosed(day)}
+                          className="h-8 rounded-full px-3 text-[11px] font-semibold uppercase tracking-wide"
+                        >
+                          {isClosed ? "Mark open" : "Mark closed"}
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="space-y-6">
+          {/* Financial */}
+          <Card className="border border-border/60 bg-card shadow-sm">
+            <CardContent className="space-y-5 p-6">
+              <div>
+                <h3 className="text-sm font-medium text-foreground">Financial settings</h3>
+                <p className="text-xs text-muted-foreground">Defaults applied to invoices, services and commissions.</p>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium text-muted-foreground">Tax rate (%)</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={form.taxRate || ""}
+                    onChange={(e) => setForm({ ...form, taxRate: Number(e.target.value) || 0 })}
+                    className="h-9 rounded-xl border-input bg-background/80 text-sm"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium text-muted-foreground">Default commission (%)</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={form.commissionDefault || ""}
+                    onChange={(e) => setForm({ ...form, commissionDefault: Number(e.target.value) || 0 })}
+                    className="h-9 rounded-xl border-input bg-background/80 text-sm"
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Receipt */}
+          <Card className="border border-border/60 bg-card shadow-sm">
+            <CardContent className="space-y-4 p-6">
+              <div>
+                <h3 className="text-sm font-medium text-foreground">Receipt settings</h3>
+                <p className="text-xs text-muted-foreground">Automatically create receipts after successful payments.</p>
+              </div>
+              <label className="flex items-center justify-between gap-3">
+                <div className="space-y-0.5">
+                  <p className="text-sm font-medium">Enable receipts</p>
+                  <p className="text-xs text-muted-foreground">Send a digital receipt to clients whenever a sale is completed.</p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={form.receiptsEnabled}
+                  onChange={(e) => setForm({ ...form, receiptsEnabled: e.target.checked })}
+                  className="h-5 w-9 cursor-pointer appearance-none rounded-full border border-input bg-muted outline-none transition-[background-color] checked:bg-primary"
+                />
+              </label>
+            </CardContent>
+          </Card>
+
+          {/* Permissions Management */}
+          <Card className="border border-border/60 bg-card shadow-sm">
+            <CardContent className="flex items-start justify-between gap-4 p-6">
+              <div>
+                <div className="inline-flex items-center gap-2 rounded-full bg-muted px-2.5 py-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                  <Shield className="h-3.5 w-3.5" />
+                  Permissions
+                </div>
+                <h3 className="mt-3 text-sm font-medium text-foreground">Role & access management</h3>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Control what your team can see and do inside the admin dashboard.
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                onClick={() => (window.location.href = "/admin/settings/permissions")}
+                className="inline-flex items-center gap-2 rounded-full px-4 text-xs font-medium"
+              >
+                <Shield className="h-4 w-4" />
+                Manage roles
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-3 border-t border-border/60 pt-4">
+        <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <span>Changes are applied to all new bookings and sales.</span>
+        </div>
+        <Button
+          onClick={handleSave}
+          disabled={saving}
+          className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-primary to-primary/80 text-sm font-semibold text-primary-foreground shadow-sm hover:from-primary hover:to-primary/90 md:w-auto md:self-end"
+        >
+          <Save className="h-4 w-4" />
+          {saving ? "Saving..." : "Save changes"}
+        </Button>
+      </div>
     </div>
 
   );
 }
+

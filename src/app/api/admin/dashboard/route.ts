@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { hasPermission } from "@/lib/permissions";
 import { and, eq, gte, count as countFn } from "drizzle-orm";
 import { db } from "@/db";
 import {
@@ -9,7 +10,12 @@ import {
 
 export async function GET() {
   const session = await auth();
-  if (session?.user?.role !== "OWNER") {
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const canViewDashboard = await hasPermission(session.user.id, "dashboard.view");
+  if (!canViewDashboard) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

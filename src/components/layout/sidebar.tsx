@@ -36,6 +36,7 @@ const serverNav: NavItem[] = [
 ];
 
 const cashierNav: NavItem[] = [
+  { title: "Dashboard", href: "/admin", icon: LayoutDashboard },
   { title: "Pending Orders", href: "/cashier", icon: ClipboardList },
   { title: "Appointments", href: "/cashier/appointments", icon: Calendar },
   { title: "Transactions", href: "/cashier/transactions", icon: CreditCard },

@@ -63,6 +63,7 @@ export function PermissionsClient() {
   });
   const [showRoleForm, setShowRoleForm] = useState(false);
   const [selectedPermissions, setSelectedPermissions] = useState<string[]>([]);
+  const [editingRoleId, setEditingRoleId] = useState<string | null>(null);
 
   // User-specific permission editing state
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
@@ -137,14 +138,63 @@ export function PermissionsClient() {
       }
 
       toast.success("Role created successfully");
-      setShowRoleForm(false);
-      setRoleForm({ name: "", description: "" });
-      setSelectedPermissions([]);
+      resetRoleFormState();
       fetchData();
     } catch (error) {
       console.error("Error creating role:", error);
       toast.error(error instanceof Error ? error.message : "Failed to create role");
     }
+  }
+
+  async function updateRole() {
+    if (!editingRoleId) return;
+
+    try {
+      const res = await fetch(`/api/admin/roles/${editingRoleId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...roleForm,
+          permissionIds: selectedPermissions,
+        }),
+      });
+
+      if (!res.ok) {
+        const error = await res.json().catch(() => null);
+        throw new Error(error?.error || "Failed to update role");
+      }
+
+      toast.success("Role updated successfully");
+      resetRoleFormState();
+      fetchData();
+    } catch (error) {
+      console.error("Error updating role:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to update role");
+    }
+  }
+
+  function resetRoleFormState() {
+    setEditingRoleId(null);
+    setRoleForm({ name: "", description: "" });
+    setSelectedPermissions([]);
+    setShowRoleForm(false);
+  }
+
+  function startCreateRoleForm() {
+    setEditingRoleId(null);
+    setRoleForm({ name: "", description: "" });
+    setSelectedPermissions([]);
+    setShowRoleForm(true);
+  }
+
+  function startEditRoleForm(role: Role) {
+    setEditingRoleId(role.id);
+    setRoleForm({
+      name: role.name,
+      description: role.description || "",
+    });
+    setSelectedPermissions((role.permissions || []).map((permission) => permission.id));
+    setShowRoleForm(true);
   }
 
   async function updateUserPermission(userId: string, permissionId: string, action: "grant" | "deny" | "remove") {
@@ -206,115 +256,160 @@ export function PermissionsClient() {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 gap-3">
-        <div className="h-10 w-10 rounded-full border-3 border-gray-200 border-t-gray-500 animate-spin" />
+      <div className="flex flex-col items-center justify-center gap-3 py-20">
+        <div className="h-10 w-10 animate-spin rounded-full border-2 border-border border-t-foreground/80" />
         <p className="text-sm text-muted-foreground">Loading permissions...</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-          <Shield className="h-6 w-6 text-gray-500" />
-          Permission Management
-        </h1>
-        <p className="text-muted-foreground mt-1">Manage user roles and permissions</p>
+    <div className="mx-auto flex max-w-5xl flex-col gap-8">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-[11px] font-medium uppercase tracking-[0.25em] text-muted-foreground">Admin</p>
+          <h1 className="mt-2 flex items-center gap-2 text-2xl font-semibold tracking-tight">
+            <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <Shield className="h-4 w-4" />
+            </span>
+            <span>Permissions</span>
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Define what each role and team member can see and do inside your salon system.
+          </p>
+        </div>
       </div>
 
-      {/* Tab Navigation */}
-      <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg">
-        <Button
-          variant={activeTab === "permissions" ? "default" : "ghost"}
-          onClick={() => setActiveTab("permissions")}
-          className="flex items-center gap-2"
-        >
-          <Key className="h-4 w-4" />
-          Permissions
-        </Button>
-        <Button
-          variant={activeTab === "roles" ? "default" : "ghost"}
-          onClick={() => setActiveTab("roles")}
-          className="flex items-center gap-2"
-        >
-          <Users className="h-4 w-4" />
-          Roles
-        </Button>
-        <Button
-          variant={activeTab === "users" ? "default" : "ghost"}
-          onClick={() => setActiveTab("users")}
-          className="flex items-center gap-2"
-        >
-          <Shield className="h-4 w-4" />
-          User Permissions
-        </Button>
-      </div>
+      {/* Tabs */}
+      <Card className="border border-border/60 bg-card shadow-sm">
+        <CardContent className="flex flex-col gap-4 p-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="inline-flex items-center gap-2 rounded-full bg-muted px-2.5 py-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            <Key className="h-3.5 w-3.5" />
+            Access control
+          </div>
+          <div className="flex w-full gap-1 rounded-full bg-muted p-1 sm:w-auto">
+            <Button
+              type="button"
+              variant={activeTab === "permissions" ? "default" : "ghost"}
+              onClick={() => setActiveTab("permissions")}
+              className={`h-8 flex-1 rounded-full px-3 text-xs font-medium sm:flex-none ${activeTab === "permissions" ? "shadow-sm" : "text-muted-foreground"}`}
+            >
+              <span className="flex items-center justify-center gap-1.5">
+                <Key className="h-3.5 w-3.5" />
+                <span>Permissions</span>
+              </span>
+            </Button>
+            <Button
+              type="button"
+              variant={activeTab === "roles" ? "default" : "ghost"}
+              onClick={() => setActiveTab("roles")}
+              className={`h-8 flex-1 rounded-full px-3 text-xs font-medium sm:flex-none ${activeTab === "roles" ? "shadow-sm" : "text-muted-foreground"}`}
+            >
+              <span className="flex items-center justify-center gap-1.5">
+                <Users className="h-3.5 w-3.5" />
+                <span>Roles</span>
+              </span>
+            </Button>
+            <Button
+              type="button"
+              variant={activeTab === "users" ? "default" : "ghost"}
+              onClick={() => setActiveTab("users")}
+              className={`h-8 flex-1 rounded-full px-3 text-xs font-medium sm:flex-none ${activeTab === "users" ? "shadow-sm" : "text-muted-foreground"}`}
+            >
+              <span className="flex items-center justify-center gap-1.5">
+                <Shield className="h-3.5 w-3.5" />
+                <span>Users</span>
+              </span>
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Permissions Tab */}
       {activeTab === "permissions" && (
-        <div className="space-y-4">
-          <div className="flex justify-between items-center">
-            <h3 className="text-lg font-semibold">System Permissions</h3>
-            <Button onClick={() => setShowPermissionForm(true)} className="flex items-center gap-2">
-              <Plus className="h-4 w-4" />
-              Add Permission
+        <div className="space-y-5">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h3 className="text-sm font-medium text-foreground">System permissions</h3>
+              <p className="text-xs text-muted-foreground">Fine-grained capabilities grouped by resource.</p>
+            </div>
+            <Button
+              type="button"
+              onClick={() => setShowPermissionForm(true)}
+              className="inline-flex items-center gap-2 rounded-full px-4 text-xs font-medium"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              New permission
             </Button>
           </div>
 
           {showPermissionForm && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  <span>Create New Permission</span>
-                  <Button variant="ghost" size="sm" onClick={() => setShowPermissionForm(false)}>
-                    <X className="h-4 w-4" />
+            <Card className="border border-border/60 bg-card shadow-sm">
+              <CardHeader className="px-6 pb-2 pt-5">
+                <CardTitle className="flex items-center justify-between text-sm font-medium">
+                  <span>Create permission</span>
+                  <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full" onClick={() => setShowPermissionForm(false)}>
+                    <X className="h-3.5 w-3.5" />
                   </Button>
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Permission Name</Label>
+              <CardContent className="space-y-4 px-6 pb-6 pt-2">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-medium text-muted-foreground">Permission name</Label>
                     <Input
                       value={permissionForm.name}
                       onChange={(e) => setPermissionForm({ ...permissionForm, name: e.target.value })}
-                      placeholder="e.g., appointments.create"
+                      placeholder="e.g. appointments.create"
+                      className="h-9 rounded-xl border-input bg-background/80 text-sm"
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label>Resource</Label>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-medium text-muted-foreground">Resource</Label>
                     <Input
                       value={permissionForm.resource}
                       onChange={(e) => setPermissionForm({ ...permissionForm, resource: e.target.value })}
-                      placeholder="e.g., appointments"
+                      placeholder="e.g. appointments"
+                      className="h-9 rounded-xl border-input bg-background/80 text-sm"
                     />
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Action</Label>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-medium text-muted-foreground">Action</Label>
                     <Input
                       value={permissionForm.action}
                       onChange={(e) => setPermissionForm({ ...permissionForm, action: e.target.value })}
-                      placeholder="e.g., create"
+                      placeholder="e.g. create"
+                      className="h-9 rounded-xl border-input bg-background/80 text-sm"
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label>Description</Label>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-medium text-muted-foreground">Description</Label>
                     <Input
                       value={permissionForm.description}
                       onChange={(e) => setPermissionForm({ ...permissionForm, description: e.target.value })}
                       placeholder="Optional description"
+                      className="h-9 rounded-xl border-input bg-background/80 text-sm"
                     />
                   </div>
                 </div>
-                <div className="flex gap-2">
-                  <Button onClick={createPermission} className="flex items-center gap-2">
-                    <Save className="h-4 w-4" />
-                    Create Permission
+                <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+                  <Button
+                    type="button"
+                    onClick={createPermission}
+                    className="inline-flex items-center gap-2 rounded-full px-4 text-xs font-medium"
+                  >
+                    <Save className="h-3.5 w-3.5" />
+                    Create permission
                   </Button>
-                  <Button variant="outline" onClick={() => setShowPermissionForm(false)}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setShowPermissionForm(false)}
+                    className="rounded-full px-4 text-xs font-medium"
+                  >
                     Cancel
                   </Button>
                 </div>
@@ -324,24 +419,35 @@ export function PermissionsClient() {
 
           <div className="space-y-4">
             {Object.entries(groupedPermissions).map(([resource, resourcePermissions]) => (
-              <Card key={resource}>
-                <CardHeader>
-                  <CardTitle className="capitalize">{resource}</CardTitle>
+              <Card
+                key={resource}
+                className="border border-border/60 bg-linear-to-b from-background to-muted/40 shadow-sm"
+              >
+                <CardHeader className="px-5 pb-2 pt-4">
+                  <CardTitle className="flex items-center justify-between text-sm font-medium">
+                    <span className="capitalize">{resource}</span>
+                    <span className="text-[11px] text-muted-foreground">
+                      {resourcePermissions.length} permission{resourcePermissions.length !== 1 ? "s" : ""}
+                    </span>
+                  </CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                <CardContent className="px-5 pb-5 pt-2">
+                  <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
                     {resourcePermissions.map((permission) => (
                       <div
                         key={permission.id}
-                        className="flex items-center justify-between p-3 border rounded-lg"
+                        className="flex items-start justify-between gap-3 rounded-xl border border-border/60 bg-background/80 p-3"
                       >
                         <div>
-                          <div className="font-medium text-sm">{permission.name}</div>
+                          <div className="text-sm font-medium">{permission.name}</div>
                           <div className="text-xs text-muted-foreground">
                             {permission.description || permission.action}
                           </div>
                         </div>
-                        <Badge variant={permission.isActive ? "default" : "secondary"}>
+                        <Badge
+                          variant={permission.isActive ? "default" : "secondary"}
+                          className="mt-0.5 text-[11px] uppercase tracking-wide"
+                        >
                           {permission.action}
                         </Badge>
                       </div>
@@ -356,49 +462,67 @@ export function PermissionsClient() {
 
       {/* Roles Tab */}
       {activeTab === "roles" && (
-        <div className="space-y-4">
-          <div className="flex justify-between items-center">
-            <h3 className="text-lg font-semibold">System Roles</h3>
-            <Button onClick={() => setShowRoleForm(true)} className="flex items-center gap-2">
-              <Plus className="h-4 w-4" />
-              Add Role
+        <div className="space-y-5">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h3 className="text-sm font-medium text-foreground">System roles</h3>
+              <p className="text-xs text-muted-foreground">High-level access profiles composed of many permissions.</p>
+            </div>
+            <Button
+              type="button"
+              onClick={startCreateRoleForm}
+              className="inline-flex items-center gap-2 rounded-full px-4 text-xs font-medium"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              New role
             </Button>
           </div>
 
           {showRoleForm && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  <span>Create New Role</span>
-                  <Button variant="ghost" size="sm" onClick={() => setShowRoleForm(false)}>
-                    <X className="h-4 w-4" />
+            <Card className="border border-border/60 bg-card shadow-sm">
+              <CardHeader className="px-6 pb-2 pt-5">
+                <CardTitle className="flex items-center justify-between text-sm font-medium">
+                  <span>{editingRoleId ? "Edit role" : "Create role"}</span>
+                  <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full" onClick={resetRoleFormState}>
+                    <X className="h-3.5 w-3.5" />
                   </Button>
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Role Name</Label>
+              <CardContent className="space-y-4 px-6 pb-6 pt-2">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-medium text-muted-foreground">Role name</Label>
                     <Input
                       value={roleForm.name}
                       onChange={(e) => setRoleForm({ ...roleForm, name: e.target.value })}
-                      placeholder="e.g., MANAGER"
+                      placeholder="e.g. MANAGER"
+                      className="h-9 rounded-xl border-input bg-background/80 text-sm"
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label>Description</Label>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-medium text-muted-foreground">Description</Label>
                     <Input
                       value={roleForm.description}
                       onChange={(e) => setRoleForm({ ...roleForm, description: e.target.value })}
                       placeholder="Optional description"
+                      className="h-9 rounded-xl border-input bg-background/80 text-sm"
                     />
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label>Permissions</Label>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-40 overflow-y-auto p-2 border rounded-lg">
+                  <Label className="text-xs font-medium text-muted-foreground">Permissions</Label>
+                  <div className="max-h-44 space-y-1 overflow-y-auto rounded-xl border border-border/60 bg-muted/40 p-2">
                     {permissions.map((permission) => (
-                      <label key={permission.id} className="flex items-center space-x-2 cursor-pointer">
+                      <label
+                        key={permission.id}
+                        className="flex cursor-pointer items-center justify-between gap-2 rounded-lg bg-background px-2 py-1.5 text-xs"
+                      >
+                        <div className="flex flex-col">
+                          <span className="font-medium">{permission.name}</span>
+                          <span className="text-[11px] text-muted-foreground">
+                            {permission.description || `${permission.resource}.${permission.action}`}
+                          </span>
+                        </div>
                         <input
                           type="checkbox"
                           checked={selectedPermissions.includes(permission.id)}
@@ -406,22 +530,30 @@ export function PermissionsClient() {
                             if (e.target.checked) {
                               setSelectedPermissions([...selectedPermissions, permission.id]);
                             } else {
-                              setSelectedPermissions(selectedPermissions.filter(id => id !== permission.id));
+                              setSelectedPermissions(selectedPermissions.filter((id) => id !== permission.id));
                             }
                           }}
-                          className="rounded"
+                          className="h-3.5 w-3.5 rounded border-input text-primary focus-visible:outline-none"
                         />
-                        <span className="text-sm">{permission.name}</span>
                       </label>
                     ))}
                   </div>
                 </div>
-                <div className="flex gap-2">
-                  <Button onClick={createRole} className="flex items-center gap-2">
-                    <Save className="h-4 w-4" />
-                    Create Role
+                <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+                  <Button
+                    type="button"
+                    onClick={editingRoleId ? updateRole : createRole}
+                    className="inline-flex items-center gap-2 rounded-full px-4 text-xs font-medium"
+                  >
+                    <Save className="h-3.5 w-3.5" />
+                    {editingRoleId ? "Save changes" : "Create role"}
                   </Button>
-                  <Button variant="outline" onClick={() => setShowRoleForm(false)}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={resetRoleFormState}
+                    className="rounded-full px-4 text-xs font-medium"
+                  >
                     Cancel
                   </Button>
                 </div>
@@ -429,29 +561,34 @@ export function PermissionsClient() {
             </Card>
           )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid gap-4 md:grid-cols-2">
             {roles.map((role) => (
-              <Card key={role.id}>
-                <CardHeader>
-                  <CardTitle className="flex items-center justify-between">
+              <Card key={role.id} className="border border-border/60 bg-card shadow-sm">
+                <CardHeader className="px-5 pb-2 pt-4">
+                  <CardTitle className="flex items-center justify-between text-sm font-medium">
                     <span>{role.name}</span>
-                    <div className="flex gap-2">
-                      <Button variant="ghost" size="sm">
-                        <Edit className="h-4 w-4" />
+                    <div className="flex gap-1.5">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 rounded-full"
+                        onClick={() => startEditRoleForm(role)}
+                      >
+                        <Edit className="h-3.5 w-3.5" />
                       </Button>
-                      <Button variant="ghost" size="sm">
-                        <Trash2 className="h-4 w-4" />
+                      <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full">
+                        <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     </div>
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="px-5 pb-4 pt-1">
                   {role.description && (
-                    <p className="text-sm text-muted-foreground mb-3">{role.description}</p>
+                    <p className="mb-2 text-xs text-muted-foreground">{role.description}</p>
                   )}
                   <div className="flex flex-wrap gap-1">
                     {role.permissions?.map((permission) => (
-                      <Badge key={permission.id} variant="secondary" className="text-xs">
+                      <Badge key={permission.id} variant="secondary" className="text-[11px]">
                         {permission.name}
                       </Badge>
                     ))}
@@ -465,32 +602,41 @@ export function PermissionsClient() {
 
       {/* User Permissions Tab */}
       {activeTab === "users" && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold">User Permission Overrides</h3>
-            <p className="text-xs text-muted-foreground">
-              Select a user to fine-tune permissions on top of their role.
-            </p>
+        <div className="space-y-5">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h3 className="text-sm font-medium text-foreground">User permission overrides</h3>
+              <p className="text-xs text-muted-foreground">
+                Start from the user’s role, then override specific permissions only where needed.
+              </p>
+            </div>
           </div>
 
           {/* Users grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
             {users.map((user) => {
               const isSelected = selectedUser?.id === user.id;
               return (
-                <Card key={user.id} className={isSelected ? "border-pink-400 shadow-sm" : ""}>
-                  <CardHeader>
-                    <CardTitle className="flex items-center justify-between">
+                <Card
+                  key={user.id}
+                  className={`border bg-card shadow-sm transition-colors ${isSelected ? "border-primary/60" : "border-border/60"
+                    }`}
+                >
+                  <CardHeader className="px-5 pb-3 pt-4">
+                    <CardTitle className="flex items-center justify-between text-sm font-medium">
                       <div className="flex flex-col">
-                        <span>{user.firstName} {user.lastName}</span>
+                        <span>
+                          {user.firstName} {user.lastName}
+                        </span>
                         <span className="text-xs text-muted-foreground">{user.email}</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Badge>{user.role}</Badge>
+                        <Badge className="text-[11px]">{user.role}</Badge>
                         <Button
                           size="sm"
                           variant={isSelected ? "default" : "outline"}
                           onClick={() => loadUserPermissions(user)}
+                          className="h-8 rounded-full px-3 text-xs font-medium"
                         >
                           Manage
                         </Button>
@@ -504,18 +650,20 @@ export function PermissionsClient() {
 
           {/* Selected user detail panel */}
           {selectedUser && (
-            <Card className="mt-4">
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between">
+            <Card className="mt-4 border border-border/60 bg-card shadow-sm">
+              <CardHeader className="px-5 pb-2 pt-4">
+                <CardTitle className="flex items-center justify-between text-sm font-medium">
                   <div className="flex flex-col">
-                    <span>{selectedUser.firstName} {selectedUser.lastName}</span>
+                    <span>
+                      {selectedUser.firstName} {selectedUser.lastName}
+                    </span>
                     <span className="text-xs text-muted-foreground">
                       {selectedUser.email} • Role: {selectedUser.role}
                     </span>
                   </div>
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-4 px-5 pb-5 pt-2">
                 {loadingUserPermissions ? (
                   <p className="text-sm text-muted-foreground">Loading user permissions...</p>
                 ) : (
@@ -533,7 +681,7 @@ export function PermissionsClient() {
                             return (
                               <div
                                 key={permission.id}
-                                className="flex items-center justify-between p-2 border rounded-md bg-white/60"
+                                className="flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-background/80 p-2.5"
                               >
                                 <div className="flex flex-col">
                                   <span className="text-sm font-medium">{permission.name}</span>
@@ -551,8 +699,8 @@ export function PermissionsClient() {
                                     )}
                                   </span>
                                 </div>
-                                <div className="flex flex-col gap-1 ml-4 min-w-[180px]">
-                                  <div className="flex gap-1 justify-end">
+                                <div className="ml-4 flex min-w-47.5 flex-col gap-1">
+                                  <div className="flex justify-end gap-1">
                                     <Button
                                       variant={override === "inherit" ? "default" : "outline"}
                                       size="xs"
@@ -561,6 +709,7 @@ export function PermissionsClient() {
                                         await updateUserPermission(selectedUser.id, permission.id, "remove");
                                         await loadUserPermissions(selectedUser);
                                       }}
+                                      className="h-7 rounded-full px-3 text-[11px]"
                                     >
                                       Inherit
                                     </Button>
@@ -572,7 +721,7 @@ export function PermissionsClient() {
                                         await updateUserPermission(selectedUser.id, permission.id, "grant");
                                         await loadUserPermissions(selectedUser);
                                       }}
-                                      className="text-emerald-700 border-emerald-300"
+                                      className="h-7 rounded-full px-3 text-[11px] text-emerald-700 border-emerald-300"
                                     >
                                       Allow
                                     </Button>
@@ -584,7 +733,7 @@ export function PermissionsClient() {
                                         await updateUserPermission(selectedUser.id, permission.id, "deny");
                                         await loadUserPermissions(selectedUser);
                                       }}
-                                      className="text-rose-700 border-rose-300"
+                                      className="h-7 rounded-full px-3 text-[11px] text-rose-700 border-rose-300"
                                     >
                                       Deny
                                     </Button>
@@ -606,3 +755,4 @@ export function PermissionsClient() {
     </div>
   );
 }
+

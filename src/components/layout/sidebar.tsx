@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -26,6 +27,7 @@ type NavItem = {
   title: string;
   href: string;
   icon: React.ComponentType<{ className?: string }>;
+  requiredPermissions?: string[];
 };
 
 const serverNav: NavItem[] = [
@@ -40,18 +42,18 @@ const cashierNav: NavItem[] = [
 ];
 
 const adminNav: NavItem[] = [
-  { title: "Dashboard", href: "/admin", icon: LayoutDashboard },
-  { title: "Staff", href: "/admin/staff", icon: Users },
-  { title: "Services", href: "/admin/services", icon: Scissors },
-  { title: "Inventory", href: "/admin/inventory", icon: Package },
-  { title: "Customers", href: "/admin/customers", icon: UserCircle },
-  { title: "Appointments", href: "/admin/appointments", icon: Calendar },
-  { title: "Expenses", href: "/admin/expenses", icon: DollarSign },
-  { title: "Invoices", href: "/admin/invoices", icon: Receipt },
-  { title: "Employees", href: "/admin/employees", icon: Award },
-  { title: "Reports", href: "/admin/reports", icon: BarChart3 },
-  { title: "Product Usage", href: "/admin/analytics", icon: Sparkles },
-  { title: "Settings", href: "/admin/settings", icon: Settings },
+  { title: "Dashboard", href: "/admin", icon: LayoutDashboard, requiredPermissions: ["dashboard.view"] },
+  { title: "Staff", href: "/admin/staff", icon: Users, requiredPermissions: ["staff.view"] },
+  { title: "Services", href: "/admin/services", icon: Scissors, requiredPermissions: ["services.view"] },
+  { title: "Inventory", href: "/admin/inventory", icon: Package, requiredPermissions: ["inventory.view"] },
+  { title: "Customers", href: "/admin/customers", icon: UserCircle, requiredPermissions: ["customers.view"] },
+  { title: "Appointments", href: "/admin/appointments", icon: Calendar, requiredPermissions: ["appointments.view"] },
+  { title: "Expenses", href: "/admin/expenses", icon: DollarSign, requiredPermissions: ["expenses.view"] },
+  { title: "Invoices", href: "/admin/invoices", icon: Receipt, requiredPermissions: ["billing.view"] },
+  { title: "Employees", href: "/admin/employees", icon: Award, requiredPermissions: ["staff.view"] },
+  { title: "Reports", href: "/admin/reports", icon: BarChart3, requiredPermissions: ["reports.view"] },
+  { title: "Product Usage", href: "/admin/analytics", icon: Sparkles, requiredPermissions: ["reports.view"] },
+  { title: "Settings", href: "/admin/settings", icon: Settings, requiredPermissions: ["settings.view"] },
 ];
 
 function getNavItems(role: StaffRole): NavItem[] {
@@ -75,7 +77,49 @@ const roleSubtitle: Record<string, string> = {
 
 export function Sidebar({ role }: { role: StaffRole }) {
   const pathname = usePathname();
-  const navItems = getNavItems(role);
+  const [permissionNames, setPermissionNames] = useState<string[] | null>(
+    role === "OWNER" ? null : [],
+  );
+
+  useEffect(() => {
+    // Only owners need fine-grained permission filtering; others remain role-based
+    if (role !== "OWNER") return;
+
+    let cancelled = false;
+
+    async function loadPermissions() {
+      try {
+        const res = await fetch("/api/me/permissions");
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled) {
+          setPermissionNames(data.permissionNames ?? []);
+        }
+      } catch {
+        // Fail open for now: if permissions cannot be loaded, show all owner items
+        if (!cancelled) setPermissionNames([]);
+      }
+    }
+
+    loadPermissions();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [role]);
+
+  let navItems = getNavItems(role);
+
+  // For OWNER, filter admin nav by permissions once loaded (null = still loading)
+  if (role === "OWNER" && permissionNames !== null) {
+    const set = new Set(permissionNames);
+    navItems = navItems.filter((item) => {
+      if (!item.requiredPermissions || item.requiredPermissions.length === 0) {
+        return true;
+      }
+      return item.requiredPermissions.every((perm) => set.has(perm));
+    });
+  }
 
   return (
     <aside className="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0 border-r bg-gradient-to-b from-white via-white to-pink-50/30">

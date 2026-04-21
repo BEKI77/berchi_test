@@ -22,6 +22,13 @@
       "when": 1776503777485,
       "tag": "0002_brief_professor_monster",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1776755830653,
+      "tag": "0003_omniscient_doomsday",
+      "breakpoints": true
     }
   ]
 }

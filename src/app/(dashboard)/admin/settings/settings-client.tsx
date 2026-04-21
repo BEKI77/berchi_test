@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Settings, Save } from "lucide-react";
+import { Settings, Save, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -42,7 +42,7 @@ export function SettingsClient() {
           });
         }
       })
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => setLoading(false));
   }, []);
 
@@ -88,8 +88,8 @@ export function SettingsClient() {
       ...prev,
       businessHours: {
         ...prev.businessHours,
-        [day]: isClosed 
-          ? { open: "09:00", close: "18:00" } 
+        [day]: isClosed
+          ? { open: "09:00", close: "18:00" }
           : { open: "closed", close: "closed" }
       }
     }));
@@ -149,26 +149,26 @@ export function SettingsClient() {
             {DAY_NAMES.map((day) => {
               const hours = form.businessHours[day] || { open: "closed", close: "closed" };
               const isClosed = hours.open === "closed";
-              
+
               return (
                 <div key={day} className="flex items-center justify-between p-3 rounded-xl border border-gray-100 bg-gray-50/50">
                   <div className="w-24">
                     <span className="text-sm font-medium capitalize">{day}</span>
                   </div>
-                  
+
                   <div className="flex items-center gap-3">
                     {!isClosed ? (
                       <div className="flex items-center gap-2">
-                        <Input 
-                          type="time" 
-                          value={hours.open} 
+                        <Input
+                          type="time"
+                          value={hours.open}
                           onChange={(e) => handleHourChange(day, "open", e.target.value)}
                           className="w-32 h-9 rounded-lg"
                         />
                         <span className="text-xs text-muted-foreground">to</span>
-                        <Input 
-                          type="time" 
-                          value={hours.close} 
+                        <Input
+                          type="time"
+                          value={hours.close}
                           onChange={(e) => handleHourChange(day, "close", e.target.value)}
                           className="w-32 h-9 rounded-lg"
                         />
@@ -176,14 +176,13 @@ export function SettingsClient() {
                     ) : (
                       <span className="text-sm text-muted-foreground italic w-[280px] text-center">Closed</span>
                     )}
-                    
-                    <Button 
-                      variant="ghost" 
+
+                    <Button
+                      variant="ghost"
                       size="sm"
                       onClick={() => toggleClosed(day)}
-                      className={`h-9 px-3 rounded-lg text-xs font-semibold uppercase tracking-wider ${
-                        isClosed ? "text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50" : "text-rose-600 hover:text-rose-700 hover:bg-rose-50"
-                      }`}
+                      className={`h-9 px-3 rounded-lg text-xs font-semibold uppercase tracking-wider ${isClosed ? "text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50" : "text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+                        }`}
                     >
                       {isClosed ? "Open" : "Close"}
                     </Button>
@@ -227,6 +226,27 @@ export function SettingsClient() {
             />
             <span className="text-sm font-medium">Enable receipt generation after payment</span>
           </label>
+        </CardContent>
+      </Card>
+
+      {/* Permissions Management */}
+      <Card className="rounded-xl border-gray-200 overflow-hidden">
+        <div className="h-1 bg-gradient-to-r from-purple-400 to-indigo-400" />
+        <CardContent className="pt-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-semibold uppercase tracking-wider text-purple-600">Permission Management</h3>
+              <p className="text-xs text-muted-foreground mt-1">Manage user roles and access permissions</p>
+            </div>
+            <Button
+              variant="outline"
+              onClick={() => window.location.href = "/admin/settings/permissions"}
+              className="flex items-center gap-2 rounded-lg"
+            >
+              <Shield className="h-4 w-4" />
+              Manage Permissions
+            </Button>
+          </div>
         </CardContent>
       </Card>
 

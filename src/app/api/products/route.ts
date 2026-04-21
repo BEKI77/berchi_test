@@ -2,12 +2,18 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { and, eq, gt, asc } from "drizzle-orm";
 import { db } from "@/db";
+import { hasPermission } from "@/lib/permissions";
 import { products } from "@/db/schema";
 
 export async function GET() {
   const session = await auth();
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const canView = await hasPermission(session.user.id, "inventory.view");
+  if (!canView) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const result = await db.query.products.findMany({

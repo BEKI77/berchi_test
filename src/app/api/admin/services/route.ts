@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { hasPermission } from "@/lib/permissions";
 import { asc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { services, serviceConsumables } from "@/db/schema";
@@ -8,6 +9,12 @@ export async function GET() {
   const session = await auth();
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Check if user has permission to view services
+  const canViewServices = await hasPermission(session.user.id, "services.view");
+  if (!canViewServices) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   try {
@@ -28,7 +35,13 @@ export async function GET() {
 
 export async function POST(req: Request) {
   const session = await auth();
-  if (session?.user?.role !== "OWNER") {
+  if (!session?.user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Check if user has permission to create services
+  const canCreateServices = await hasPermission(session.user.id, "services.create");
+  if (!canCreateServices) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

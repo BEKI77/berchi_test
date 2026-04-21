@@ -2,11 +2,17 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { desc, eq } from "drizzle-orm";
 import { db } from "@/db";
+import { hasPermission } from "@/lib/permissions";
 import { expenses } from "@/db/schema";
 
 export async function GET() {
   const session = await auth();
-  if (session?.user?.role !== "OWNER") {
+  if (!session?.user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const canView = await hasPermission(session.user.id, "expenses.view");
+  if (!canView) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -24,7 +30,12 @@ export async function GET() {
 
 export async function POST(req: Request) {
   const session = await auth();
-  if (session?.user?.role !== "OWNER") {
+  if (!session?.user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const canCreate = await hasPermission(session.user.id, "expenses.create");
+  if (!canCreate) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

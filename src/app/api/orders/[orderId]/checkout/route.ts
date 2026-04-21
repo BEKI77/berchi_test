@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { eq, gte, count as countFn, sql } from "drizzle-orm";
 import { db } from "@/db";
+import { hasPermission } from "@/lib/permissions";
 import {
   serviceOrders, invoices, payments, products,
   stockMovements, commissionLogs, salonSettings,
@@ -19,7 +20,8 @@ export async function POST(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  if (session.user.role !== "CASHIER" && session.user.role !== "OWNER") {
+  const canCheckout = await hasPermission(session.user.id, "orders.checkout");
+  if (!canCheckout) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

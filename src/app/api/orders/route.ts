@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { and, eq, gte, desc, count as countFn, SQL } from "drizzle-orm";
 import { db } from "@/db";
+import { hasPermission } from "@/lib/permissions";
 import { serviceOrders } from "@/db/schema";
 
 // GET: List orders for the current server (or all for cashier/owner)
@@ -23,6 +24,12 @@ export async function GET(req: Request) {
     conditions.push(eq(serviceOrders.serverId, serverId));
   } else if (session.user.role === "SERVER") {
     conditions.push(eq(serviceOrders.serverId, session.user.id));
+  }
+
+  // Permission: list orders
+  const canView = await hasPermission(session.user.id, "orders.view");
+  if (!canView) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const orders = await db.query.serviceOrders.findMany({
@@ -58,7 +65,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  if (session.user.role !== "SERVER" && session.user.role !== "OWNER") {
+  const canCreate = await hasPermission(session.user.id, "orders.create");
+  if (!canCreate) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

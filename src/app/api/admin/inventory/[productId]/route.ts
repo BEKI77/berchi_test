@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { eq, desc } from "drizzle-orm";
 import { db } from "@/db";
+import { hasPermission } from "@/lib/permissions";
 import { products, stockMovements, serviceOrderProducts } from "@/db/schema";
 
 export async function GET(
@@ -9,7 +10,12 @@ export async function GET(
   { params }: { params: Promise<{ productId: string }> }
 ) {
   const session = await auth();
-  if (session?.user?.role !== "OWNER") {
+  if (!session?.user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const canView = await hasPermission(session.user.id, "inventory.view");
+  if (!canView) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

@@ -3,13 +3,19 @@ import { and, eq, gte, lte, notInArray } from "drizzle-orm";
 import { db } from "@/db";
 import { salonSettings, appointments } from "@/db/schema";
 import { auth } from "@/lib/auth";
+import { hasPermission } from "@/lib/permissions";
 import { DEFAULT_BUSINESS_HOURS, DAY_NAMES } from "@/lib/constants";
 
 const SLOT_INTERVAL = 30;
 
 export async function GET(req: Request) {
   const session = await auth();
-  if (session?.user?.role !== "OWNER" && session?.user?.role !== "CASHIER") {
+  if (!session?.user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const canView = await hasPermission(session.user.id, "appointments.view");
+  if (!canView) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

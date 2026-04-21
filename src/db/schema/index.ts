@@ -11,6 +11,7 @@ export * from "./orders";
 export * from "./billing";
 export * from "./operations";
 export * from "./settings";
+export * from "./permissions";
 
 // Relations
 export * from "./relations";

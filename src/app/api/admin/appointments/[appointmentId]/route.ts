@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
+import { hasPermission } from "@/lib/permissions";
 import { appointments, services } from "@/db/schema";
 
 export async function PATCH(
@@ -9,7 +10,12 @@ export async function PATCH(
   { params }: { params: Promise<{ appointmentId: string }> }
 ) {
   const session = await auth();
-  if (session?.user?.role !== "OWNER" && session?.user?.role !== "CASHIER") {
+  if (!session?.user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const canUpdate = await hasPermission(session.user.id, "appointments.update");
+  if (!canUpdate) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

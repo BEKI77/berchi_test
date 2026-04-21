@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
+import { hasPermission } from "@/lib/permissions";
 import { salonSettings } from "@/db/schema";
 
 export async function GET() {
@@ -10,13 +11,23 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const canView = await hasPermission(session.user.id, "settings.view");
+  if (!canView) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   const [settings] = await db.select().from(salonSettings).limit(1);
   return NextResponse.json(settings ?? null);
 }
 
 export async function PATCH(req: Request) {
   const session = await auth();
-  if (session?.user?.role !== "OWNER") {
+  if (!session?.user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const canUpdate = await hasPermission(session.user.id, "settings.update");
+  if (!canUpdate) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

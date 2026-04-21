@@ -3,10 +3,16 @@ import { eq, and } from "drizzle-orm";
 import { db } from "@/db";
 import { appointments, customers, services, serviceCategories } from "@/db/schema";
 import { auth } from "@/lib/auth";
+import { hasPermission } from "@/lib/permissions";
 
 export async function POST(req: Request) {
   const session = await auth();
-  if (session?.user?.role !== "OWNER" && session?.user?.role !== "CASHIER") {
+  if (!session?.user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const canBlock = await hasPermission(session.user.id, "appointments.manage_slots");
+  if (!canBlock) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -96,7 +102,12 @@ export async function POST(req: Request) {
 
 export async function DELETE(req: Request) {
   const session = await auth();
-  if (session?.user?.role !== "OWNER" && session?.user?.role !== "CASHIER") {
+  if (!session?.user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const canUnblock = await hasPermission(session.user.id, "appointments.manage_slots");
+  if (!canUnblock) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

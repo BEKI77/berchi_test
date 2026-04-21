@@ -7,6 +7,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -78,20 +79,22 @@ export function Header({ user }: { user: SessionUser }) {
             </span>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-60 rounded-xl p-1.5">
-            <DropdownMenuLabel className="px-3 py-2.5">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-pink-400 to-rose-400 text-white text-sm font-bold shadow-sm">
-                  {user.firstName[0]}{user.lastName[0]}
+            <DropdownMenuGroup>
+              <DropdownMenuLabel className="px-3 py-2.5">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-pink-400 to-rose-400 text-white text-sm font-bold shadow-sm">
+                    {user.firstName[0]}{user.lastName[0]}
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="font-semibold">{user.firstName} {user.lastName}</span>
+                    <span className="text-xs text-muted-foreground font-normal">
+                      {user.email}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex flex-col">
-                  <span className="font-semibold">{user.firstName} {user.lastName}</span>
-                  <span className="text-xs text-muted-foreground font-normal">
-                    {user.email}
-                  </span>
-                </div>
-              </div>
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+            </DropdownMenuGroup>
             <DropdownMenuItem
               onClick={handleSignOut}
               className="text-red-500 cursor-pointer rounded-lg mx-1 focus:bg-red-50 focus:text-red-600"

@@ -3,7 +3,7 @@ import "dotenv/config";
 
 const ALLOWED_ORIGINS = [
   process.env.WEBSITE_URL, // e.g. https://berchi.com
-  "https://berchibeauty.com/", // production website
+  "https://berchibeauty.com", // production website
   "http://localhost:3001", // local website dev
   "http://localhost:3002",
   "*",

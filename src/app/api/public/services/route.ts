@@ -19,7 +19,7 @@ export async function GET(req: Request) {
 
   // Filter to only services with active categories, sort by category then name
   const filtered = result
-    .filter((s) => s.category?.isActive !== false)
+    .filter((s) => (s.category?.isActive !== false) && s.category?.name !== 'System')
     .sort((a, b) => {
       const catCmp = (a.category?.name ?? "").localeCompare(b.category?.name ?? "");
       return catCmp !== 0 ? catCmp : a.name.localeCompare(b.name);

@@ -27,3 +27,11 @@ export const expenseCategoryEnum = pgEnum("ExpenseCategory", [
 export const stockMovementTypeEnum = pgEnum("StockMovementType", [
   "RESTOCK", "USED_IN_SERVICE", "SOLD", "ADJUSTMENT", "DAMAGED",
 ]);
+
+export const expenseTypeEnum = pgEnum("ExpenseType", ["SPONTANEOUS", "RECURRING"]);
+
+export const recurrenceFrequencyEnum = pgEnum("RecurrenceFrequency", [
+  "DAILY", "WEEKLY", "MONTHLY", "YEARLY", "CUSTOM",
+]);
+
+export const expenseStatusEnum = pgEnum("ExpenseStatus", ["DUE", "PAID", "SKIPPED", "OVERDUE"]);

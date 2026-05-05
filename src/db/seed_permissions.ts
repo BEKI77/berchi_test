@@ -72,6 +72,10 @@ const defaultPermissions = [
   { name: "expenses.create", description: "Log new expenses", resource: "expenses", action: "create" },
   { name: "expenses.update", description: "Update expenses", resource: "expenses", action: "update" },
   { name: "expenses.delete", description: "Delete expenses", resource: "expenses", action: "delete" },
+
+  // Expense schedules permissions
+  { name: "expenses.schedule.view", description: "View expense schedules", resource: "expenses", action: "schedule_view" },
+  { name: "expenses.schedule.manage", description: "Manage expense schedules", resource: "expenses", action: "schedule_manage" },
 ];
 
 // Define default roles

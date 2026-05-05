@@ -14,5 +14,21 @@ export default async function ExpensesPage() {
     redirect("/");
   }
 
-  return <ExpensesClient />;
+  const canDeleteExpenses = await hasPermission(session.user.id, "expenses.delete");
+  const canUpdateExpenses = await hasPermission(session.user.id, "expenses.update");
+  const canManageSchedules = await hasPermission(session.user.id, "expenses.schedule.manage");
+
+  console.log("Permission checks for user", session.user.id, {
+    canDeleteExpenses,
+    canUpdateExpenses,
+    canManageSchedules,
+  });
+
+  return (
+    <ExpensesClient
+      canDeleteExpenses={canDeleteExpenses}
+      canUpdateExpenses={canUpdateExpenses}
+      canManageSchedules={canManageSchedules}
+    />
+  );
 }

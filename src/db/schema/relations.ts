@@ -6,7 +6,7 @@ import { productCategories, products } from "./products";
 import { appointments } from "./appointments";
 import { serviceOrders, serviceOrderItems, serviceOrderProducts, orderItemConsumables } from "./orders";
 import { invoices, payments } from "./billing";
-import { expenses, stockMovements, commissionLogs, productUsageLogs } from "./operations";
+import { expenses, stockMovements, commissionLogs, productUsageLogs, expenseSchedules } from "./operations";
 
 // ── Customers ──────────────────────────────────────────────
 export const customersRelations = relations(customers, ({ many }) => ({
@@ -23,6 +23,8 @@ export const staffRelations = relations(staff, ({ many }) => ({
   stockMovements: many(stockMovements),
   commissionLogs: many(commissionLogs),
   productUsageLogs: many(productUsageLogs),
+  createdExpenseSchedules: many(expenseSchedules),
+  payeeExpenseSchedules: many(expenseSchedules),
 }));
 
 // ── Service Categories ─────────────────────────────────────
@@ -178,6 +180,27 @@ export const expensesRelations = relations(expenses, ({ one }) => ({
     fields: [expenses.loggedBy],
     references: [staff.id],
   }),
+  schedule: one(expenseSchedules, {
+    fields: [expenses.scheduleId],
+    references: [expenseSchedules.id],
+  }),
+  payeeStaff: one(staff, {
+    fields: [expenses.payeeStaffId],
+    references: [staff.id],
+  }),
+}));
+
+// ── Expense Schedules ─────────────────────────────────────
+export const expenseSchedulesRelations = relations(expenseSchedules, ({ one, many }) => ({
+  createdBy: one(staff, {
+    fields: [expenseSchedules.createdBy],
+    references: [staff.id],
+  }),
+  payeeStaff: one(staff, {
+    fields: [expenseSchedules.payeeStaffId],
+    references: [staff.id],
+  }),
+  expenses: many(expenses),
 }));
 
 // ── Stock Movements ────────────────────────────────────────

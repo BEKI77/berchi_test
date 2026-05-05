@@ -54,7 +54,7 @@ export async function GET(req: Request) {
         columns: { id: true, status: true, startedAt: true, serverId: true, completedAt: true },
       }),
       db.query.expenses.findMany({
-        columns: { amount: true, category: true, date: true, description: true },
+        columns: { amount: true, category: true, date: true, description: true, status: true },
       }),
       db.query.staff.findMany({
         where: eq(staff.isActive, true),
@@ -100,7 +100,7 @@ export async function GET(req: Request) {
     const totalTips = paidInvoices.reduce((s, i) => s + Number(i.tipAmount), 0);
     const totalTax = paidInvoices.reduce((s, i) => s + Number(i.taxAmount), 0);
     const totalDiscounts = paidInvoices.reduce((s, i) => s + Number(i.discountAmount), 0);
-    const totalExpensesAll = allExpenses.reduce((s, e) => s + Number(e.amount), 0);
+    const totalExpensesAll = allExpenses.filter((e) => e.status === "PAID").reduce((s, e) => s + Number(e.amount), 0);
 
     // === RANGE-FILTERED METRICS ===
     const rangePaid = rangeFrom
@@ -111,7 +111,7 @@ export async function GET(req: Request) {
     const rangeTax = rangePaid.reduce((s, i) => s + Number(i.taxAmount), 0);
     const rangeDiscounts = rangePaid.reduce((s, i) => s + Number(i.discountAmount), 0);
     const rangeExpenses = rangeFrom
-      ? allExpenses.filter((e) => inRange(new Date(e.date))).reduce((s, e) => s + Number(e.amount), 0)
+      ? allExpenses.filter((e) => e.status === "PAID" && inRange(new Date(e.date))).reduce((s, e) => s + Number(e.amount), 0)
       : totalExpensesAll;
     const rangeSubtotal = rangePaid.reduce((s, i) => s + Number(i.subtotal), 0);
     const avgTransactionValue = rangePaid.length > 0 ? rangeRevenue / rangePaid.length : 0;
@@ -237,14 +237,14 @@ export async function GET(req: Request) {
 
     // === EXPENSE BREAKDOWN ===
     const rangeExpensesList = rangeFrom
-      ? allExpenses.filter((e) => inRange(new Date(e.date)))
-      : allExpenses;
+      ? allExpenses.filter((e) => e.status === "PAID" && inRange(new Date(e.date)))
+      : allExpenses.filter((e) => e.status === "PAID");
     const expenseByCategory: Record<string, number> = {};
     rangeExpensesList.forEach((e) => {
       expenseByCategory[e.category] = (expenseByCategory[e.category] || 0) + Number(e.amount);
     });
     const thisMonthExpenses = allExpenses
-      .filter((e) => new Date(e.date) >= thisMonthStart)
+      .filter((e) => e.status === "PAID" && new Date(e.date) >= thisMonthStart)
       .reduce((s, e) => s + Number(e.amount), 0);
 
     // === CUSTOMER INSIGHTS ===

@@ -18,7 +18,7 @@ export const invoiceStatusEnum = pgEnum("InvoiceStatus", [
 
 export const discountTypeEnum = pgEnum("DiscountType", ["PERCENTAGE", "FIXED"]);
 
-export const paymentMethodEnum = pgEnum("PaymentMethod", ["CASH", "CARD", "MOBILE"]);
+export const paymentMethodEnum = pgEnum("PaymentMethod", ["CASH", "CARD", "MOBILE", "CHAPA"]);
 
 export const expenseCategoryEnum = pgEnum("ExpenseCategory", [
   "SUPPLIES", "RENT", "UTILITIES", "EQUIPMENT", "MARKETING", "SALARIES", "OTHER",

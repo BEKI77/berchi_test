@@ -25,5 +25,6 @@ export const payments = pgTable("payments", {
   method: paymentMethodEnum("method").notNull(),
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
   reference: varchar("reference", { length: 255 }),
+  chapaTxRef: varchar("chapa_tx_ref", { length: 255 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });

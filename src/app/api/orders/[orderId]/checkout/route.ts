@@ -32,11 +32,13 @@ export async function POST(
     discountValue = 0,
     tipAmount = 0,
     paymentMethod,
+    chapaTxRef,
   }: {
     discountType?: DiscountType;
     discountValue?: number;
     tipAmount?: number;
     paymentMethod: PaymentMethod;
+    chapaTxRef?: string;
   } = body;
 
   if (!paymentMethod) {
@@ -137,6 +139,7 @@ export async function POST(
         invoiceId: invoice.id,
         method: paymentMethod,
         amount: String(totalAmount),
+        ...(chapaTxRef ? { chapaTxRef } : {}),
       })
       .returning();
 

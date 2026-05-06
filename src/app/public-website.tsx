@@ -1094,8 +1094,19 @@ export function PublicWebsite() {
               </a>
             </div>
           </div>
-          <div className="mt-6 sm:mt-8 pt-4 sm:pt-6 border-t border-gray-800 text-center text-[10px] sm:text-xs text-gray-600">
-            © {new Date().getFullYear()} Berchi Salon. All rights reserved.
+          <div className="mt-6 sm:mt-8 pt-4 sm:pt-6 border-t border-gray-800 text-center text-[10px] sm:text-xs text-gray-600 space-y-1.5">
+            <p>© {new Date().getFullYear()} Berchi Salon. All rights reserved.</p>
+            <p>
+              Developed by{" "}
+              <a
+                href="https://syntaxsoftwaresolution.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-pink-400/80 hover:text-pink-300 transition-colors font-medium"
+              >
+                Syntax Software Solution
+              </a>
+            </p>
           </div>
         </div>
       </footer>

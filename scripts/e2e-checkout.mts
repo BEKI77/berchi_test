@@ -78,6 +78,17 @@ async function main() {
   check("ticket is findable by its printed number",
     Array.isArray(found.body) && found.body[0]?.id === order.id);
 
+  // Staff say "45", not "ORD-20260823-0045".
+  const shortNo = String(Number(order.orderNumber.split("-").pop()));
+  const byShort = await asServer(`/api/orders?orderNumber=${shortNo}`);
+  check(`short number "${shortNo}" resolves to the same ticket`,
+    Array.isArray(byShort.body) && byShort.body[0]?.id === order.id,
+    `got ${JSON.stringify(byShort.body).slice(0, 120)}`);
+
+  const missing = await asServer(`/api/orders?orderNumber=999999`);
+  check("an unknown ticket number returns nothing",
+    Array.isArray(missing.body) && missing.body.length === 0);
+
   console.log("\n3. Add a service");
   const svcs = await asServer("/api/services");
   const svc = Array.isArray(svcs.body) ? svcs.body[0] : null;

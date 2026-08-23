@@ -6,14 +6,15 @@ import { hasPermission } from "@/lib/permissions";
 import { serviceOrders } from "@/db/schema";
 import type { OrderStatus } from "@/db/schema";
 import { ORDER_WITH, EDITABLE_ORDER_STATUSES } from "@/lib/orders";
-import { nextOrderNumber, getSalonTimezone } from "@/lib/order-numbers";
+import { nextOrderNumber, getSalonTimezone, resolveOrderNumber } from "@/lib/order-numbers";
 
 const DEFAULT_LIMIT = 200;
 const MAX_LIMIT = 500;
 
 // GET: Look up orders.
 //
-//   ?orderNumber=ORD-20260823-0001   exact ticket lookup (what tablets use)
+//   ?orderNumber=45                  today's ticket 45 (what staff type)
+//   ?orderNumber=ORD-20260823-0045   exact ticket lookup
 //   ?open=true                       tickets still on the floor
 //   ?status=SENT_TO_CASHIER          single status
 //   ?serverId=<uuid>                 tickets a given stylist worked on
@@ -40,7 +41,9 @@ export async function GET(req: Request) {
   const conditions: SQL[] = [];
 
   if (orderNumber) {
-    conditions.push(eq(serviceOrders.orderNumber, orderNumber.trim().toUpperCase()));
+    // Staff type "45", not the full number printed on the slip.
+    const timeZone = await getSalonTimezone();
+    conditions.push(eq(serviceOrders.orderNumber, resolveOrderNumber(orderNumber, timeZone)));
   }
   if (open === "true") {
     conditions.push(inArray(serviceOrders.status, [...EDITABLE_ORDER_STATUSES]));

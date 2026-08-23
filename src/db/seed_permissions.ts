@@ -155,7 +155,9 @@ async function seedPermissions() {
       // orders.update lets the cashier add a service the stylist forgot before
       // closing the ticket. The items endpoint takes an explicit staffId, so
       // the work is still credited to the stylist who performed it.
-      "orders.view", "orders.update", "orders.checkout",
+      // Reception is the cashier's desk: it issues the ticket number when the
+      // customer walks in, adds anything the stylist forgot, and closes it.
+      "orders.view", "orders.create", "orders.update", "orders.checkout",
       "billing.view", "billing.create", "billing.update",
     ];
 

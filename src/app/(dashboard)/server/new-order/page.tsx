@@ -46,7 +46,7 @@ export default function NewOrderPage() {
     );
   });
 
-  async function startOrder(customerId: string) {
+  async function startOrder(customerId: string | null) {
     setCreating(true);
     try {
       const res = await fetch("/api/orders", {
@@ -61,7 +61,7 @@ export default function NewOrderPage() {
       }
 
       const order = await res.json();
-      toast.success("Order created!");
+      toast.success("Ticket opened");
       router.push(`/server/order/${order.id}`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to create order");
@@ -115,8 +115,27 @@ export default function NewOrderPage() {
         </Button>
         <div>
           <h1 className="text-2xl font-bold tracking-tight">New Order</h1>
-          <p className="text-sm text-muted-foreground">Select or create a customer to begin their session</p>
+          <p className="text-sm text-muted-foreground">Attach a customer, or start without one</p>
         </div>
+      </div>
+
+      {/* Most walk-ins never give a name. Starting without one is the norm,
+          so it goes first rather than being buried under the search. */}
+      <Button
+        onClick={() => startOrder(null)}
+        disabled={creating}
+        className="w-full h-16 rounded-xl text-base font-semibold bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 shadow-md shadow-pink-200/40 transition-all duration-200 hover:-translate-y-0.5"
+      >
+        <Plus className="h-5 w-5 mr-2" />
+        {creating ? "Starting..." : "Start without a customer"}
+      </Button>
+
+      <div className="flex items-center gap-3">
+        <div className="h-px flex-1 bg-pink-100" />
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          or attach a customer
+        </span>
+        <div className="h-px flex-1 bg-pink-100" />
       </div>
 
       {/* Search */}

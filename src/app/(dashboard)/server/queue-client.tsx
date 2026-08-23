@@ -2,8 +2,9 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Scissors, Clock, CheckCircle, Send, Sparkles, ArrowRight } from "lucide-react";
+import { Plus, Scissors, Clock, CheckCircle, Send, Sparkles, ArrowRight, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
 import { customerName } from "@/lib/orders";
@@ -26,6 +27,8 @@ export function ServerQueueClient({ userId }: { userId: string }) {
   const router = useRouter();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const [ticketInput, setTicketInput] = useState("");
+  const [lookingUp, setLookingUp] = useState(false);
 
   const fetchOrders = useCallback(async () => {
     try {
@@ -75,6 +78,36 @@ export function ServerQueueClient({ userId }: { userId: string }) {
     );
   }
 
+  // A stylist walks up to a chair and is told a number. This is the whole
+  // point of numbering tickets: no searching by customer name.
+  async function openTicket(e: React.FormEvent) {
+    e.preventDefault();
+    const entered = ticketInput.trim();
+    if (!entered) return;
+
+    setLookingUp(true);
+    try {
+      const res = await fetch(`/api/orders?orderNumber=${encodeURIComponent(entered)}`);
+      if (!res.ok) throw new Error("Could not look up that ticket");
+      const found: Order[] = await res.json();
+
+      if (found.length === 0) {
+        toast.error(`No ticket ${entered} today`);
+        return;
+      }
+      if (found[0].status === "CHECKED_OUT" || found[0].status === "CANCELLED") {
+        toast.error(`Ticket ${entered} is already closed`);
+        return;
+      }
+      setTicketInput("");
+      router.push(`/server/order/${found[0].id}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not look up that ticket");
+    } finally {
+      setLookingUp(false);
+    }
+  }
+
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -96,6 +129,28 @@ export function ServerQueueClient({ userId }: { userId: string }) {
           New Order
         </Button>
       </div>
+
+      {/* Open a ticket by its number */}
+      <form onSubmit={openTicket} className="flex gap-2">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-pink-400" />
+          <Input
+            value={ticketInput}
+            onChange={(e) => setTicketInput(e.target.value)}
+            inputMode="numeric"
+            placeholder="Ticket number, e.g. 45"
+            aria-label="Open a ticket by its number"
+            className="pl-9 h-12 rounded-xl border-pink-100 focus:border-pink-300 text-base"
+          />
+        </div>
+        <Button
+          type="submit"
+          disabled={lookingUp || !ticketInput.trim()}
+          className="h-12 px-6 rounded-xl bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 font-semibold"
+        >
+          {lookingUp ? "Finding..." : "Open"}
+        </Button>
+      </form>
 
       {/* Stats */}
       {orders.length > 0 && (

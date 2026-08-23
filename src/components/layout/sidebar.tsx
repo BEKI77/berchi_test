@@ -21,6 +21,7 @@ import {
   UserCircle,
   Sparkles,
   Award,
+  Ticket,
 } from "lucide-react";
 
 type NavItem = {
@@ -37,6 +38,7 @@ const serverNav: NavItem[] = [
 
 const cashierNav: NavItem[] = [
   { title: "Dashboard", href: "/admin", icon: LayoutDashboard },
+  { title: "Reception", href: "/cashier/reception", icon: Ticket },
   { title: "Pending Orders", href: "/cashier", icon: ClipboardList },
   { title: "Appointments", href: "/cashier/appointments", icon: Calendar },
   { title: "Transactions", href: "/cashier/transactions", icon: CreditCard },

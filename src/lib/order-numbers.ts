@@ -69,6 +69,26 @@ function withSiteCode(base: string): string {
   return SITE_CODE ? `${SITE_CODE}-${base}` : base;
 }
 
+/** Builds the full ticket number for a given day and sequence. */
+export function buildOrderNumber(dateKey: string, seq: number): string {
+  return withSiteCode(`ORD-${dateKey}-${String(seq).padStart(4, "0")}`);
+}
+
+/**
+ * Expands what staff actually type into a full order number.
+ *
+ * Nobody at the counter says "ORD-20260823-0045" -- they say "forty-five", and
+ * that is what is written on the slip. A bare number is read as today's ticket
+ * with that sequence; anything else is passed through as an exact number.
+ */
+export function resolveOrderNumber(input: string, timeZone: string): string {
+  const trimmed = input.trim().toUpperCase();
+  if (/^\d{1,6}$/.test(trimmed)) {
+    return buildOrderNumber(localDateKey(timeZone), Number(trimmed));
+  }
+  return trimmed;
+}
+
 /** e.g. ORD-20260823-0001, or BOLE-ORD-20260823-0001 with a site code set. */
 export async function nextOrderNumber(client: DbOrTx, timeZone: string): Promise<string> {
   const dateKey = localDateKey(timeZone);

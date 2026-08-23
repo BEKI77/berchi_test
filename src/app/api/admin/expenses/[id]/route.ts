@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { hasPermission } from "@/lib/permissions";
 import { expenses } from "@/db/schema";
+import { toSantim } from "@/lib/money";
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -24,7 +25,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const updateData: any = {};
     if (status !== undefined) updateData.status = status;
     if (date !== undefined) updateData.date = new Date(date).toISOString().split("T")[0];
-    if (amount !== undefined) updateData.amount = String(amount);
+    if (amount !== undefined) updateData.amount = toSantim(amount);
     if (receiptUrl !== undefined) updateData.receiptUrl = receiptUrl;
 
     const [expense] = await db

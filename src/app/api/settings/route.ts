@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { hasPermission } from "@/lib/permissions";
 import { salonSettings } from "@/db/schema";
+import { toBasisPoints } from "@/lib/money";
 
 export async function GET() {
   const session = await auth();
@@ -33,6 +34,13 @@ export async function PATCH(req: Request) {
 
   try {
     const body = await req.json();
+
+    // taxRate arrives as a percentage from the form; the column is basis
+    // points. Convert before the body is spread into the row.
+    if (body.taxRate !== undefined) {
+      body.taxRate = toBasisPoints(body.taxRate);
+    }
+
     const [existing] = await db.select().from(salonSettings).limit(1);
 
     if (!existing) {

@@ -11,6 +11,7 @@ import {
 import type { DiscountType, PaymentMethod } from "@/db/schema";
 import { nextInvoiceNumber, getSalonTimezone } from "@/lib/order-numbers";
 import { isOrderEditable } from "@/lib/orders";
+import { toSantim, toBasisPoints, applyRate, sumSantim, formatMoney } from "@/lib/money";
 
 // POST: Checkout an order — create invoice + payment, update stock, log commissions
 export async function POST(
@@ -78,31 +79,47 @@ export async function POST(
     );
   }
 
-  // Calculate subtotal
-  const servicesSubtotal = order.items.reduce(
-    (sum, item) => sum + Number(item.unitPrice) * item.quantity,
-    0
+  // Every figure below is an integer: santim for money, basis points for
+  // rates. The request carries human units (ETB, percent), so it is converted
+  // once here at the edge and never turned back into a float.
+  const tipSantim = toSantim(tipAmount);
+  const discountFixedSantim = discountType === "FIXED" ? toSantim(discountValue) : 0;
+  const discountRateBp = discountType === "PERCENTAGE" ? toBasisPoints(discountValue) : 0;
+
+  // unitPrice is already santim, so these sums are exact.
+  const servicesSubtotal = sumSantim(
+    order.items.map((item) => item.unitPrice * item.quantity)
   );
-  const productsSubtotal = order.products.reduce(
-    (sum, p) => sum + Number(p.unitPrice) * p.quantity,
-    0
+  const productsSubtotal = sumSantim(
+    order.products.map((p) => p.unitPrice * p.quantity)
   );
   const subtotal = servicesSubtotal + productsSubtotal;
 
-  // Get salon settings for tax rate
   const [settings] = await db.select().from(salonSettings).limit(1);
-  const taxRate = settings ? Number(settings.taxRate) : 0;
-  const taxAmount = subtotal * (taxRate / 100);
+  const taxRateBp = settings?.taxRate ?? 0;
+  const taxAmount = applyRate(subtotal, taxRateBp);
 
-  // Calculate discount
-  let discountAmount = 0;
-  if (discountType === "PERCENTAGE") {
-    discountAmount = subtotal * (discountValue / 100);
-  } else if (discountType === "FIXED") {
-    discountAmount = discountValue;
+  const discountAmount =
+    discountType === "PERCENTAGE"
+      ? applyRate(subtotal, discountRateBp)
+      : discountType === "FIXED"
+        ? discountFixedSantim
+        : 0;
+
+  if (discountAmount > subtotal + taxAmount) {
+    return NextResponse.json(
+      { error: `Discount of ${formatMoney(discountAmount)} is more than the bill` },
+      { status: 400 }
+    );
+  }
+  if (tipSantim < 0 || discountAmount < 0) {
+    return NextResponse.json(
+      { error: "Discount and tip cannot be negative" },
+      { status: 400 }
+    );
   }
 
-  const totalAmount = subtotal + taxAmount - discountAmount + tipAmount;
+  const totalAmount = subtotal + taxAmount - discountAmount + tipSantim;
 
   const timeZone = await getSalonTimezone();
 
@@ -118,14 +135,16 @@ export async function POST(
       .values({
         invoiceNumber,
         orderId,
-        subtotal: String(subtotal),
-        taxRate: String(taxRate),
-        taxAmount: String(taxAmount),
+        subtotal,
+        taxRate: taxRateBp,
+        taxAmount,
         discountType: discountType || null,
-        discountValue: String(discountValue),
-        discountAmount: String(discountAmount),
-        tipAmount: String(tipAmount),
-        totalAmount: String(totalAmount),
+        // Basis points for a percentage discount, santim for a fixed one --
+        // the unit follows discountType, as it always has.
+        discountValue: discountType === "PERCENTAGE" ? discountRateBp : discountFixedSantim,
+        discountAmount,
+        tipAmount: tipSantim,
+        totalAmount,
         status: "PAID",
       })
       .returning();
@@ -136,7 +155,7 @@ export async function POST(
       .values({
         invoiceId: invoice.id,
         method: paymentMethod,
-        amount: String(totalAmount),
+        amount: totalAmount,
         ...(chapaTxRef ? { chapaTxRef } : {}),
       })
       .returning();
@@ -226,18 +245,18 @@ export async function POST(
     // 6. Log commissions for each service item
     for (const item of order.items) {
       const staffMember = item.staff;
-      const commRate = Number(staffMember.commissionRate);
-      const serviceAmount = Number(item.unitPrice) * item.quantity;
-      const commissionAmount = serviceAmount * (commRate / 100);
+      const commRateBp = staffMember.commissionRate;
+      const serviceAmount = item.unitPrice * item.quantity;
+      const commissionAmount = applyRate(serviceAmount, commRateBp);
 
       if (commissionAmount > 0) {
         await tx.insert(commissionLogs).values({
           staffId: item.staffId,
           invoiceId: invoice.id,
           serviceOrderItemId: item.id,
-          commissionRate: String(commRate),
-          serviceAmount: String(serviceAmount),
-          commissionAmount: String(commissionAmount),
+          commissionRate: commRateBp,
+          serviceAmount,
+          commissionAmount,
         });
       }
     }

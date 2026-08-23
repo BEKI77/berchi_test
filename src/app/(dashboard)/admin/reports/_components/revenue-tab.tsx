@@ -3,6 +3,7 @@
 import { BarChart3, Clock } from "lucide-react";
 import type { ReportData } from "../types";
 import { Section } from "./section";
+import { formatMoney } from "@/lib/money";
 
 type RevenueTabProps = {
   dailyRevenue: ReportData["dailyRevenue"];
@@ -25,10 +26,10 @@ export function RevenueTab({ dailyRevenue, busiestHours }: RevenueTabProps) {
               <div key={d.date} className="flex-1 flex flex-col items-center group relative">
                 <div className="absolute -top-16 left-1/2 -translate-x-1/2 hidden group-hover:block z-10">
                   <div className="bg-gray-900 text-white text-[10px] px-2 py-1.5 rounded-lg whitespace-nowrap shadow-lg">
-                    <p className="font-semibold">ETB {d.revenue.toFixed(0)}</p>
+                    <p className="font-semibold">ETB {formatMoney(d.revenue)}</p>
                     <p className="text-gray-300">
                       {d.orders} orders 
-· Tips: ETB {d.tips.toFixed(0)}
+· Tips: ETB {formatMoney(d.tips)}
                     </p>
                     <p className="text-gray-400">{d.date}</p>
                   </div>
@@ -53,17 +54,17 @@ export function RevenueTab({ dailyRevenue, busiestHours }: RevenueTabProps) {
           <div className="p-2 rounded-lg bg-indigo-50 border border-indigo-100">
             <p className="text-[10px] text-muted-foreground">Best Day</p>
             <p className="font-bold text-sm text-indigo-700">
-              ETB {Math.max(...dailyRevenue.map((d) => d.revenue)).toFixed(0)}
+              ETB {formatMoney(Math.max(...dailyRevenue.map((d) => d.revenue)))}
             </p>
           </div>
           <div className="p-2 rounded-lg bg-indigo-50 border border-indigo-100">
             <p className="text-[10px] text-muted-foreground">Daily Average</p>
             <p className="font-bold text-sm text-indigo-700">
               ETB
-              {(
+              {formatMoney((
                 dailyRevenue.reduce((s, d) => s + d.revenue, 0) /
                 Math.max(dailyRevenue.length, 1)
-              ).toFixed(0)}
+              ))}
             </p>
           </div>
           <div className="p-2 rounded-lg bg-indigo-50 border border-indigo-100">
@@ -89,7 +90,7 @@ export function RevenueTab({ dailyRevenue, busiestHours }: RevenueTabProps) {
                   <div className="absolute -top-14 left-1/2 -translate-x-1/2 hidden group-hover:block z-10">
                     <div className="bg-gray-900 text-white text-[10px] px-2 py-1 rounded-lg whitespace-nowrap shadow-lg">
                       <p className="font-semibold">{h.count} transactions</p>
-                      <p className="text-gray-300">ETB {h.revenue.toFixed(0)}</p>
+                      <p className="text-gray-300">ETB {formatMoney(h.revenue)}</p>
                     </div>
                   </div>
                   <div

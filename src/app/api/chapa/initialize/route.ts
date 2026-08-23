@@ -4,6 +4,7 @@ import { hasPermission } from "@/lib/permissions";
 import { db } from "@/db";
 import { serviceOrders } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { fromSantim } from "@/lib/money";
 
 const CHAPA_BASE_URL = "https://api.chapa.co/v1/transaction/initialize";
 
@@ -58,7 +59,8 @@ export async function POST(req: Request) {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        amount: amount.toFixed(2),
+        // The caller passes santim; Chapa wants ETB as a decimal string.
+        amount: fromSantim(amount).toFixed(2),
         currency: "ETB",
         email,
         first_name: firstName,

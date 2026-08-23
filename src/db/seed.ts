@@ -4,6 +4,7 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { eq } from "drizzle-orm";
 import * as schema from "./schema";
+import { toSantim, toBasisPoints } from "../lib/money";
 
 dotenv.config();
 
@@ -29,7 +30,10 @@ async function main() {
     for (const s of staffData) {
       const [existing] = await db.select().from(schema.staff).where(eq(schema.staff.email, s.email)).limit(1);
       if (!existing) {
-        await db.insert(schema.staff).values(s);
+        await db.insert(schema.staff).values({
+          ...s,
+          commissionRate: toBasisPoints(s.commissionRate),
+        });
       }
     }
 
@@ -76,7 +80,10 @@ async function main() {
     ];
 
     for (const svc of servicesData) {
-      await db.insert(schema.services).values(svc).onConflictDoNothing();
+      await db
+        .insert(schema.services)
+        .values({ ...svc, basePrice: toSantim(svc.basePrice) })
+        .onConflictDoNothing();
     }
 
     console.log("✅ Services created");
@@ -128,7 +135,12 @@ async function main() {
     for (const prod of productsData) {
       const [existing] = await db.select().from(schema.products).where(eq(schema.products.sku, prod.sku)).limit(1);
       if (!existing) {
-        await db.insert(schema.products).values(prod);
+        await db.insert(schema.products).values({
+          ...prod,
+          costPrice: toSantim(prod.costPrice),
+          sellPrice: toSantim(prod.sellPrice),
+          usagePrice: toSantim(prod.usagePrice),
+        });
       }
     }
 
@@ -163,7 +175,7 @@ async function main() {
         salonName: "Berchi Salon",
         address: "Addis Ababa, Ethiopia",
         phone: "+251911000000",
-        taxRate: "15",
+        taxRate: toBasisPoints(15),
         currency: "ETB",
         receiptsEnabled: true,
         businessHours: JSON.stringify({

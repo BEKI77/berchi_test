@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { Banknote, CreditCard, Smartphone, Wallet } from "lucide-react";
 import type { ReportData } from "../types";
 import { Section } from "./section";
+import { formatMoney } from "@/lib/money";
 
 type MoneyTabProps = {
   paymentMethods: ReportData["paymentMethods"];
@@ -66,7 +67,7 @@ export function MoneyTab({ paymentMethods, expenseByCategory, thisMonthExpenses 
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="font-semibold">ETB {info.amount.toFixed(0)}</p>
+                      <p className="font-semibold">ETB {formatMoney(info.amount)}</p>
                       <p className="text-[10px] text-muted-foreground">{info.count} payments</p>
                     </div>
                   </div>
@@ -90,7 +91,7 @@ export function MoneyTab({ paymentMethods, expenseByCategory, thisMonthExpenses 
         <div className="flex items-center justify-between mb-3">
           <p className="text-xs text-muted-foreground">Where your money goes.</p>
           <span className="text-xs font-medium text-red-600">
-            This month: ETB {thisMonthExpenses.toFixed(0)}
+            This month: ETB {formatMoney(thisMonthExpenses)}
           </span>
         </div>
         {Object.keys(expenseByCategory).length === 0 ? (
@@ -113,7 +114,7 @@ export function MoneyTab({ paymentMethods, expenseByCategory, thisMonthExpenses 
                         <span className="font-medium capitalize">{category.toLowerCase()}</span>
                       </div>
                       <div className="text-right">
-                        <span className="font-semibold">ETB {amount.toFixed(0)}</span>
+                        <span className="font-semibold">ETB {formatMoney(amount)}</span>
                         <span className="text-[10px] text-muted-foreground ml-1">({pct.toFixed(0)}%)</span>
                       </div>
                     </div>

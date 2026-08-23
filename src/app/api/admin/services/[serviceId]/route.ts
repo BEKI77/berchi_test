@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { services, serviceConsumables } from "@/db/schema";
+import { toSantim } from "@/lib/money";
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ serviceId: string }> }) {
   const session = await auth();
@@ -24,7 +25,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ servic
       if (name !== undefined) updateData.name = name;
       if (description !== undefined) updateData.description = description || null;
       if (categoryId !== undefined) updateData.categoryId = categoryId;
-      if (basePrice !== undefined) updateData.basePrice = basePrice;
+      if (basePrice !== undefined) updateData.basePrice = toSantim(basePrice);
       if (durationMinutes !== undefined) updateData.durationMinutes = durationMinutes;
       if (isActive !== undefined) updateData.isActive = isActive;
 

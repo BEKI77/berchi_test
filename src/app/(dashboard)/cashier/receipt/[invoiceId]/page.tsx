@@ -16,18 +16,19 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { customerName } from "@/lib/orders";
+import { formatMoney, formatPercent } from "@/lib/money";
 
 type ReceiptData = {
   id: string;
   invoiceNumber: string;
-  subtotal: string;
-  taxRate: string;
-  taxAmount: string;
+  subtotal: number;
+  taxRate: number;
+  taxAmount: number;
   discountType: string | null;
-  discountValue: string;
-  discountAmount: string;
-  tipAmount: string;
-  totalAmount: string;
+  discountValue: number;
+  discountAmount: number;
+  tipAmount: number;
+  totalAmount: number;
   status: string;
   createdAt: string;
   order: {
@@ -35,10 +36,10 @@ type ReceiptData = {
     startedAt: string;
     customer: { firstName: string; lastName: string; phone: string | null } | null;
     server: { firstName: string; lastName: string };
-    items: { unitPrice: string; quantity: number; service: { name: string } }[];
-    products: { unitPrice: string; quantity: number; product: { name: string } }[];
+    items: { unitPrice: number; quantity: number; service: { name: string } }[];
+    products: { unitPrice: number; quantity: number; product: { name: string } }[];
   };
-  payment: { method: string; amount: string; reference: string | null; createdAt: string } | null;
+  payment: { method: string; amount: number; reference: string | null; createdAt: string } | null;
 };
 
 const methodIcons: Record<string, React.ReactNode> = {
@@ -146,7 +147,7 @@ export default function ReceiptPage() {
                   {item.service.name}
                   {item.quantity > 1 && <span className="text-muted-foreground"> x{item.quantity}</span>}
                 </span>
-                <span className="font-medium">ETB {(Number(item.unitPrice) * item.quantity).toFixed(2)}</span>
+                <span className="font-medium">ETB {formatMoney((Number(item.unitPrice) * item.quantity))}</span>
               </div>
             ))}
           </div>
@@ -164,7 +165,7 @@ export default function ReceiptPage() {
                   {p.product.name}
                   {p.quantity > 1 && <span className="text-muted-foreground"> x{p.quantity}</span>}
                 </span>
-                <span className="font-medium">ETB {(Number(p.unitPrice) * p.quantity).toFixed(2)}</span>
+                <span className="font-medium">ETB {formatMoney((Number(p.unitPrice) * p.quantity))}</span>
               </div>
             ))}
           </div>
@@ -178,30 +179,30 @@ export default function ReceiptPage() {
         <div className="px-6 py-3 space-y-1.5">
           <div className="flex justify-between text-xs">
             <span className="text-muted-foreground">Subtotal</span>
-            <span>ETB {Number(receipt.subtotal).toFixed(2)}</span>
+            <span>ETB {formatMoney(Number(receipt.subtotal))}</span>
           </div>
           <div className="flex justify-between text-xs">
-            <span className="text-muted-foreground">Tax ({Number(receipt.taxRate).toFixed(1)}%)</span>
-            <span>ETB {Number(receipt.taxAmount).toFixed(2)}</span>
+            <span className="text-muted-foreground">Tax ({formatPercent(receipt.taxRate)})</span>
+            <span>ETB {formatMoney(Number(receipt.taxAmount))}</span>
           </div>
           {Number(receipt.discountAmount) > 0 && (
             <div className="flex justify-between text-xs">
               <span className="text-muted-foreground">
                 Discount {receipt.discountType === "PERCENTAGE" ? `(${Number(receipt.discountValue)}%)` : ""}
               </span>
-              <span className="text-red-500">-ETB {Number(receipt.discountAmount).toFixed(2)}</span>
+              <span className="text-red-500">-ETB {formatMoney(Number(receipt.discountAmount))}</span>
             </div>
           )}
           {Number(receipt.tipAmount) > 0 && (
             <div className="flex justify-between text-xs">
               <span className="text-muted-foreground">Tip</span>
-              <span className="text-emerald-600">+ETB {Number(receipt.tipAmount).toFixed(2)}</span>
+              <span className="text-emerald-600">+ETB {formatMoney(Number(receipt.tipAmount))}</span>
             </div>
           )}
           <Separator className="my-1.5" />
           <div className="flex justify-between text-lg font-bold">
             <span>Total</span>
-            <span className="text-emerald-700">ETB {Number(receipt.totalAmount).toFixed(2)}</span>
+            <span className="text-emerald-700">ETB {formatMoney(Number(receipt.totalAmount))}</span>
           </div>
         </div>
 

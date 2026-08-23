@@ -18,17 +18,18 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { customerName, customerInitials } from "@/lib/orders";
+import { formatMoney, formatPercent, toSantim, toBasisPoints, applyRate, fromSantim } from "@/lib/money";
 
 type OrderItem = {
   id: string;
-  unitPrice: string;
+  unitPrice: number;
   quantity: number;
   service: { id: string; name: string };
 };
 
 type OrderProduct = {
   id: string;
-  unitPrice: string;
+  unitPrice: number;
   quantity: number;
   product: { id: string; name: string };
 };
@@ -64,7 +65,8 @@ export default function CheckoutPage() {
   const [discountType, setDiscountType] = useState<DiscountType>(null);
   const [discountValue, setDiscountValue] = useState(0);
   const [tipAmount, setTipAmount] = useState(0);
-  const [taxRate, setTaxRate] = useState(0);
+  // Basis points, as stored. 15% is 1500.
+  const [taxRateBp, setTaxRateBp] = useState(0);
 
   const fetchOrder = useCallback(async () => {
     try {
@@ -95,7 +97,7 @@ export default function CheckoutPage() {
         return null;
       })
       .then((data) => {
-        if (data?.taxRate) setTaxRate(Number(data.taxRate));
+        if (data?.taxRate) setTaxRateBp(Number(data.taxRate));
       })
       .catch(() => { });
   }, []);
@@ -108,23 +110,27 @@ export default function CheckoutPage() {
     );
   }
 
+  // This preview must mirror the server's arithmetic exactly, or the cashier
+  // sees one total and the customer is charged another. Prices are already
+  // santim; the discount and tip inputs are in human units and get converted.
   const servicesSubtotal = order.items.reduce(
-    (s, i) => s + Number(i.unitPrice) * i.quantity,
+    (s, i) => s + i.unitPrice * i.quantity,
     0
   );
   const productsSubtotal = order.products.reduce(
-    (s, p) => s + Number(p.unitPrice) * p.quantity,
+    (s, p) => s + p.unitPrice * p.quantity,
     0
   );
   const subtotal = servicesSubtotal + productsSubtotal;
-  const taxAmount = subtotal * (taxRate / 100);
+  const taxAmount = applyRate(subtotal, taxRateBp);
   const discountAmount =
     discountType === "PERCENTAGE"
-      ? subtotal * (discountValue / 100)
+      ? applyRate(subtotal, toBasisPoints(discountValue))
       : discountType === "FIXED"
-        ? discountValue
+        ? toSantim(discountValue)
         : 0;
-  const total = subtotal + taxAmount - discountAmount + tipAmount;
+  const tipSantim = toSantim(tipAmount);
+  const total = subtotal + taxAmount - discountAmount + tipSantim;
 
   // One action: record the payment and move on. The cashier does not pick a
   // method -- the invoice records CASH by default, which is how the salon is
@@ -217,7 +223,7 @@ export default function CheckoutPage() {
             {order.items.map((item) => (
               <div key={item.id} className="flex justify-between text-sm py-0.5">
                 <span>{item.service.name} {item.quantity > 1 && `x${item.quantity}`}</span>
-                <span className="font-medium">ETB {(Number(item.unitPrice) * item.quantity).toFixed(2)}</span>
+                <span className="font-medium">ETB {formatMoney((Number(item.unitPrice) * item.quantity))}</span>
               </div>
             ))}
 
@@ -230,7 +236,7 @@ export default function CheckoutPage() {
                 {order.products.map((p) => (
                   <div key={p.id} className="flex justify-between text-sm py-0.5">
                     <span>{p.product.name} x{p.quantity}</span>
-                    <span className="font-medium">ETB {(Number(p.unitPrice) * p.quantity).toFixed(2)}</span>
+                    <span className="font-medium">ETB {formatMoney((Number(p.unitPrice) * p.quantity))}</span>
                   </div>
                 ))}
               </>
@@ -242,27 +248,27 @@ export default function CheckoutPage() {
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Subtotal</span>
-              <span className="font-medium">ETB {subtotal.toFixed(2)}</span>
+              <span className="font-medium">ETB {formatMoney(subtotal)}</span>
             </div>
 
-            {taxRate > 0 && (
+            {taxRateBp > 0 && (
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Tax ({taxRate}%)</span>
-                <span className="font-medium">ETB {taxAmount.toFixed(2)}</span>
+                <span className="text-muted-foreground">Tax ({formatPercent(taxRateBp)})</span>
+                <span className="font-medium">ETB {formatMoney(taxAmount)}</span>
               </div>
             )}
 
             {discountAmount > 0 && (
               <div className="flex justify-between text-sm text-emerald-600">
                 <span>Discount{discountType === "PERCENTAGE" ? ` (${discountValue}%)` : ""}</span>
-                <span className="font-medium">- ETB {discountAmount.toFixed(2)}</span>
+                <span className="font-medium">- ETB {formatMoney(discountAmount)}</span>
               </div>
             )}
 
-            {tipAmount > 0 && (
+            {tipSantim > 0 && (
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Tip</span>
-                <span className="font-medium">ETB {tipAmount.toFixed(2)}</span>
+                <span className="font-medium">ETB {formatMoney(tipSantim)}</span>
               </div>
             )}
           </div>
@@ -272,7 +278,7 @@ export default function CheckoutPage() {
           <div className="flex justify-between items-center">
             <span className="font-semibold text-base">Total</span>
             <span className="font-bold text-xl bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">
-              ETB {total.toFixed(2)}
+              ETB {formatMoney(total)}
             </span>
           </div>
         </CardContent>
@@ -331,7 +337,7 @@ export default function CheckoutPage() {
               <Input
                 type="number"
                 min={0}
-                max={discountType === "PERCENTAGE" ? 100 : subtotal}
+                max={discountType === "PERCENTAGE" ? 100 : fromSantim(subtotal)}
                 value={discountValue || ""}
                 onChange={(e) => setDiscountValue(Number(e.target.value) || 0)}
                 className="h-11 rounded-xl border-amber-100 focus:border-amber-300"
@@ -360,7 +366,7 @@ export default function CheckoutPage() {
           className="w-full h-14 text-lg font-semibold rounded-xl bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-500 hover:from-emerald-600 hover:via-teal-600 hover:to-emerald-600 shadow-lg shadow-emerald-300/30 hover:shadow-emerald-400/40 transition-all duration-300 hover:-translate-y-0.5"
         >
           <CheckCircle className="h-5 w-5 mr-2" />
-          {processing ? "Confirming..." : `Confirm Payment — ETB ${total.toFixed(2)}`}
+          {processing ? "Confirming..." : `Confirm Payment — ETB ${formatMoney(total)}`}
         </Button>
       </div>
     </div>

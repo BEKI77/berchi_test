@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, boolean, timestamp, decimal } from "drizzle-orm/pg-core";
+import { pgTable, uuid, varchar, boolean, timestamp, integer} from "drizzle-orm/pg-core";
 import { staffRoleEnum } from "./enums";
 
 export const staff = pgTable("staff", {
@@ -9,7 +9,7 @@ export const staff = pgTable("staff", {
   passwordHash: varchar("password_hash", { length: 255 }).notNull(),
   phone: varchar("phone", { length: 20 }),
   role: staffRoleEnum("role").notNull(),
-  commissionRate: decimal("commission_rate", { precision: 5, scale: 2 }).default("0").notNull(),
+  commissionRate: integer("commission_rate").default(0).notNull(),
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),

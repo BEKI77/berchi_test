@@ -4,6 +4,7 @@ import { eq, desc } from "drizzle-orm";
 import { db } from "@/db";
 import { hasPermission } from "@/lib/permissions";
 import { staff } from "@/db/schema";
+import { toBasisPoints } from "@/lib/money";
 
 export async function GET() {
   const session = await auth();
@@ -73,7 +74,7 @@ export async function POST(req: Request) {
         email,
         phone: phone || null,
         role,
-        commissionRate: commissionRate || 0,
+        commissionRate: toBasisPoints(commissionRate || 0),
         passwordHash,
       })
       .returning();

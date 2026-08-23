@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
 import { customerName, customerInitials } from "@/lib/orders";
+import { formatMoney } from "@/lib/money";
 
 type Order = {
   id: string;
@@ -31,25 +32,25 @@ type Order = {
   completedAt: string | null;
   customer: { id: string; firstName: string; lastName: string; phone: string | null } | null;
   server: { id: string; firstName: string; lastName: string };
-  items: { id: string; unitPrice: string; quantity: number; service: { id: string; name: string } }[];
-  products: { id: string; unitPrice: string; quantity: number; product: { id: string; name: string } }[];
+  items: { id: string; unitPrice: number; quantity: number; service: { id: string; name: string } }[];
+  products: { id: string; unitPrice: number; quantity: number; product: { id: string; name: string } }[];
   invoice: {
     id: string;
     invoiceNumber: string;
-    subtotal: string;
-    taxRate: string;
-    taxAmount: string;
+    subtotal: number;
+    taxRate: number;
+    taxAmount: number;
     discountType: string | null;
-    discountValue: string;
-    discountAmount: string;
-    tipAmount: string;
-    totalAmount: string;
+    discountValue: number;
+    discountAmount: number;
+    tipAmount: number;
+    totalAmount: number;
     status: string;
     createdAt: string;
     payment: {
       id: string;
       method: string;
-      amount: string;
+      amount: number;
       createdAt: string;
     } | null;
   } | null;
@@ -149,7 +150,7 @@ export function TransactionsClient() {
             <Banknote className="h-3.5 w-3.5" />
             Revenue
           </div>
-          <p className="text-xl font-bold">ETB {totalRevenue.toFixed(0)}</p>
+          <p className="text-xl font-bold">ETB {formatMoney(totalRevenue)}</p>
         </div>
         <div className="rounded-xl bg-gradient-to-br from-blue-500 to-indigo-500 p-4 text-white shadow-lg shadow-blue-200/40 overflow-hidden relative">
           <div className="absolute top-0 right-0 w-16 h-16 bg-white/10 rounded-full -translate-y-4 translate-x-4" />
@@ -166,7 +167,7 @@ export function TransactionsClient() {
             Average
           </div>
           <p className="text-xl font-bold">
-            ETB {totalOrders > 0 ? (totalRevenue / totalOrders).toFixed(0) : "0"}
+            ETB {formatMoney(totalOrders > 0 ? Math.round(totalRevenue / totalOrders) : 0)}
           </p>
         </div>
         <div className="rounded-xl bg-gradient-to-br from-pink-500 to-rose-500 p-4 text-white shadow-lg shadow-pink-200/40 overflow-hidden relative">
@@ -175,7 +176,7 @@ export function TransactionsClient() {
             <Heart className="h-3.5 w-3.5" />
             Tips
           </div>
-          <p className="text-xl font-bold">ETB {totalTips.toFixed(0)}</p>
+          <p className="text-xl font-bold">ETB {formatMoney(totalTips)}</p>
         </div>
       </div>
 
@@ -230,9 +231,9 @@ export function TransactionsClient() {
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
                         <div className="text-right">
-                          <p className="font-bold text-sm text-emerald-700">ETB {total.toFixed(0)}</p>
+                          <p className="font-bold text-sm text-emerald-700">ETB {formatMoney(total)}</p>
                           {inv && Number(inv.tipAmount) > 0 && (
-                            <p className="text-[9px] text-pink-500 font-medium">+ETB {Number(inv.tipAmount).toFixed(0)} tip</p>
+                            <p className="text-[9px] text-pink-500 font-medium">+ETB {formatMoney(Number(inv.tipAmount))} tip</p>
                           )}
                         </div>
                         {isOpen ? <ChevronUp className="h-4 w-4 text-gray-300" /> : <ChevronDown className="h-4 w-4 text-gray-300" />}
@@ -252,7 +253,7 @@ export function TransactionsClient() {
                           {order.items.map((item) => (
                             <div key={item.id} className="flex justify-between text-xs">
                               <span className="text-gray-700">{item.service.name} {item.quantity > 1 && <span className="text-muted-foreground">x{item.quantity}</span>}</span>
-                              <span className="font-medium text-gray-900">ETB {(Number(item.unitPrice) * item.quantity).toFixed(0)}</span>
+                              <span className="font-medium text-gray-900">ETB {formatMoney((Number(item.unitPrice) * item.quantity))}</span>
                             </div>
                           ))}
                         </div>
@@ -268,7 +269,7 @@ export function TransactionsClient() {
                             {order.products.map((p) => (
                               <div key={p.id} className="flex justify-between text-xs">
                                 <span className="text-gray-700">{p.product.name} <span className="text-muted-foreground">x{p.quantity}</span></span>
-                                <span className="font-medium text-gray-900">ETB {(Number(p.unitPrice) * p.quantity).toFixed(0)}</span>
+                                <span className="font-medium text-gray-900">ETB {formatMoney((Number(p.unitPrice) * p.quantity))}</span>
                               </div>
                             ))}
                           </div>
@@ -280,29 +281,29 @@ export function TransactionsClient() {
                         <div className="rounded-lg bg-gray-50/80 p-2.5 space-y-1">
                           <div className="flex justify-between text-xs">
                             <span className="text-muted-foreground">Subtotal</span>
-                            <span className="font-medium">ETB {Number(inv.subtotal).toFixed(0)}</span>
+                            <span className="font-medium">ETB {formatMoney(Number(inv.subtotal))}</span>
                           </div>
                           {Number(inv.taxAmount) > 0 && (
                             <div className="flex justify-between text-xs">
                               <span className="text-muted-foreground flex items-center gap-1"><Percent className="h-2.5 w-2.5" /> Tax ({Number(inv.taxRate)}%)</span>
-                              <span className="font-medium">+ETB {Number(inv.taxAmount).toFixed(0)}</span>
+                              <span className="font-medium">+ETB {formatMoney(Number(inv.taxAmount))}</span>
                             </div>
                           )}
                           {Number(inv.discountAmount) > 0 && (
                             <div className="flex justify-between text-xs">
                               <span className="text-red-500 flex items-center gap-1">Discount {inv.discountType === "PERCENTAGE" ? `(${Number(inv.discountValue)}%)` : ""}</span>
-                              <span className="font-medium text-red-500">-ETB {Number(inv.discountAmount).toFixed(0)}</span>
+                              <span className="font-medium text-red-500">-ETB {formatMoney(Number(inv.discountAmount))}</span>
                             </div>
                           )}
                           {Number(inv.tipAmount) > 0 && (
                             <div className="flex justify-between text-xs">
                               <span className="text-pink-500 flex items-center gap-1"><Heart className="h-2.5 w-2.5" /> Tip</span>
-                              <span className="font-medium text-pink-500">+ETB {Number(inv.tipAmount).toFixed(0)}</span>
+                              <span className="font-medium text-pink-500">+ETB {formatMoney(Number(inv.tipAmount))}</span>
                             </div>
                           )}
                           <div className="flex justify-between text-sm font-bold pt-1 border-t border-gray-200/60">
                             <span className="text-emerald-700">Total Paid</span>
-                            <span className="text-emerald-700">ETB {Number(inv.totalAmount).toFixed(0)}</span>
+                            <span className="text-emerald-700">ETB {formatMoney(Number(inv.totalAmount))}</span>
                           </div>
                         </div>
                       )}

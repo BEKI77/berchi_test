@@ -17,9 +17,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { formatMoney } from "@/lib/money";
 
 type StaffOption = { id: string; firstName: string; lastName: string };
-type ServiceOption = { id: string; name: string; durationMinutes: number; basePrice: string };
+type ServiceOption = { id: string; name: string; durationMinutes: number; basePrice: number };
 
 export default function WalkInPage() {
   const router = useRouter();
@@ -268,7 +269,7 @@ export default function WalkInPage() {
               >
                 <option value="">Select service...</option>
                 {services.map((s) => (
-                  <option key={s.id} value={s.id}>{s.name} — ETB {Number(s.basePrice).toFixed(0)} ({s.durationMinutes}min)</option>
+                  <option key={s.id} value={s.id}>{s.name} — ETB {formatMoney(Number(s.basePrice))} ({s.durationMinutes}min)</option>
                 ))}
               </select>
             </div>

@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { eq, not, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { staff, customers, appointments } from "@/db/schema";
+import { applyRate, fromBasisPoints } from "@/lib/money";
 
 export async function GET(req: Request) {
   const session = await auth();
@@ -186,8 +187,9 @@ export async function GET(req: Request) {
       .map((s) => {
         const staffOrders = rangeOrders.filter((o) => o.serverId === s.id);
         const staffItems = rangeServiceItems.filter((i) => i.staffId === s.id);
-        const serviceRevenue = staffItems.reduce((sum, i) => sum + Number(i.unitPrice) * i.quantity, 0);
-        const commissionEarned = serviceRevenue * (Number(s.commissionRate) / 100);
+        const serviceRevenue = staffItems.reduce((sum, i) => sum + i.unitPrice * i.quantity, 0);
+        // commissionRate is basis points, so this must not divide by 100.
+        const commissionEarned = applyRate(serviceRevenue, s.commissionRate);
         return {
           id: s.id,
           name: `${s.firstName} ${s.lastName}`,
@@ -195,7 +197,7 @@ export async function GET(req: Request) {
           completedOrders: staffOrders.filter((o) => o.status === "CHECKED_OUT").length,
           serviceRevenue,
           servicesPerformed: staffItems.reduce((sum, i) => sum + i.quantity, 0),
-          commissionRate: Number(s.commissionRate),
+          commissionRate: fromBasisPoints(s.commissionRate),
           commissionEarned,
         };
       })

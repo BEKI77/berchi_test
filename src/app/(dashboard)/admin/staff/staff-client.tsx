@@ -16,6 +16,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { formatPercent, fromBasisPoints } from "@/lib/money";
 
 type Staff = {
   id: string;
@@ -24,7 +25,7 @@ type Staff = {
   email: string;
   phone: string | null;
   role: string;
-  commissionRate: string;
+  commissionRate: number;
   isActive: boolean;
   createdAt: string;
 };
@@ -89,7 +90,7 @@ export function StaffClient() {
       email: s.email,
       phone: s.phone || "",
       role: s.role,
-      commissionRate: Number(s.commissionRate),
+      commissionRate: fromBasisPoints(s.commissionRate),
       password: "",
     });
     setShowForm(true);
@@ -277,8 +278,8 @@ export function StaffClient() {
                   <span className={`text-[10px] font-semibold px-2 py-1 rounded-full border ${roleColors[s.role] || "bg-gray-50 text-gray-600 border-gray-200"}`}>
                     {s.role}
                   </span>
-                  {Number(s.commissionRate) > 0 && (
-                    <span className="text-[10px] font-medium text-muted-foreground">{Number(s.commissionRate)}%</span>
+                  {s.commissionRate > 0 && (
+                    <span className="text-[10px] font-medium text-muted-foreground">{formatPercent(s.commissionRate)}</span>
                   )}
                   <button onClick={() => openEdit(s)} className="p-1.5 rounded-lg hover:bg-violet-50 text-violet-500 transition-colors">
                     <Edit2 className="h-3.5 w-3.5" />

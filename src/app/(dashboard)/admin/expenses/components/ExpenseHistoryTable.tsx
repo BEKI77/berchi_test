@@ -23,6 +23,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Expense } from "../types";
 import { categories, catColors } from "../constants";
+import { formatMoney } from "@/lib/money";
 
 interface ExpenseHistoryTableProps {
   expenses: Expense[];
@@ -129,11 +130,11 @@ export function ExpenseHistoryTable({
         </div>
         <div className="flex items-center gap-2">
           <Badge variant="secondary" className="text-sm">
-            ETB {expenses.reduce((sum, e) => sum + Number(e.amount), 0).toFixed(2)} total
+            ETB {formatMoney(expenses.reduce((sum, e) => sum + Number(e.amount), 0))} total
           </Badge>
           {filteredExpenses.length !== expenses.length && (
             <Badge variant="outline" className="text-sm">
-              ETB {filteredExpenses.reduce((sum, e) => sum + Number(e.amount), 0).toFixed(2)} filtered
+              ETB {formatMoney(filteredExpenses.reduce((sum, e) => sum + Number(e.amount), 0))} filtered
             </Badge>
           )}
         </div>
@@ -308,7 +309,7 @@ export function ExpenseHistoryTable({
                       {expense.staff.firstName} {expense.staff.lastName}
                     </TableCell>
                     <TableCell className="text-right font-semibold text-red-600">
-                      ETB {Number(expense.amount).toFixed(2)}
+                      ETB {formatMoney(Number(expense.amount))}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1">

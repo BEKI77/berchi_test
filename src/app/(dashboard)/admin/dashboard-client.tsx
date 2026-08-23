@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { formatMoney } from "@/lib/money";
 
 type Stats = {
   todaysRevenue: number;
@@ -85,7 +86,7 @@ export function AdminDashboardClient({ firstName }: { firstName: string }) {
             <DollarSign className="h-4 w-4" />
             Today&apos;s Revenue
           </div>
-          <p className="text-2xl font-bold">ETB {(stats?.todaysRevenue || 0).toFixed(2)}</p>
+          <p className="text-2xl font-bold">ETB {formatMoney((stats?.todaysRevenue || 0))}</p>
           <p className="text-emerald-200 text-xs mt-1">{stats?.transactionCount || 0} transactions</p>
         </div>
 
@@ -115,7 +116,7 @@ export function AdminDashboardClient({ firstName }: { firstName: string }) {
             <TrendingUp className="h-4 w-4" />
             Tips Collected
           </div>
-          <p className="text-2xl font-bold">ETB {(stats?.todaysTips || 0).toFixed(2)}</p>
+          <p className="text-2xl font-bold">ETB {formatMoney((stats?.todaysTips || 0))}</p>
           <p className="text-amber-200 text-xs mt-1">Today</p>
         </div>
       </div>

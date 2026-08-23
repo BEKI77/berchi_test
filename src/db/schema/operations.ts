@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, text, timestamp, decimal, integer, date, boolean } from "drizzle-orm/pg-core";
+import { pgTable, uuid, varchar, text, timestamp, integer, date, boolean } from "drizzle-orm/pg-core";
 import { expenseCategoryEnum, stockMovementTypeEnum, recurrenceFrequencyEnum, expenseTypeEnum, expenseStatusEnum } from "./enums";
 import { staff } from "./staff";
 import { products } from "./products";
@@ -8,7 +8,7 @@ export const expenses = pgTable("expenses", {
   id: uuid("id").primaryKey().defaultRandom(),
   description: varchar("description", { length: 500 }).notNull(),
   category: expenseCategoryEnum("category").notNull(),
-  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  amount: integer("amount").notNull(),
   date: date("date").notNull(),
   loggedBy: uuid("logged_by").notNull().references(() => staff.id),
   receiptUrl: varchar("receipt_url", { length: 500 }),
@@ -27,7 +27,7 @@ export const expenseSchedules = pgTable("expense_schedules", {
   name: varchar("name", { length: 255 }).notNull(),
   description: text("description"),
   category: expenseCategoryEnum("category").notNull(),
-  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  amount: integer("amount").notNull(),
   frequency: recurrenceFrequencyEnum("frequency").notNull(),
   interval: integer("interval").notNull().default(1),
   dayOfMonth: integer("day_of_month"),
@@ -71,8 +71,8 @@ export const commissionLogs = pgTable("commission_logs", {
   staffId: uuid("staff_id").notNull().references(() => staff.id),
   invoiceId: uuid("invoice_id").notNull(),
   serviceOrderItemId: uuid("service_order_item_id").notNull().references(() => serviceOrderItems.id),
-  commissionRate: decimal("commission_rate", { precision: 5, scale: 2 }).notNull(),
-  serviceAmount: decimal("service_amount", { precision: 10, scale: 2 }).notNull(),
-  commissionAmount: decimal("commission_amount", { precision: 10, scale: 2 }).notNull(),
+  commissionRate: integer("commission_rate").notNull(),
+  serviceAmount: integer("service_amount").notNull(),
+  commissionAmount: integer("commission_amount").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });

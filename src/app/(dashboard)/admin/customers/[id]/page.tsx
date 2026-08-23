@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import { formatMoney } from "@/lib/money";
 
 type CustomerDetail = {
   customer: {
@@ -36,8 +37,8 @@ type CustomerDetail = {
     startedAt: string;
     completedAt: string | null;
     server: { firstName: string; lastName: string };
-    items: { unitPrice: string; quantity: number; service: { name: string } }[];
-    products: { unitPrice: string; quantity: number; product: { name: string } }[];
+    items: { unitPrice: number; quantity: number; service: { name: string } }[];
+    products: { unitPrice: number; quantity: number; product: { name: string } }[];
   }[];
   recentAppointments: {
     id: string;
@@ -49,8 +50,8 @@ type CustomerDetail = {
   recentInvoices: {
     id: string;
     invoiceNumber: string;
-    totalAmount: string;
-    tipAmount: string;
+    totalAmount: number;
+    tipAmount: number;
     status: string;
     createdAt: string;
     payment: { method: string } | null;
@@ -149,7 +150,7 @@ export default function CustomerDetailPage() {
           <div className="h-1 bg-gradient-to-r from-rose-400 to-pink-400" />
           <CardContent className="pt-3 pb-3">
             <p className="text-[10px] font-semibold text-rose-500 uppercase tracking-wider">Total Spent</p>
-            <p className="text-xl font-bold mt-1">ETB {stats.totalSpent.toFixed(0)}</p>
+            <p className="text-xl font-bold mt-1">ETB {formatMoney(stats.totalSpent)}</p>
           </CardContent>
         </Card>
         <Card className="rounded-xl border-blue-100 overflow-hidden">
@@ -163,7 +164,7 @@ export default function CustomerDetailPage() {
           <div className="h-1 bg-gradient-to-r from-emerald-400 to-teal-400" />
           <CardContent className="pt-3 pb-3">
             <p className="text-[10px] font-semibold text-emerald-500 uppercase tracking-wider">Tips Given</p>
-            <p className="text-xl font-bold mt-1">ETB {stats.totalTips.toFixed(0)}</p>
+            <p className="text-xl font-bold mt-1">ETB {formatMoney(stats.totalTips)}</p>
           </CardContent>
         </Card>
       </div>
@@ -234,7 +235,7 @@ export default function CustomerDetailPage() {
                           <span>{order.items.length} services, {order.products.length} products</span>
                         </div>
                       </div>
-                      <span className="font-semibold text-sm text-rose-700 shrink-0">ETB {total.toFixed(0)}</span>
+                      <span className="font-semibold text-sm text-rose-700 shrink-0">ETB {formatMoney(total)}</span>
                     </div>
                   </CardContent>
                 </Card>
@@ -306,13 +307,13 @@ export default function CustomerDetailPage() {
                           {Number(inv.tipAmount) > 0 && (
                             <>
                               <span className="text-muted-foreground/40">·</span>
-                              <span className="text-emerald-600">Tip: ETB {Number(inv.tipAmount).toFixed(0)}</span>
+                              <span className="text-emerald-600">Tip: ETB {formatMoney(Number(inv.tipAmount))}</span>
                             </>
                           )}
                         </div>
                       </div>
                     </div>
-                    <span className="font-semibold text-sm text-emerald-700 shrink-0">ETB {Number(inv.totalAmount).toFixed(0)}</span>
+                    <span className="font-semibold text-sm text-emerald-700 shrink-0">ETB {formatMoney(Number(inv.totalAmount))}</span>
                   </div>
                 </CardContent>
               </Card>

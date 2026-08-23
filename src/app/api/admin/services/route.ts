@@ -4,6 +4,7 @@ import { hasPermission } from "@/lib/permissions";
 import { asc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { services, serviceConsumables } from "@/db/schema";
+import { toSantim } from "@/lib/money";
 
 export async function GET() {
   const session = await auth();
@@ -63,7 +64,7 @@ export async function POST(req: Request) {
           name,
           description: description || null,
           categoryId,
-          basePrice,
+          basePrice: toSantim(basePrice),
           durationMinutes,
         })
         .returning();

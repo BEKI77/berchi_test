@@ -37,7 +37,7 @@ export async function POST(req: Request) {
       [blockSvc] = await db.insert(services).values({
         name: "Time Block",
         categoryId: systemCat.id,
-        basePrice: "0",
+        basePrice: 0,
         durationMinutes: 30,
       }).returning();
     }

@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { asc, eq, not, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { staff, customers, appointments } from "@/db/schema";
+import { fromBasisPoints } from "@/lib/money";
 
 // GET: All employees with their stats for the owner employees overview page
 export async function GET() {
@@ -117,7 +118,7 @@ export async function GET() {
 
       return {
         ...s,
-        commissionRate: Number(s.commissionRate),
+        commissionRate: fromBasisPoints(s.commissionRate),
         stats: {
           totalOrders,
           completedOrders,

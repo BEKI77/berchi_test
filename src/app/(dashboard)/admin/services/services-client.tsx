@@ -14,6 +14,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { formatMoney, fromSantim } from "@/lib/money";
 
 type Category = { id: string; name: string; description: string | null; isActive?: boolean };
 type Product = { id: string; name: string; isConsumable: boolean };
@@ -27,7 +28,7 @@ type Service = {
   id: string;
   name: string;
   description: string | null;
-  basePrice: string;
+  basePrice: number;
   durationMinutes: number;
   isActive: boolean;
   category: Category;
@@ -94,7 +95,7 @@ export function ServicesClient() {
       name: s.name,
       description: s.description || "",
       categoryId: s.category.id,
-      basePrice: Number(s.basePrice),
+      basePrice: fromSantim(s.basePrice),
       durationMinutes: s.durationMinutes,
       consumables: s.consumables?.map(c => ({
         productId: c.productId,
@@ -550,7 +551,7 @@ export function ServicesClient() {
                   <div className="flex-1">
                     <p className="font-medium text-sm">{s.name}</p>
                     <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
-                      <span className="font-semibold text-pink-600">ETB {Number(s.basePrice).toFixed(2)}</span>
+                      <span className="font-semibold text-pink-600">ETB {formatMoney(Number(s.basePrice))}</span>
                       <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {s.durationMinutes}m</span>
                       {s.consumables && s.consumables.length > 0 && (
                         <span className="flex items-center gap-1 text-teal-600"><Droplets className="h-3 w-3" /> {s.consumables.length} product(s)</span>

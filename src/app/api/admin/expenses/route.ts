@@ -4,6 +4,7 @@ import { desc, eq, and, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { hasPermission } from "@/lib/permissions";
 import { expenses, expenseSchedules } from "@/db/schema";
+import { toSantim } from "@/lib/money";
 
 export async function GET(req: Request) {
   const session = await auth();
@@ -144,7 +145,7 @@ export async function POST(req: Request) {
       .values({
         description,
         category,
-        amount,
+        amount: toSantim(amount),
         date: new Date(date).toISOString().split("T")[0],
         loggedBy: session.user.id,
         type: "SPONTANEOUS",

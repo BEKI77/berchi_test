@@ -23,6 +23,7 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import { formatMoney } from "@/lib/money";
 
 type Employee = {
   id: string;
@@ -141,7 +142,7 @@ export function EmployeesClient() {
             <div className="h-1 bg-gradient-to-r from-emerald-400 to-teal-400" />
             <CardContent className="pt-3 pb-3">
               <p className="text-[10px] font-semibold text-emerald-500 uppercase tracking-wider">Total Revenue</p>
-              <p className="text-xl font-bold mt-1">ETB {summary.totalRevenue.toFixed(0)}</p>
+              <p className="text-xl font-bold mt-1">ETB {formatMoney(summary.totalRevenue)}</p>
               <p className="text-[10px] text-muted-foreground">{summary.totalOrders} orders</p>
             </CardContent>
           </Card>
@@ -149,7 +150,7 @@ export function EmployeesClient() {
             <div className="h-1 bg-gradient-to-r from-pink-400 to-rose-400" />
             <CardContent className="pt-3 pb-3">
               <p className="text-[10px] font-semibold text-pink-500 uppercase tracking-wider">Commissions Paid</p>
-              <p className="text-xl font-bold mt-1">ETB {summary.totalCommissions.toFixed(0)}</p>
+              <p className="text-xl font-bold mt-1">ETB {formatMoney(summary.totalCommissions)}</p>
               <p className="text-[10px] text-muted-foreground">{summary.totalServicesPerformed} services</p>
             </CardContent>
           </Card>
@@ -157,7 +158,7 @@ export function EmployeesClient() {
             <div className="h-1 bg-gradient-to-r from-amber-400 to-orange-400" />
             <CardContent className="pt-3 pb-3">
               <p className="text-[10px] font-semibold text-amber-500 uppercase tracking-wider">Tips Earned</p>
-              <p className="text-xl font-bold mt-1">ETB {summary.totalTips.toFixed(0)}</p>
+              <p className="text-xl font-bold mt-1">ETB {formatMoney(summary.totalTips)}</p>
               {topPerformer && (
                 <p className="text-[10px] text-muted-foreground">Top: {topPerformer.firstName}</p>
               )}
@@ -211,8 +212,8 @@ export function EmployeesClient() {
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       <div className="text-right">
-                        <p className="font-bold text-sm text-violet-700">ETB {s.totalInvoiceRevenue.toFixed(0)}</p>
-                        <p className="text-[9px] text-emerald-600 font-medium">+ETB {s.totalCommissions.toFixed(0)} comm</p>
+                        <p className="font-bold text-sm text-violet-700">ETB {formatMoney(s.totalInvoiceRevenue)}</p>
+                        <p className="text-[9px] text-emerald-600 font-medium">+ETB {formatMoney(s.totalCommissions)} comm</p>
                       </div>
                       {isOpen ? <ChevronUp className="h-4 w-4 text-gray-300" /> : <ChevronDown className="h-4 w-4 text-gray-300" />}
                     </div>
@@ -239,19 +240,19 @@ export function EmployeesClient() {
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                       <div className="p-2.5 rounded-lg bg-violet-50/60 border border-violet-100/50">
                         <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Revenue</p>
-                        <p className="font-bold text-sm text-violet-700">ETB {s.totalInvoiceRevenue.toFixed(0)}</p>
+                        <p className="font-bold text-sm text-violet-700">ETB {formatMoney(s.totalInvoiceRevenue)}</p>
                       </div>
                       <div className="p-2.5 rounded-lg bg-emerald-50/60 border border-emerald-100/50">
                         <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Commissions</p>
-                        <p className="font-bold text-sm text-emerald-700">ETB {s.totalCommissions.toFixed(0)}</p>
+                        <p className="font-bold text-sm text-emerald-700">ETB {formatMoney(s.totalCommissions)}</p>
                       </div>
                       <div className="p-2.5 rounded-lg bg-blue-50/60 border border-blue-100/50">
                         <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Avg per Order</p>
-                        <p className="font-bold text-sm text-blue-700">ETB {s.avgRevenuePerOrder.toFixed(0)}</p>
+                        <p className="font-bold text-sm text-blue-700">ETB {formatMoney(s.avgRevenuePerOrder)}</p>
                       </div>
                       <div className="p-2.5 rounded-lg bg-pink-50/60 border border-pink-100/50">
                         <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1"><Heart className="h-2.5 w-2.5" /> Tips</p>
-                        <p className="font-bold text-sm text-pink-700">ETB {s.totalTipsEarned.toFixed(0)}</p>
+                        <p className="font-bold text-sm text-pink-700">ETB {formatMoney(s.totalTipsEarned)}</p>
                       </div>
                     </div>
 
@@ -332,7 +333,7 @@ export function EmployeesClient() {
                                     <span className="truncate">{svc.name}</span>
                                     <span className="text-muted-foreground shrink-0">{svc.count}x</span>
                                   </div>
-                                  <span className="font-semibold text-violet-700 shrink-0">ETB {svc.revenue.toFixed(0)}</span>
+                                  <span className="font-semibold text-violet-700 shrink-0">ETB {formatMoney(svc.revenue)}</span>
                                 </div>
                                 <div className="h-1.5 bg-violet-50 rounded-full overflow-hidden">
                                   <div className="h-full rounded-full bg-gradient-to-r from-violet-400 to-purple-400" style={{ width: `${pct}%` }} />

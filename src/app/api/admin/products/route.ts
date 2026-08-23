@@ -4,6 +4,7 @@ import { asc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { hasPermission } from "@/lib/permissions";
 import { products } from "@/db/schema";
+import { toSantim } from "@/lib/money";
 
 export async function GET() {
   const session = await auth();
@@ -61,9 +62,9 @@ export async function POST(req: Request) {
         name,
         sku: sku || null,
         categoryId,
-        costPrice,
-        sellPrice,
-        usagePrice: usagePrice || 0,
+        costPrice: toSantim(costPrice),
+        sellPrice: toSantim(sellPrice),
+        usagePrice: toSantim(usagePrice || 0),
         quantityOnHand: quantityOnHand || 0,
         reorderLevel: reorderLevel || 5,
         isConsumable: isConsumable || false,

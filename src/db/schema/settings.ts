@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, text, boolean, timestamp, decimal } from "drizzle-orm/pg-core";
+import { pgTable, uuid, varchar, text, boolean, timestamp, integer} from "drizzle-orm/pg-core";
 
 export const salonSettings = pgTable("salon_settings", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -6,7 +6,7 @@ export const salonSettings = pgTable("salon_settings", {
   address: varchar("address", { length: 500 }),
   phone: varchar("phone", { length: 20 }),
   logoUrl: varchar("logo_url", { length: 500 }),
-  taxRate: decimal("tax_rate", { precision: 5, scale: 2 }).default("0").notNull(),
+  taxRate: integer("tax_rate").default(0).notNull(),
   currency: varchar("currency", { length: 10 }).default("ETB").notNull(),
   timezone: varchar("timezone", { length: 64 }).default("Africa/Addis_Ababa").notNull(),
   receiptsEnabled: boolean("receipts_enabled").default(true).notNull(),

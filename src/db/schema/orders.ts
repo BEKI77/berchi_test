@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, text, timestamp, decimal, integer } from "drizzle-orm/pg-core";
+import { pgTable, uuid, varchar, text, timestamp, integer } from "drizzle-orm/pg-core";
 import { orderStatusEnum } from "./enums";
 import { customers } from "./customers";
 import { staff } from "./staff";
@@ -24,7 +24,7 @@ export const serviceOrderItems = pgTable("service_order_items", {
   id: uuid("id").primaryKey().defaultRandom(),
   orderId: uuid("order_id").notNull().references(() => serviceOrders.id, { onDelete: "cascade" }),
   serviceId: uuid("service_id").notNull().references(() => services.id),
-  unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
+  unitPrice: integer("unit_price").notNull(),
   quantity: integer("quantity").default(1).notNull(),
   staffId: uuid("staff_id").notNull().references(() => staff.id),
 });
@@ -35,7 +35,7 @@ export const serviceOrderProducts = pgTable("service_order_products", {
   orderItemId: uuid("order_item_id").references(() => serviceOrderItems.id, { onDelete: "cascade" }),
   productId: uuid("product_id").notNull().references(() => products.id),
   quantity: integer("quantity").notNull(),
-  unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
+  unitPrice: integer("unit_price").notNull(),
 });
 
 export const orderItemConsumables = pgTable("order_item_consumables", {

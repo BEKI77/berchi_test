@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ExpenseSchedule } from "../types";
 import { catColors } from "../constants";
+import { formatMoney } from "@/lib/money";
 
 interface ScheduleCardProps {
   schedule: ExpenseSchedule;
@@ -53,7 +54,7 @@ export function ScheduleCard({
         </div>
         <div className="flex items-center gap-2">
           <p className="font-bold text-red-600 text-sm">
-            ETB {Number(schedule.amount).toFixed(2)}
+            ETB {formatMoney(Number(schedule.amount))}
           </p>
           <Button
             size="sm"

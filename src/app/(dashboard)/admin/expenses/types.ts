@@ -2,7 +2,7 @@ export type Expense = {
   id: string;
   description: string;
   category: string;
-  amount: string;
+  amount: number;
   date: string;
   status?: string;
   type?: string;
@@ -17,7 +17,7 @@ export type ExpenseSchedule = {
   name: string;
   description: string | null;
   category: string;
-  amount: string;
+  amount: number;
   frequency: string;
   interval: number;
   nextDueDate: string;

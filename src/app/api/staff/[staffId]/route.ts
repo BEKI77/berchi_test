@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { staff } from "@/db/schema";
+import { toBasisPoints } from "@/lib/money";
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ staffId: string }> }) {
   const session = await auth();
@@ -22,7 +23,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ staffI
     if (email !== undefined) updateData.email = email;
     if (phone !== undefined) updateData.phone = phone || null;
     if (role !== undefined) updateData.role = role;
-    if (commissionRate !== undefined) updateData.commissionRate = commissionRate;
+    if (commissionRate !== undefined) updateData.commissionRate = toBasisPoints(commissionRate);
     if (isActive !== undefined) updateData.isActive = isActive;
 
     if (password) {

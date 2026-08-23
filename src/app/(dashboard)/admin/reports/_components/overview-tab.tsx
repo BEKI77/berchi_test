@@ -3,6 +3,7 @@
 import { ArrowDownRight, ArrowUpRight, DollarSign, Target, TrendingDown, TrendingUp, Users } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import type { ReportData } from "../types";
+import { formatMoney } from "@/lib/money";
 
 type OverviewTabProps = {
   overview: ReportData["overview"];
@@ -50,16 +51,16 @@ export function OverviewTab({ overview, rangeMetrics, rangeLabel }: OverviewTabP
                 <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
                   {m.label}
                 </p>
-                <p className={`text-lg font-bold mt-1 ${m.color}`}>ETB {m.value.toFixed(0)}</p>
+                <p className={`text-lg font-bold mt-1 ${m.color}`}>ETB {formatMoney(m.value)}</p>
                 <p className="text-[10px] text-muted-foreground mt-0.5">{m.desc}</p>
               </div>
             ))}
           </div>
           <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-3">
             {[
-              { label: "Subtotal (before tax)", value: `ETB ${rm.subtotal.toFixed(0)}` },
-              { label: "Tax Collected", value: `ETB ${rm.tax.toFixed(0)}` },
-              { label: "Discounts Given", value: `ETB ${rm.discounts.toFixed(0)}` },
+              { label: "Subtotal (before tax)", value: `ETB ${formatMoney(rm.subtotal)}` },
+              { label: "Tax Collected", value: `ETB ${formatMoney(rm.tax)}` },
+              { label: "Discounts Given", value: `ETB ${formatMoney(rm.discounts)}` },
               { label: "New Customers", value: `${rm.newCustomers}` },
             ].map((m) => (
               <div
@@ -86,7 +87,7 @@ export function OverviewTab({ overview, rangeMetrics, rangeLabel }: OverviewTabP
             <div className="h-1 bg-gradient-to-r from-emerald-400 to-teal-400" />
             <CardContent className="pt-3 pb-3">
               <p className="text-[10px] font-semibold text-emerald-500 uppercase tracking-wider">Total Revenue</p>
-              <p className="text-xl font-bold mt-1">ETB {overview.totalRevenue.toFixed(0)}</p>
+              <p className="text-xl font-bold mt-1">ETB {formatMoney(overview.totalRevenue)}</p>
               <p className="text-[10px] text-muted-foreground">{overview.totalInvoices} invoices</p>
             </CardContent>
           </Card>
@@ -101,7 +102,7 @@ export function OverviewTab({ overview, rangeMetrics, rangeLabel }: OverviewTabP
                   <ArrowDownRight className="h-3.5 w-3.5 text-red-500" />
                 )}
               </div>
-              <p className="text-xl font-bold mt-1">ETB {overview.thisMonthRevenue.toFixed(0)}</p>
+              <p className="text-xl font-bold mt-1">ETB {formatMoney(overview.thisMonthRevenue)}</p>
               <p
                 className={`text-[10px] font-medium ${overview.revenueGrowth >= 0 ? "text-emerald-600" : "text-red-600"
                   }`}
@@ -115,7 +116,7 @@ export function OverviewTab({ overview, rangeMetrics, rangeLabel }: OverviewTabP
             <div className="h-1 bg-gradient-to-r from-violet-400 to-purple-400" />
             <CardContent className="pt-3 pb-3">
               <p className="text-[10px] font-semibold text-violet-500 uppercase tracking-wider">Net Profit</p>
-              <p className="text-xl font-bold mt-1">ETB {overview.netProfit.toFixed(0)}</p>
+              <p className="text-xl font-bold mt-1">ETB {formatMoney(overview.netProfit)}</p>
               <p className="text-[10px] text-muted-foreground">Revenue - Expenses</p>
             </CardContent>
           </Card>
@@ -123,7 +124,7 @@ export function OverviewTab({ overview, rangeMetrics, rangeLabel }: OverviewTabP
             <div className="h-1 bg-gradient-to-r from-pink-400 to-rose-400" />
             <CardContent className="pt-3 pb-3">
               <p className="text-[10px] font-semibold text-pink-500 uppercase tracking-wider">Today</p>
-              <p className="text-xl font-bold mt-1">ETB {overview.todayRevenue.toFixed(0)}</p>
+              <p className="text-xl font-bold mt-1">ETB {formatMoney(overview.todayRevenue)}</p>
               <p className="text-[10px] text-muted-foreground">
                 {overview.completedOrders}/{overview.totalOrders} orders done
               </p>
@@ -135,14 +136,14 @@ export function OverviewTab({ overview, rangeMetrics, rangeLabel }: OverviewTabP
             {
               icon: <TrendingUp className="h-4 w-4" />,
               label: "Tips",
-              value: `ETB ${overview.totalTips.toFixed(0)}`,
+              value: `ETB ${formatMoney(overview.totalTips)}`,
               bg: "bg-emerald-50/50 border-emerald-100/50",
               iconBg: "bg-emerald-100 text-emerald-600",
             },
             {
               icon: <TrendingDown className="h-4 w-4" />,
               label: "Discounts",
-              value: `ETB ${overview.totalDiscounts.toFixed(0)}`,
+              value: `ETB ${formatMoney(overview.totalDiscounts)}`,
               bg: "bg-amber-50/50 border-amber-100/50",
               iconBg: "bg-amber-100 text-amber-600",
             },
@@ -157,7 +158,7 @@ export function OverviewTab({ overview, rangeMetrics, rangeLabel }: OverviewTabP
             {
               icon: <DollarSign className="h-4 w-4" />,
               label: "Expenses",
-              value: `ETB ${overview.totalExpenses.toFixed(0)}`,
+              value: `ETB ${formatMoney(overview.totalExpenses)}`,
               bg: "bg-red-50/50 border-red-100/50",
               iconBg: "bg-red-100 text-red-600",
             },

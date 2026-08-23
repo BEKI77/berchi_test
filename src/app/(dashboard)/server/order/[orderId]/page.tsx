@@ -26,22 +26,23 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { customerName } from "@/lib/orders";
+import { formatMoney } from "@/lib/money";
 
 type ServiceConsumable = {
   productId: string;
   portionsRequired: number;
-  product: { id: string; name: string; usagePrice: string; sellPrice: string };
+  product: { id: string; name: string; usagePrice: number; sellPrice: number };
 };
 
 type ConsumableUsed = {
   productId: string;
   portionsUsed: number;
-  product: { id: string; name: string; usagePrice: string; sellPrice: string };
+  product: { id: string; name: string; usagePrice: number; sellPrice: number };
 };
 
 type OrderItem = {
   id: string;
-  unitPrice: string;
+  unitPrice: number;
   quantity: number;
   service: {
     id: string;
@@ -53,10 +54,10 @@ type OrderItem = {
 
 type OrderProduct = {
   id: string;
-  unitPrice: string;
+  unitPrice: number;
   quantity: number;
   orderItemId?: string | null;
-  product: { id: string; name: string; sellPrice: string; usagePrice: string };
+  product: { id: string; name: string; sellPrice: number; usagePrice: number };
 };
 
 type Order = {
@@ -74,7 +75,7 @@ type Order = {
 type ServiceOption = {
   id: string;
   name: string;
-  basePrice: string;
+  basePrice: number;
   durationMinutes: number;
   category: { id: string; name: string };
 };
@@ -82,8 +83,8 @@ type ServiceOption = {
 type ProductOption = {
   id: string;
   name: string;
-  usagePrice: string;
-  sellPrice: string;
+  usagePrice: number;
+  sellPrice: number;
   quantityOnHand: number;
   isConsumable: boolean;
   category: { id: string; name: string };
@@ -444,7 +445,7 @@ export default function ActiveOrderPage() {
                     </div>
                     <div className="flex items-center gap-2 mt-0.5">
                       <p className="text-[10px] text-muted-foreground uppercase tracking-tight">
-                        ETB {Number(item.unitPrice).toFixed(2)} x {item.quantity}
+                        ETB {formatMoney(Number(item.unitPrice))} x {item.quantity}
                       </p>
                       {consumables.length > 0 && (
                         <Badge variant="secondary" className="bg-teal-50 text-teal-600 border-teal-100 text-[9px] h-4 py-0">
@@ -455,7 +456,7 @@ export default function ActiveOrderPage() {
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-semibold text-pink-700">
-                      ETB {(Number(item.unitPrice) * item.quantity).toFixed(2)}
+                      ETB {formatMoney((Number(item.unitPrice) * item.quantity))}
                     </span>
                     {isEditable && (
                       <button onClick={() => removeItem(item.id)} className="p-1.5 rounded-lg text-rose-300 hover:text-rose-500 hover:bg-rose-50">
@@ -487,7 +488,7 @@ export default function ActiveOrderPage() {
                           <div className="flex flex-col">
                             <span className="text-muted-foreground">{c.product.name}</span>
                             <span className="text-[10px] text-pink-400 font-medium">
-                              ETB {Number(c.product.usagePrice).toFixed(2)} / portion
+                              ETB {formatMoney(Number(c.product.usagePrice))} / portion
                             </span>
                           </div>
                           <div className="text-right">
@@ -495,7 +496,7 @@ export default function ActiveOrderPage() {
                               {'portionsUsed' in c ? c.portionsUsed : c.portionsRequired} portion(s)
                             </p>
                             <p className="text-[10px] font-bold text-pink-700">
-                              ETB {(Number(c.product.usagePrice) * ('portionsUsed' in c ? c.portionsUsed : c.portionsRequired)).toFixed(2)}
+                              ETB {formatMoney((Number(c.product.usagePrice) * ('portionsUsed' in c ? c.portionsUsed : c.portionsRequired)))}
                             </p>
                           </div>
                         </div>
@@ -516,10 +517,10 @@ export default function ActiveOrderPage() {
                           <div key={p.id} className="flex justify-between items-center text-xs bg-violet-50/40 p-1.5 rounded-lg border border-violet-100/30">
                             <div>
                               <p className="font-medium text-violet-700">{p.product.name}</p>
-                              <p className="text-[9px] text-violet-500">ETB {Number(p.unitPrice).toFixed(2)} x {p.quantity}</p>
+                              <p className="text-[9px] text-violet-500">ETB {formatMoney(Number(p.unitPrice))} x {p.quantity}</p>
                             </div>
                             <div className="flex items-center gap-2">
-                              <span className="font-bold text-violet-700">ETB {(Number(p.unitPrice) * p.quantity).toFixed(2)}</span>
+                              <span className="font-bold text-violet-700">ETB {formatMoney((Number(p.unitPrice) * p.quantity))}</span>
                               {isEditable && (
                                 <button onClick={() => removeProduct(p.id)} className="p-1 text-rose-300 hover:text-rose-500">
                                   <Trash2 className="h-3 w-3" />
@@ -571,12 +572,12 @@ export default function ActiveOrderPage() {
               <div>
                 <p className="text-sm font-medium">{p.product.name}</p>
                 <p className="text-[10px] text-muted-foreground">
-                  ETB {Number(p.unitPrice).toFixed(2)} x {p.quantity}
+                  ETB {formatMoney(Number(p.unitPrice))} x {p.quantity}
                 </p>
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-sm font-semibold text-violet-700">
-                  ETB {(Number(p.unitPrice) * p.quantity).toFixed(2)}
+                  ETB {formatMoney((Number(p.unitPrice) * p.quantity))}
                 </span>
                 {isEditable && (
                   <button onClick={() => removeProduct(p.id)} className="p-1.5 rounded-lg text-rose-300 hover:text-rose-500 hover:bg-rose-50">
@@ -594,17 +595,17 @@ export default function ActiveOrderPage() {
         <CardContent className="space-y-2 pt-4">
           <div className="flex justify-between text-xs">
             <span className="text-muted-foreground uppercase tracking-tight">Services Total</span>
-            <span className="font-semibold text-pink-700">ETB {servicesTotal.toFixed(2)}</span>
+            <span className="font-semibold text-pink-700">ETB {formatMoney(servicesTotal)}</span>
           </div>
           <div className="flex justify-between text-xs">
             <span className="text-muted-foreground uppercase tracking-tight">Products Total</span>
-            <span className="font-semibold text-pink-700">ETB {productsTotal.toFixed(2)}</span>
+            <span className="font-semibold text-pink-700">ETB {formatMoney(productsTotal)}</span>
           </div>
           <Separator className="my-2 bg-pink-100/50" />
           <div className="flex justify-between items-center">
             <span className="text-sm font-bold uppercase tracking-wider">Estimated Total</span>
             <span className="text-2xl font-black bg-gradient-to-r from-pink-600 via-rose-600 to-fuchsia-600 bg-clip-text text-transparent">
-              ETB {grandTotal.toFixed(2)}
+              ETB {formatMoney(grandTotal)}
             </span>
           </div>
         </CardContent>
@@ -686,7 +687,7 @@ export default function ActiveOrderPage() {
                               <div className="w-24 space-y-1">
                                 <div className="flex justify-between px-1">
                                   <Label className="text-[10px] text-muted-foreground">Portions</Label>
-                                  {prod && <span className="text-[9px] font-bold text-pink-500">ETB {prod.usagePrice}</span>}
+                                  {prod && <span className="text-[9px] font-bold text-pink-500">ETB {formatMoney(prod.usagePrice)}</span>}
                                 </div>
                                 <Input
                                   type="number"
@@ -710,10 +711,10 @@ export default function ActiveOrderPage() {
                         <div className="text-xs">
                           <span className="text-muted-foreground">Total Usage Cost:</span>
                           <span className="ml-2 font-bold text-pink-600">
-                            ETB {tempConsumables.reduce((acc, c) => {
+                            ETB {formatMoney(tempConsumables.reduce((acc, c) => {
                               const p = products.find(prod => prod.id === c.productId);
-                              return acc + (Number(p?.usagePrice || 0) * c.portionsUsed);
-                            }, 0).toFixed(2)}
+                              return acc + ((p?.usagePrice ?? 0) * c.portionsUsed);
+                            }, 0))}
                           </span>
                         </div>
                         <Button onClick={saveConsumables} disabled={addingItems} className="bg-pink-600 hover:bg-pink-700 text-white rounded-xl px-6 h-11">
@@ -731,11 +732,11 @@ export default function ActiveOrderPage() {
                         <Input placeholder="Search retail products..." value={modalSearch} onChange={(e) => setModalSearch(e.target.value)} className="pl-9 rounded-xl border-violet-100" />
                       </div>
                       <div className="space-y-1.5 max-h-[300px] overflow-y-auto pr-1">
-                        {filteredProducts.filter(p => !p.isConsumable || p.sellPrice !== "0.00").map(p => (
+                        {filteredProducts.filter(p => !p.isConsumable || p.sellPrice > 0).map(p => (
                           <div key={p.id} className={`w-full flex items-center justify-between p-3 rounded-xl border-2 transition-all ${selectedProductIds.has(p.id) ? "bg-violet-50 border-violet-300" : "bg-white border-transparent hover:bg-violet-50/50"}`}>
                             <button onClick={() => toggleProduct(p.id)} className="flex-1 text-left">
                               <span className="text-sm font-medium">{p.name}</span>
-                              <p className="text-[10px] text-violet-500 font-bold">ETB {Number(p.sellPrice).toFixed(2)} retail price</p>
+                              <p className="text-[10px] text-violet-500 font-bold">ETB {formatMoney(Number(p.sellPrice))} retail price</p>
                             </button>
                             {selectedProductIds.has(p.id) ? (
                               <div className="flex items-center gap-2">
@@ -776,7 +777,7 @@ export default function ActiveOrderPage() {
                         {items.map(s => (
                           <button key={s.id} onClick={() => toggleService(s.id)} className={`w-full flex items-center justify-between p-3 rounded-xl border-2 transition-all ${selectedServiceIds.has(s.id) ? "bg-pink-50 border-pink-300" : "bg-white border-transparent hover:bg-pink-25"}`}>
                             <span className="text-sm font-medium">{s.name}</span>
-                            <span className="text-xs font-bold text-pink-600">ETB {Number(s.basePrice).toFixed(2)}</span>
+                            <span className="text-xs font-bold text-pink-600">ETB {formatMoney(Number(s.basePrice))}</span>
                           </button>
                         ))}
                       </div>
@@ -802,7 +803,7 @@ export default function ActiveOrderPage() {
                           <div key={p.id} className={`w-full flex items-center justify-between p-3 rounded-xl border-2 transition-all ${selectedProductIds.has(p.id) ? "bg-violet-50 border-violet-300" : "bg-white border-transparent hover:bg-violet-25"}`}>
                             <button onClick={() => toggleProduct(p.id)} className="flex-1 text-left">
                               <span className="text-sm font-medium">{p.name}</span>
-                              <p className="text-[10px] text-violet-500 font-bold">ETB {Number(p.sellPrice).toFixed(2)}</p>
+                              <p className="text-[10px] text-violet-500 font-bold">ETB {formatMoney(Number(p.sellPrice))}</p>
                             </button>
                             {selectedProductIds.has(p.id) ? (
                               <div className="flex items-center gap-2">

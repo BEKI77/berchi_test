@@ -5,6 +5,7 @@ import { db } from "@/db";
 import { hasPermission } from "@/lib/permissions";
 import { expenseSchedules } from "@/db/schema";
 import type { NewExpenseSchedule } from "@/db/schema/types";
+import { toSantim } from "@/lib/money";
 
 export async function GET() {
   const session = await auth();
@@ -78,7 +79,7 @@ export async function POST(req: Request) {
       name,
       description: description || null,
       category,
-      amount: String(amount),
+      amount: toSantim(amount),
       frequency,
       interval: interval || 1,
       dayOfMonth: dayOfMonth || null,

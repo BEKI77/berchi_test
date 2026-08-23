@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { hasPermission } from "@/lib/permissions";
 import { products } from "@/db/schema";
+import { toSantim } from "@/lib/money";
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ productId: string }> }) {
   const session = await auth();
@@ -30,9 +31,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ produc
     if (name !== undefined) updateData.name = name;
     if (sku !== undefined) updateData.sku = sku || null;
     if (categoryId !== undefined) updateData.categoryId = categoryId;
-    if (costPrice !== undefined) updateData.costPrice = costPrice;
-    if (sellPrice !== undefined) updateData.sellPrice = sellPrice;
-    if (usagePrice !== undefined) updateData.usagePrice = usagePrice;
+    if (costPrice !== undefined) updateData.costPrice = toSantim(costPrice);
+    if (sellPrice !== undefined) updateData.sellPrice = toSantim(sellPrice);
+    if (usagePrice !== undefined) updateData.usagePrice = toSantim(usagePrice);
     if (quantityOnHand !== undefined) updateData.quantityOnHand = quantityOnHand;
     if (reorderLevel !== undefined) updateData.reorderLevel = reorderLevel;
     if (isActive !== undefined) updateData.isActive = isActive;

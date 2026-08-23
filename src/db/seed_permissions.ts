@@ -113,10 +113,14 @@ async function seedPermissions() {
     const allPermissions = await db.select().from(permissions);
     const permissionMap = new Map(allPermissions.map(p => [p.name, p.id]));
 
-    // Get roles for permission assignment
-    const ownerRole = insertedRoles.find(r => r.name === "OWNER");
-    const serverRole = insertedRoles.find(r => r.name === "SERVER");
-    const cashierRole = insertedRoles.find(r => r.name === "CASHIER");
+    // Read the roles back rather than relying on what this run inserted.
+    // On a re-run nothing is inserted, and reading from insertedRoles meant the
+    // whole assignment step below was silently skipped -- so adding a
+    // permission to an existing role never took effect.
+    const allRoles = await db.select().from(roles);
+    const ownerRole = allRoles.find(r => r.name === "OWNER");
+    const serverRole = allRoles.find(r => r.name === "SERVER");
+    const cashierRole = allRoles.find(r => r.name === "CASHIER");
 
     // Assign permissions to roles
     const rolePermissionAssignments: Array<{ roleId: string; permissionId: string }> = [];
@@ -148,7 +152,10 @@ async function seedPermissions() {
       "customers.view", "customers.update",
       "services.view",
       "inventory.view",
-      "orders.view", "orders.checkout",
+      // orders.update lets the cashier add a service the stylist forgot before
+      // closing the ticket. The items endpoint takes an explicit staffId, so
+      // the work is still credited to the stylist who performed it.
+      "orders.view", "orders.update", "orders.checkout",
       "billing.view", "billing.create", "billing.update",
     ];
 

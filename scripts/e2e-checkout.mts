@@ -88,12 +88,16 @@ async function main() {
   check("service line added", added.status === 201,
     `status ${added.status} ${JSON.stringify(added.body).slice(0, 160)}`);
 
-  console.log("\n4. Cashier cannot edit lines (permission boundary)");
-  const denied = await asCashier(`/api/orders/${order.id}/items`, {
-    method: "POST", body: JSON.stringify({ serviceId: svc.id }),
+  console.log("\n4. Cashier adds a forgotten service, credited to the stylist");
+  const byCashier = await asCashier(`/api/orders/${order.id}/items`, {
+    method: "POST",
+    body: JSON.stringify({ serviceId: svc.id, staffId: sess.body.user.id }),
   });
-  check("cashier is refused orders.update", denied.status === 403,
-    `got ${denied.status}`);
+  check("cashier can add on the stylist's behalf", byCashier.status === 201,
+    `status ${byCashier.status} ${JSON.stringify(byCashier.body).slice(0, 140)}`);
+  check("the line is credited to the stylist, not the cashier",
+    byCashier.body?.staffId === sess.body.user.id,
+    `credited to ${byCashier.body?.staffId}`);
 
   console.log("\n5. Send, then add again (send must not lock)");
   const sent = await asServer(`/api/orders/${order.id}/send`, { method: "POST" });
@@ -115,8 +119,33 @@ async function main() {
     JSON.stringify(out.body).slice(0, 160));
   check("payment recorded as CASH by default", out.body?.payment?.method === "CASH",
     `got ${out.body?.payment?.method}`);
-  if (out.body?.invoice) {
-    console.log(`     invoice ${out.body.invoice.invoiceNumber}, total ${out.body.invoice.totalAmount}`);
+  console.log("\n6b. Amounts are exact integers in santim");
+  const inv = out.body?.invoice;
+  if (inv) {
+    // Read the rate off the invoice itself -- the cashier role has no
+    // settings.view permission, and the invoice records the rate it used.
+    const taxBp = inv.taxRate;
+    const expectedSubtotal = svc.basePrice * 3;           // stylist, cashier, then late
+    const expectedTax = Math.round((expectedSubtotal * taxBp) / 10000);
+    const expectedTotal = expectedSubtotal + expectedTax;
+    const fmt = (n: number) =>
+      `${Math.floor(Math.abs(n) / 100).toLocaleString("en-US")}.${String(Math.abs(n) % 100).padStart(2, "0")}`;
+
+    check("service price is an integer, not a decimal string",
+      Number.isInteger(svc.basePrice), `basePrice=${svc.basePrice} (${typeof svc.basePrice})`);
+    check("tax rate is basis points", Number.isInteger(taxBp), `taxRate=${taxBp}`);
+    check("subtotal is exact", inv.subtotal === expectedSubtotal,
+      `${inv.subtotal} vs ${expectedSubtotal}`);
+    check("tax is exact", inv.taxAmount === expectedTax,
+      `${inv.taxAmount} vs ${expectedTax}`);
+    check("total is exact", inv.totalAmount === expectedTotal,
+      `${inv.totalAmount} vs ${expectedTotal}`);
+    check("every stored amount is a whole number of santim",
+      [inv.subtotal, inv.taxAmount, inv.discountAmount, inv.tipAmount, inv.totalAmount]
+        .every(Number.isInteger));
+    check("payment matches the invoice total", out.body?.payment?.amount === inv.totalAmount,
+      `${out.body?.payment?.amount} vs ${inv.totalAmount}`);
+    console.log(`     ${inv.invoiceNumber}: ${fmt(inv.subtotal)} + ${fmt(inv.taxAmount)} tax = ETB ${fmt(inv.totalAmount)}`);
   }
 
   console.log("\n7. A closed ticket is closed");
@@ -128,6 +157,54 @@ async function main() {
     method: "POST", body: JSON.stringify({}),
   });
   check("cannot be paid twice", twice.status === 409, `got ${twice.status}`);
+
+  console.log("\n8. A ticket with a percentage discount and a tip");
+  {
+    const t = await asServer("/api/orders", { method: "POST", body: "{}" });
+    const tid = t.body?.id;
+    await asServer(`/api/orders/${tid}/items`, {
+      method: "POST", body: JSON.stringify({ serviceId: svc.id }),
+    });
+
+    // 10% off, 25.50 tip -- both sent in human units, as the till does.
+    const paid = await asCashier(`/api/orders/${tid}/checkout`, {
+      method: "POST",
+      body: JSON.stringify({
+        discountType: "PERCENTAGE", discountValue: 10, tipAmount: 25.5,
+      }),
+    });
+    const i2 = paid.body?.invoice;
+    check("discounted checkout succeeds", paid.status === 200, `status ${paid.status}`);
+    if (i2) {
+      const sub = svc.basePrice;
+      const tax = Math.round((sub * i2.taxRate) / 10000);
+      const disc = Math.round((sub * 1000) / 10000);   // 10% = 1000bp
+      const tip = 2550;                                 // 25.50 ETB
+      check("discount stored in basis points", i2.discountValue === 1000,
+        `${i2.discountValue}`);
+      check("discount amount is exact", i2.discountAmount === disc,
+        `${i2.discountAmount} vs ${disc}`);
+      check("a fractional tip survives as santim", i2.tipAmount === tip,
+        `${i2.tipAmount} vs ${tip}`);
+      check("total is exact with discount and tip",
+        i2.totalAmount === sub + tax - disc + tip,
+        `${i2.totalAmount} vs ${sub + tax - disc + tip}`);
+    }
+  }
+
+  console.log("\n9. A discount larger than the bill is refused");
+  {
+    const t = await asServer("/api/orders", { method: "POST", body: "{}" });
+    const tid = t.body?.id;
+    await asServer(`/api/orders/${tid}/items`, {
+      method: "POST", body: JSON.stringify({ serviceId: svc.id }),
+    });
+    const bad = await asCashier(`/api/orders/${tid}/checkout`, {
+      method: "POST",
+      body: JSON.stringify({ discountType: "FIXED", discountValue: 999999 }),
+    });
+    check("over-large discount rejected", bad.status === 400, `got ${bad.status}`);
+  }
 
   console.log(`\n${failures === 0 ? "ALL CHECKS PASSED" : failures + " CHECK(S) FAILED"}\n`);
   process.exit(failures === 0 ? 0 : 1);

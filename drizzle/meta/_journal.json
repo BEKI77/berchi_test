@@ -50,6 +50,20 @@
       "when": 1787508573634,
       "tag": "0006_hesitant_magneto",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1787511503012,
+      "tag": "0007_green_colleen_wing",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1787512116138,
+      "tag": "0008_steady_thunderbird",
+      "breakpoints": true
     }
   ]
 }

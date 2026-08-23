@@ -18,17 +18,18 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { customerName, customerInitials } from "@/lib/orders";
+import { formatMoney, formatPercent } from "@/lib/money";
 
 type InvoiceItem = {
   id: string;
-  unitPrice: string;
+  unitPrice: number;
   quantity: number;
   service: { name: string };
 };
 
 type InvoiceProduct = {
   id: string;
-  unitPrice: string;
+  unitPrice: number;
   quantity: number;
   product: { name: string };
 };
@@ -36,7 +37,7 @@ type InvoiceProduct = {
 type Payment = {
   id: string;
   method: string;
-  amount: string;
+  amount: number;
   reference: string | null;
   createdAt: string;
 };
@@ -44,14 +45,14 @@ type Payment = {
 type Invoice = {
   id: string;
   invoiceNumber: string;
-  subtotal: string;
-  taxRate: string;
-  taxAmount: string;
+  subtotal: number;
+  taxRate: number;
+  taxAmount: number;
   discountType: string | null;
-  discountValue: string;
-  discountAmount: string;
-  tipAmount: string;
-  totalAmount: string;
+  discountValue: number;
+  discountAmount: number;
+  tipAmount: number;
+  totalAmount: number;
   status: string;
   createdAt: string;
   order: {
@@ -144,14 +145,14 @@ export function InvoicesClient() {
           <div className="h-1 bg-gradient-to-r from-emerald-400 to-teal-400" />
           <CardContent className="pt-3 pb-3">
             <p className="text-[10px] font-semibold text-emerald-500 uppercase tracking-wider">Total Revenue</p>
-            <p className="text-xl font-bold mt-1">ETB {totalRevenue.toFixed(2)}</p>
+            <p className="text-xl font-bold mt-1">ETB {formatMoney(totalRevenue)}</p>
           </CardContent>
         </Card>
         <Card className="rounded-xl border-blue-100 overflow-hidden">
           <div className="h-1 bg-gradient-to-r from-blue-400 to-indigo-400" />
           <CardContent className="pt-3 pb-3">
             <p className="text-[10px] font-semibold text-blue-500 uppercase tracking-wider">Total Tips</p>
-            <p className="text-xl font-bold mt-1">ETB {totalTips.toFixed(2)}</p>
+            <p className="text-xl font-bold mt-1">ETB {formatMoney(totalTips)}</p>
           </CardContent>
         </Card>
         <Card className="rounded-xl border-green-100 overflow-hidden">
@@ -231,7 +232,7 @@ export function InvoicesClient() {
                   </div>
                   <div className="flex items-center gap-3 shrink-0">
                     <div className="text-right">
-                      <p className="font-bold text-sm text-emerald-700">ETB {Number(inv.totalAmount).toFixed(2)}</p>
+                      <p className="font-bold text-sm text-emerald-700">ETB {formatMoney(Number(inv.totalAmount))}</p>
                       {inv.payment && (
                         <div className="flex items-center gap-1 text-[10px] text-muted-foreground justify-end mt-0.5">
                           {methodIcons[inv.payment.method]}
@@ -261,7 +262,7 @@ export function InvoicesClient() {
                         {inv.order.items.map((item) => (
                           <div key={item.id} className="flex justify-between text-xs px-2 py-1.5 rounded-lg bg-pink-50/50">
                             <span>{item.service.name} x{item.quantity}</span>
-                            <span className="font-medium">ETB {(Number(item.unitPrice) * item.quantity).toFixed(2)}</span>
+                            <span className="font-medium">ETB {formatMoney((Number(item.unitPrice) * item.quantity))}</span>
                           </div>
                         ))}
                       </div>
@@ -276,7 +277,7 @@ export function InvoicesClient() {
                         {inv.order.products.map((p) => (
                           <div key={p.id} className="flex justify-between text-xs px-2 py-1.5 rounded-lg bg-violet-50/50">
                             <span>{p.product.name} x{p.quantity}</span>
-                            <span className="font-medium">ETB {(Number(p.unitPrice) * p.quantity).toFixed(2)}</span>
+                            <span className="font-medium">ETB {formatMoney((Number(p.unitPrice) * p.quantity))}</span>
                           </div>
                         ))}
                       </div>
@@ -286,29 +287,29 @@ export function InvoicesClient() {
                     <div className="space-y-1 pt-2 border-t border-dashed border-emerald-100/60">
                       <div className="flex justify-between text-xs">
                         <span className="text-muted-foreground">Subtotal</span>
-                        <span>ETB {Number(inv.subtotal).toFixed(2)}</span>
+                        <span>ETB {formatMoney(Number(inv.subtotal))}</span>
                       </div>
                       <div className="flex justify-between text-xs">
-                        <span className="text-muted-foreground">Tax ({Number(inv.taxRate).toFixed(1)}%)</span>
-                        <span>ETB {Number(inv.taxAmount).toFixed(2)}</span>
+                        <span className="text-muted-foreground">Tax ({formatPercent(inv.taxRate)})</span>
+                        <span>ETB {formatMoney(Number(inv.taxAmount))}</span>
                       </div>
                       {Number(inv.discountAmount) > 0 && (
                         <div className="flex justify-between text-xs">
                           <span className="text-muted-foreground">
-                            Discount ({inv.discountType === "PERCENTAGE" ? `${Number(inv.discountValue)}%` : `ETB ${Number(inv.discountValue).toFixed(2)}`})
+                            Discount ({inv.discountType === "PERCENTAGE" ? formatPercent(inv.discountValue) : `ETB ${formatMoney(Number(inv.discountValue))}`})
                           </span>
-                          <span className="text-red-500">-ETB {Number(inv.discountAmount).toFixed(2)}</span>
+                          <span className="text-red-500">-ETB {formatMoney(Number(inv.discountAmount))}</span>
                         </div>
                       )}
                       {Number(inv.tipAmount) > 0 && (
                         <div className="flex justify-between text-xs">
                           <span className="text-muted-foreground">Tip</span>
-                          <span className="text-emerald-600">+ETB {Number(inv.tipAmount).toFixed(2)}</span>
+                          <span className="text-emerald-600">+ETB {formatMoney(Number(inv.tipAmount))}</span>
                         </div>
                       )}
                       <div className="flex justify-between text-sm font-bold pt-1">
                         <span>Total</span>
-                        <span className="text-emerald-700">ETB {Number(inv.totalAmount).toFixed(2)}</span>
+                        <span className="text-emerald-700">ETB {formatMoney(Number(inv.totalAmount))}</span>
                       </div>
                     </div>
 

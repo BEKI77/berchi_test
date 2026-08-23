@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Expense } from "../types";
 import { catColors, statusColors } from "../constants";
+import { formatMoney } from "@/lib/money";
 
 interface ExpenseCardProps {
   expense: Expense;
@@ -83,7 +84,7 @@ export function ExpenseCard({
         </div>
         <div className="flex items-center gap-2">
           <p className="font-bold text-red-600 text-sm">
-            ETB {Number(expense.amount).toFixed(2)}
+            ETB {formatMoney(Number(expense.amount))}
           </p>
           {isUpcoming && onMarkAsPaid && (
             <Button

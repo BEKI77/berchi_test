@@ -16,6 +16,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { customerName } from "@/lib/orders";
+import { formatMoney } from "@/lib/money";
 
 type ProductDetail = {
   product: {
@@ -23,8 +24,8 @@ type ProductDetail = {
     name: string;
     sku: string | null;
     description: string | null;
-    costPrice: string;
-    usagePrice: string;
+    costPrice: number;
+    usagePrice: number;
     quantityOnHand: number;
     reorderLevel: number;
     isActive: boolean;
@@ -43,7 +44,7 @@ type ProductDetail = {
   usageHistory: {
     id: string;
     quantity: number;
-    unitPrice: string;
+    unitPrice: number;
     order: {
       orderNumber: string;
       startedAt: string;
@@ -174,7 +175,7 @@ export default function ProductDetailPage() {
           <div className="h-1 bg-gradient-to-r from-emerald-400 to-teal-400" />
           <CardContent className="pt-3 pb-3">
             <p className="text-[10px] font-semibold text-emerald-500 uppercase tracking-wider">Revenue</p>
-            <p className="text-xl font-bold mt-1">ETB {stats.totalRevenue.toFixed(0)}</p>
+            <p className="text-xl font-bold mt-1">ETB {formatMoney(stats.totalRevenue)}</p>
           </CardContent>
         </Card>
         <Card className="rounded-xl border-pink-100 overflow-hidden">
@@ -182,8 +183,8 @@ export default function ProductDetailPage() {
           <CardContent className="pt-3 pb-3">
             <p className="text-[10px] font-semibold text-pink-500 uppercase tracking-wider">Prices</p>
             <div className="flex items-baseline gap-1 mt-1">
-              <span className="text-sm font-bold">Cost: {Number(product.costPrice).toFixed(0)}</span>
-              <span className="text-[10px] text-muted-foreground">/ Usage: {Number(product.usagePrice).toFixed(0)}</span>
+              <span className="text-sm font-bold">Cost: {formatMoney(product.costPrice)}</span>
+              <span className="text-[10px] text-muted-foreground">/ Usage: {formatMoney(product.usagePrice)}</span>
             </div>
           </CardContent>
         </Card>
@@ -265,7 +266,7 @@ export default function ProductDetailPage() {
                     </div>
                     <div className="text-right shrink-0">
                       <p className="font-semibold text-sm text-violet-700">x{u.quantity}</p>
-                      <p className="text-[10px] text-muted-foreground">ETB {(Number(u.unitPrice) * u.quantity).toFixed(0)}</p>
+                      <p className="text-[10px] text-muted-foreground">ETB {formatMoney((Number(u.unitPrice) * u.quantity))}</p>
                     </div>
                   </div>
                 </CardContent>

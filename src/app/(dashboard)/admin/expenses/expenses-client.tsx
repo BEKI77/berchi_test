@@ -12,6 +12,7 @@ import { ScheduleCard } from "./components/ScheduleCard";
 import { TabsNavigation } from "./components/TabsNavigation";
 import { ExpenseHistoryTable } from "./components/ExpenseHistoryTable";
 import { useExpenses } from "./hooks/useExpenses";
+import { formatMoney } from "@/lib/money";
 
 export function ExpensesClient({ canDeleteExpenses, canUpdateExpenses, canManageSchedules }: ExpensesClientProps) {
   const [activeTab, setActiveTab] = useState<Tab>("upcoming");
@@ -166,7 +167,7 @@ export function ExpensesClient({ canDeleteExpenses, canUpdateExpenses, canManage
             Expenses
           </h1>
           <p className="text-muted-foreground mt-1">
-            {activeTab === "history" && `${expenses.length} expense(s) · Total: ETB ${totalExpenses.toFixed(2)}`}
+            {activeTab === "history" && `${expenses.length} expense(s) · Total: ETB ${formatMoney(totalExpenses)}`}
             {activeTab === "upcoming" && `${expenses.length} upcoming expense(s)`}
             {activeTab === "recurring" && `${schedules.length} schedule(s)`}
           </p>

@@ -15,6 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { customerName, customerInitials } from "@/lib/orders";
+import { formatMoney, formatPercent } from "@/lib/money";
 
 type StaffDetail = {
   staff: {
@@ -24,7 +25,7 @@ type StaffDetail = {
     email: string;
     phone: string | null;
     role: string;
-    commissionRate: string;
+    commissionRate: number;
     isActive: boolean;
     createdAt: string;
   };
@@ -43,14 +44,14 @@ type StaffDetail = {
     startedAt: string;
     completedAt: string | null;
     customer: { firstName: string; lastName: string } | null;
-    items: { unitPrice: string; quantity: number; service: { name: string } }[];
-    products: { unitPrice: string; quantity: number; product: { name: string } }[];
+    items: { unitPrice: number; quantity: number; service: { name: string } }[];
+    products: { unitPrice: number; quantity: number; product: { name: string } }[];
   }[];
   recentCommissions: {
     id: string;
-    commissionRate: string;
-    serviceAmount: string;
-    commissionAmount: string;
+    commissionRate: number;
+    serviceAmount: number;
+    commissionAmount: number;
     createdAt: string;
     serviceOrderItem: {
       service: { name: string };
@@ -141,14 +142,14 @@ export default function StaffDetailPage() {
           <div className="h-1 bg-gradient-to-r from-pink-400 to-rose-400" />
           <CardContent className="pt-3 pb-3">
             <p className="text-[10px] font-semibold text-pink-500 uppercase tracking-wider">Revenue</p>
-            <p className="text-xl font-bold mt-1">ETB {stats.totalServiceRevenue.toFixed(0)}</p>
+            <p className="text-xl font-bold mt-1">ETB {formatMoney(stats.totalServiceRevenue)}</p>
           </CardContent>
         </Card>
         <Card className="rounded-xl border-emerald-100 overflow-hidden">
           <div className="h-1 bg-gradient-to-r from-emerald-400 to-teal-400" />
           <CardContent className="pt-3 pb-3">
             <p className="text-[10px] font-semibold text-emerald-500 uppercase tracking-wider">Commissions</p>
-            <p className="text-xl font-bold mt-1">ETB {stats.totalCommissions.toFixed(0)}</p>
+            <p className="text-xl font-bold mt-1">ETB {formatMoney(stats.totalCommissions)}</p>
           </CardContent>
         </Card>
         <Card className="rounded-xl border-blue-100 overflow-hidden">
@@ -223,7 +224,7 @@ export default function StaffDetailPage() {
                           </div>
                         </div>
                       </div>
-                      <span className="font-semibold text-sm text-pink-700 shrink-0">ETB {orderTotal.toFixed(0)}</span>
+                      <span className="font-semibold text-sm text-pink-700 shrink-0">ETB {formatMoney(orderTotal)}</span>
                     </div>
                   </CardContent>
                 </Card>
@@ -249,10 +250,10 @@ export default function StaffDetailPage() {
                         <span className="text-muted-foreground/40">·</span>
                         <span>{new Date(c.createdAt).toLocaleDateString()}</span>
                         <span className="text-muted-foreground/40">·</span>
-                        <span>{Number(c.commissionRate)}% of ETB {Number(c.serviceAmount).toFixed(0)}</span>
+                        <span>{formatPercent(c.commissionRate)} of ETB {formatMoney(c.serviceAmount)}</span>
                       </div>
                     </div>
-                    <span className="font-bold text-sm text-emerald-600 shrink-0">+ETB {Number(c.commissionAmount).toFixed(2)}</span>
+                    <span className="font-bold text-sm text-emerald-600 shrink-0">+ETB {formatMoney(Number(c.commissionAmount))}</span>
                   </div>
                 </CardContent>
               </Card>
@@ -284,7 +285,7 @@ export default function StaffDetailPage() {
                         <span className="font-medium truncate">{s.name}</span>
                         <span className="text-[10px] text-muted-foreground shrink-0">{s.count}x</span>
                       </div>
-                      <span className="font-semibold text-pink-700 shrink-0">ETB {s.revenue.toFixed(0)}</span>
+                      <span className="font-semibold text-pink-700 shrink-0">ETB {formatMoney(s.revenue)}</span>
                     </div>
                     <div className="h-2 bg-pink-50 rounded-full overflow-hidden">
                       <div className="h-full rounded-full bg-gradient-to-r from-pink-400 to-rose-400" style={{ width: `${pct}%` }} />

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
 import { customerName, customerInitials } from "@/lib/orders";
+import { formatMoney } from "@/lib/money";
 
 type Order = {
   id: string;
@@ -17,8 +18,8 @@ type Order = {
   completedAt: string | null;
   customer: { id: string; firstName: string; lastName: string; phone: string | null } | null;
   server: { id: string; firstName: string; lastName: string };
-  items: { id: string; unitPrice: string; quantity: number; service: { id: string; name: string } }[];
-  products: { id: string; unitPrice: string; quantity: number; product: { id: string; name: string } }[];
+  items: { id: string; unitPrice: number; quantity: number; service: { id: string; name: string } }[];
+  products: { id: string; unitPrice: number; quantity: number; product: { id: string; name: string } }[];
 };
 
 export function CashierPendingClient() {
@@ -48,7 +49,7 @@ export function CashierPendingClient() {
   function getOrderTotal(order: Order) {
     const services = order.items.reduce((s, i) => s + Number(i.unitPrice) * i.quantity, 0);
     const products = order.products.reduce((s, p) => s + Number(p.unitPrice) * p.quantity, 0);
-    return (services + products).toFixed(2);
+    return formatMoney(services + products);
   }
 
   if (loading) {

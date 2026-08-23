@@ -22,15 +22,16 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { fromSantim } from "@/lib/money";
 
 type Category = { id: string; name: string; description: string | null };
 type Product = {
   id: string;
   name: string;
   sku: string | null;
-  costPrice: string;
-  sellPrice: string;
-  usagePrice: string;
+  costPrice: number;
+  sellPrice: number;
+  usagePrice: number;
   quantityOnHand: number;
   reorderLevel: number;
   isActive: boolean;
@@ -121,9 +122,10 @@ export function InventoryClient() {
       name: p.name,
       sku: p.sku || "",
       categoryId: p.category.id,
-      costPrice: Number(p.costPrice),
-      sellPrice: Number(p.sellPrice),
-      usagePrice: Number(p.usagePrice),
+      // The form works in ETB; the API stores santim.
+      costPrice: fromSantim(p.costPrice),
+      sellPrice: fromSantim(p.sellPrice),
+      usagePrice: fromSantim(p.usagePrice),
       quantityOnHand: p.quantityOnHand,
       reorderLevel: p.reorderLevel,
       isConsumable: p.isConsumable,

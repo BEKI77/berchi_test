@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { customerName, customerInitials } from "@/lib/orders";
+import { formatMoney } from "@/lib/money";
 
 type Order = {
   id: string;
@@ -14,8 +15,8 @@ type Order = {
   startedAt: string;
   completedAt: string | null;
   customer: { id: string; firstName: string; lastName: string } | null;
-  items: { id: string; unitPrice: string; quantity: number; service: { id: string; name: string } }[];
-  products: { id: string; unitPrice: string; quantity: number; product: { id: string; name: string } }[];
+  items: { id: string; unitPrice: number; quantity: number; service: { id: string; name: string } }[];
+  products: { id: string; unitPrice: number; quantity: number; product: { id: string; name: string } }[];
 };
 
 export function ServerHistoryClient({ userId }: { userId: string }) {
@@ -77,7 +78,7 @@ export function ServerHistoryClient({ userId }: { userId: string }) {
           <div className="rounded-xl bg-gradient-to-br from-pink-500 to-rose-500 p-5 text-white shadow-lg shadow-pink-200/40 overflow-hidden relative">
             <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -translate-y-6 translate-x-6" />
             <p className="text-pink-100 text-xs font-semibold uppercase tracking-wider mb-1">Total Earned</p>
-            <p className="text-2xl font-bold">ETB {totalEarned.toFixed(2)}</p>
+            <p className="text-2xl font-bold">ETB {formatMoney(totalEarned)}</p>
           </div>
           <div className="rounded-xl bg-gradient-to-br from-violet-500 to-purple-500 p-5 text-white shadow-lg shadow-violet-200/40 overflow-hidden relative">
             <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -translate-y-6 translate-x-6" />
@@ -115,7 +116,7 @@ export function ServerHistoryClient({ userId }: { userId: string }) {
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="font-bold text-pink-700">ETB {total.toFixed(2)}</p>
+                      <p className="font-bold text-pink-700">ETB {formatMoney(total)}</p>
                       <div className="flex items-center gap-1 justify-end mt-0.5">
                         <CheckCircle className="h-3 w-3 text-emerald-500" />
                         <span className="text-[10px] font-semibold text-emerald-500">Completed</span>

@@ -3,6 +3,7 @@
 import { Package, Percent, Scissors, Users } from "lucide-react";
 import type { ReportData } from "../types";
 import { Section } from "./section";
+import { formatMoney } from "@/lib/money";
 
 type TeamTabProps = {
   staffPerformance: ReportData["staffPerformance"];
@@ -37,7 +38,7 @@ export function TeamTab({ staffPerformance, serviceCategories, allServices, allP
                     <div className="flex items-center justify-between text-sm">
                       <span className="font-medium truncate">{s.name}</span>
                       <span className="font-semibold text-pink-700 shrink-0">
-                        ETB {s.serviceRevenue.toFixed(0)}
+                        ETB {formatMoney(s.serviceRevenue)}
                       </span>
                     </div>
                     <div className="flex items-center gap-3 text-[10px] text-muted-foreground mt-0.5 flex-wrap">
@@ -47,7 +48,7 @@ export function TeamTab({ staffPerformance, serviceCategories, allServices, allP
                         <Percent className="h-2.5 w-2.5" /> {s.commissionRate}% rate
                       </span>
                       <span className="text-emerald-600 font-medium">
-                        Commission: ETB {s.commissionEarned.toFixed(0)}
+                        Commission: ETB {formatMoney(s.commissionEarned)}
                       </span>
                     </div>
                     <div className="h-1.5 bg-pink-50 rounded-full overflow-hidden mt-1.5">
@@ -83,7 +84,7 @@ export function TeamTab({ staffPerformance, serviceCategories, allServices, allP
                     </p>
                   </div>
                   <span className="text-sm font-semibold text-fuchsia-700 shrink-0">
-                    ETB {cat.revenue.toFixed(0)}
+                    ETB {formatMoney(cat.revenue)}
                   </span>
                 </div>
               );
@@ -115,7 +116,7 @@ export function TeamTab({ staffPerformance, serviceCategories, allServices, allP
                     </div>
                   </div>
                   <span className="text-sm font-semibold text-pink-700 shrink-0">
-                    ETB {s.revenue.toFixed(0)}
+                    ETB {formatMoney(s.revenue)}
                   </span>
                 </div>
               ))}
@@ -143,7 +144,7 @@ export function TeamTab({ staffPerformance, serviceCategories, allServices, allP
                     </div>
                   </div>
                   <span className="text-sm font-semibold text-violet-700 shrink-0">
-                    ETB {p.revenue.toFixed(0)}
+                    ETB {formatMoney(p.revenue)}
                   </span>
                 </div>
               ))}

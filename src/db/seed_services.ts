@@ -1,6 +1,7 @@
 import { db } from "./index";
 import { serviceCategories, services } from "./schema/services";
 import { eq } from "drizzle-orm";
+import { toSantim } from "../lib/money";
 
 // Parse the menu data and create categories and services
 export async function seedServices() {
@@ -189,7 +190,7 @@ export async function seedServices() {
       await db.insert(services).values({
         name: service.name,
         categoryId: category.id,
-        basePrice: service.price.toString(),
+        basePrice: toSantim(service.price),
         durationMinutes,
         isActive: true,
       });

@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, text, boolean, timestamp, decimal, integer } from "drizzle-orm/pg-core";
+import { pgTable, uuid, varchar, text, boolean, timestamp, integer } from "drizzle-orm/pg-core";
 import { products } from "./products";
 
 export const serviceCategories = pgTable("service_categories", {
@@ -15,7 +15,7 @@ export const services = pgTable("services", {
   name: varchar("name", { length: 200 }).notNull(),
   description: text("description"),
   categoryId: uuid("category_id").notNull().references(() => serviceCategories.id),
-  basePrice: decimal("base_price", { precision: 10, scale: 2 }).notNull(),
+  basePrice: integer("base_price").notNull(),
   durationMinutes: integer("duration_minutes").notNull(),
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),

@@ -15,6 +15,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
+import { customerName } from "@/lib/orders";
 
 type ReceiptData = {
   id: string;
@@ -32,7 +33,7 @@ type ReceiptData = {
   order: {
     orderNumber: string;
     startedAt: string;
-    customer: { firstName: string; lastName: string; phone: string | null };
+    customer: { firstName: string; lastName: string; phone: string | null } | null;
     server: { firstName: string; lastName: string };
     items: { unitPrice: string; quantity: number; service: { name: string } }[];
     products: { unitPrice: string; quantity: number; product: { name: string } }[];
@@ -121,7 +122,7 @@ export default function ReceiptPage() {
           </div>
           <div className="flex justify-between text-xs mt-1">
             <span className="text-muted-foreground">Customer</span>
-            <span className="font-medium">{receipt.order.customer.firstName} {receipt.order.customer.lastName}</span>
+            <span className="font-medium">{customerName(receipt.order.customer)}</span>
           </div>
           <div className="flex justify-between text-xs mt-1">
             <span className="text-muted-foreground">Server</span>

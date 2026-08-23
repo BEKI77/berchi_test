@@ -17,6 +17,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import { customerName, customerInitials } from "@/lib/orders";
 
 type InvoiceItem = {
   id: string;
@@ -55,7 +56,7 @@ type Invoice = {
   createdAt: string;
   order: {
     orderNumber: string;
-    customer: { id: string; firstName: string; lastName: string; phone: string | null };
+    customer: { id: string; firstName: string; lastName: string; phone: string | null } | null;
     server: { id: string; firstName: string; lastName: string };
     items: InvoiceItem[];
     products: InvoiceProduct[];
@@ -101,7 +102,7 @@ export function InvoicesClient() {
 
   const filtered = invoices.filter((inv) => {
     const matchSearch =
-      `${inv.invoiceNumber} ${inv.order.orderNumber} ${inv.order.customer.firstName} ${inv.order.customer.lastName}`
+      `${inv.invoiceNumber} ${inv.order.orderNumber} ${customerName(inv.order.customer)}`
         .toLowerCase()
         .includes(search.toLowerCase());
     const matchStatus = filterStatus === "ALL" || inv.status === filterStatus;
@@ -208,7 +209,7 @@ export function InvoicesClient() {
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-emerald-100 to-teal-100 text-emerald-600 font-bold text-xs">
-                      {inv.order.customer.firstName[0]}{inv.order.customer.lastName[0]}
+                      {customerInitials(inv.order.customer)}
                     </div>
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
@@ -220,7 +221,7 @@ export function InvoicesClient() {
                         </Badge>
                       </div>
                       <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
-                        <span>{inv.order.customer.firstName} {inv.order.customer.lastName}</span>
+                        <span>{customerName(inv.order.customer)}</span>
                         <span className="text-muted-foreground/40">·</span>
                         <span>{date.toLocaleDateString()}</span>
                         <span className="text-muted-foreground/40">·</span>

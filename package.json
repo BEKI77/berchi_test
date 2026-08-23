@@ -14,7 +14,8 @@
     "db:generate": "npx drizzle-kit generate",
     "db:push": "npx drizzle-kit push",
     "db:studio": "npx drizzle-kit studio",
-    "db:verify-orders": "npx tsx src/db/verify_order_workflow.ts"
+    "db:verify-orders": "npx tsx src/db/verify_order_workflow.ts",
+    "test:e2e-checkout": "npx tsx scripts/e2e-checkout.mts"
   },
   "dependencies": {
     "@base-ui/react": "^1.4.0",

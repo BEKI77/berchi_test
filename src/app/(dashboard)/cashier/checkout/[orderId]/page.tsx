@@ -1,39 +1,23 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
 import {
   ArrowLeft,
   Scissors,
   Package,
-  CreditCard,
-  Banknote,
   CheckCircle,
   User,
   Percent,
   DollarSign,
-  QrCode,
-  Loader2,
-  ExternalLink,
-  ShieldCheck,
-  X,
 } from "lucide-react";
-import QRCode from "qrcode";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-  DialogClose,
-} from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { customerName, customerInitials } from "@/lib/orders";
 
 type OrderItem = {
   id: string;
@@ -61,24 +45,13 @@ type Order = {
     firstName: string;
     lastName: string;
     phone: string | null;
-  };
+  } | null;
   server: { id: string; firstName: string; lastName: string };
   items: OrderItem[];
   products: OrderProduct[];
 };
 
-type PaymentMethod = "CASH" | "CARD" | "CHAPA";
 type DiscountType = "PERCENTAGE" | "FIXED" | null;
-
-const paymentMethods: {
-  value: PaymentMethod;
-  label: string;
-  icon: React.ComponentType<{ className?: string }>;
-}[] = [
-    { value: "CASH", label: "Cash", icon: Banknote },
-    { value: "CARD", label: "Card", icon: CreditCard },
-    { value: "CHAPA", label: "Chapa", icon: QrCode },
-  ];
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -88,17 +61,10 @@ export default function CheckoutPage() {
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("CASH");
   const [discountType, setDiscountType] = useState<DiscountType>(null);
   const [discountValue, setDiscountValue] = useState(0);
   const [tipAmount, setTipAmount] = useState(0);
   const [taxRate, setTaxRate] = useState(0);
-  const [chapaCheckoutUrl, setChapaCheckoutUrl] = useState<string | null>(null);
-  const [chapaTxRef, setChapaTxRef] = useState<string | null>(null);
-  const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string | null>(null);
-  const [chapaVerifying, setChapaVerifying] = useState(false);
-  const [chapaPollCount, setChapaPollCount] = useState(0);
-  const chapaPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchOrder = useCallback(async () => {
     try {
@@ -134,58 +100,6 @@ export default function CheckoutPage() {
       .catch(() => { });
   }, []);
 
-  // Generate QR code when Chapa checkout URL is available
-  useEffect(() => {
-    if (chapaCheckoutUrl) {
-      QRCode.toDataURL(chapaCheckoutUrl, {
-        width: 256,
-        margin: 2,
-        color: { dark: "#047857", light: "#f0fdf4" },
-      })
-        .then((url) => setQrCodeDataUrl(url))
-        .catch(() => setQrCodeDataUrl(null));
-    } else {
-      setQrCodeDataUrl(null);
-    }
-  }, [chapaCheckoutUrl]);
-
-  // Poll Chapa verification
-  useEffect(() => {
-    if (!chapaTxRef || !chapaVerifying) return;
-
-    chapaPollRef.current = setInterval(async () => {
-      try {
-        const res = await fetch(`/api/chapa/verify?tx_ref=${chapaTxRef}`);
-        const data = await res.json();
-
-        if (data.status === "success") {
-          setChapaVerifying(false);
-          if (chapaPollRef.current) clearInterval(chapaPollRef.current);
-          // Complete checkout with Chapa
-          await completeChapaCheckout();
-        } else {
-          setChapaPollCount((c) => c + 1);
-        }
-      } catch {
-        setChapaPollCount((c) => c + 1);
-      }
-    }, 5000);
-
-    return () => {
-      if (chapaPollRef.current) clearInterval(chapaPollRef.current);
-    };
-  }, [chapaTxRef, chapaVerifying]);
-
-  // Stop polling after 60 attempts (5 minutes)
-  useEffect(() => {
-    if (chapaPollCount >= 60 && chapaVerifying) {
-      setChapaVerifying(false);
-      if (chapaPollRef.current) clearInterval(chapaPollRef.current);
-      toast.error("Payment verification timed out. Please try again.");
-      setProcessing(false);
-    }
-  }, [chapaPollCount, chapaVerifying]);
-
   if (loading || !order) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -212,69 +126,10 @@ export default function CheckoutPage() {
         : 0;
   const total = subtotal + taxAmount - discountAmount + tipAmount;
 
-  async function initializeChapa() {
-    setProcessing(true);
-    try {
-      const res = await fetch("/api/chapa/initialize", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          amount: total,
-          email: `${order!.customer.firstName.toLowerCase()}@berchi.com`,
-          firstName: order!.customer.firstName,
-          lastName: order!.customer.lastName,
-          orderId,
-          phone: order!.customer.phone || undefined,
-        }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Chapa initialization failed");
-
-      setChapaTxRef(data.txRef);
-      setChapaCheckoutUrl(data.checkoutUrl);
-      setChapaVerifying(true);
-      setChapaPollCount(0);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to initialize Chapa");
-      setProcessing(false);
-    }
-  }
-
-  async function completeChapaCheckout() {
-    try {
-      const res = await fetch(`/api/orders/${orderId}/checkout`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          discountType,
-          discountValue,
-          tipAmount,
-          paymentMethod: "CHAPA",
-          chapaTxRef,
-        }),
-      });
-
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Checkout failed");
-      }
-
-      const result = await res.json();
-      toast.success("Chapa payment verified & processed successfully!");
-      router.push(`/cashier/receipt/${result.invoice.id}`);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to complete checkout");
-      setProcessing(false);
-    }
-  }
-
-  async function processCheckout() {
-    if (paymentMethod === "CHAPA") {
-      await initializeChapa();
-      return;
-    }
-
+  // One action: record the payment and move on. The cashier does not pick a
+  // method -- the invoice records CASH by default, which is how the salon is
+  // paid. The Chapa routes remain in the repo, unused, if that ever changes.
+  async function confirmPayment() {
     setProcessing(true);
     try {
       const res = await fetch(`/api/orders/${orderId}/checkout`, {
@@ -284,7 +139,6 @@ export default function CheckoutPage() {
           discountType,
           discountValue,
           tipAmount,
-          paymentMethod,
         }),
       });
 
@@ -294,7 +148,7 @@ export default function CheckoutPage() {
       }
 
       const result = await res.json();
-      toast.success("Payment processed successfully!");
+      toast.success("Payment confirmed");
       router.push(`/cashier/receipt/${result.invoice.id}`);
     } catch (err) {
       toast.error(
@@ -326,11 +180,11 @@ export default function CheckoutPage() {
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-linear-to-br from-emerald-100 to-teal-100 text-sm font-bold text-emerald-600 shrink-0">
-                {order.customer.firstName[0]}{order.customer.lastName[0]}
+                {customerInitials(order.customer)}
               </div>
               <div>
                 <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Customer</p>
-                <p className="font-medium text-sm">{order.customer.firstName} {order.customer.lastName}</p>
+                <p className="font-medium text-sm">{customerName(order.customer)}</p>
               </div>
             </div>
             <div className="flex items-center gap-3">
@@ -498,156 +352,15 @@ export default function CheckoutPage() {
         </CardContent>
       </Card>
 
-      {/* Payment Method */}
-      <Card className="rounded-xl border-emerald-100 overflow-hidden">
-        <div className="h-1 bg-gradient-to-r from-emerald-400 to-teal-400" />
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-semibold flex items-center gap-2 uppercase tracking-wider text-emerald-600">
-            <CreditCard className="h-4 w-4" />
-            Payment Method
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-3 gap-3">
-            {paymentMethods.map((method) => (
-              <button
-                key={method.value}
-                onClick={() => setPaymentMethod(method.value)}
-                className={`flex flex-col items-center gap-2 rounded-xl border-2 p-4 transition-all duration-200 ${paymentMethod === method.value
-                  ? "border-emerald-400 bg-emerald-50 text-emerald-700 shadow-md shadow-emerald-100/50"
-                  : "border-border hover:bg-emerald-50/30 hover:border-emerald-200"
-                  }`}
-              >
-                <method.icon className={`h-6 w-6 ${paymentMethod === method.value ? "text-emerald-500" : "text-muted-foreground"}`} />
-                <span className="text-sm font-medium">{method.label}</span>
-              </button>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Chapa QR Code Dialog */}
-      <Dialog
-        open={!!chapaCheckoutUrl}
-        onOpenChange={(open) => {
-          if (!open && !chapaVerifying) {
-            setChapaCheckoutUrl(null);
-            setChapaTxRef(null);
-            setQrCodeDataUrl(null);
-            setProcessing(false);
-          }
-        }}
-      >
-        <DialogContent className="sm:max-w-md" showCloseButton={!chapaVerifying}>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-purple-700">
-              <QrCode className="h-5 w-5" />
-              Pay with Chapa
-            </DialogTitle>
-            <DialogDescription>
-              Scan the QR code or open the payment link to complete payment
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="flex flex-col items-center gap-4 py-2">
-            {/* QR Code */}
-            <div className="relative p-4 bg-gradient-to-br from-purple-50 to-indigo-50 rounded-2xl border-2 border-purple-100">
-              {qrCodeDataUrl ? (
-                <img
-                  src={qrCodeDataUrl}
-                  alt="Chapa Payment QR Code"
-                  className="w-52 h-52 rounded-lg"
-                />
-              ) : (
-                <div className="w-52 h-52 flex items-center justify-center">
-                  <Loader2 className="h-8 w-8 animate-spin text-purple-400" />
-                </div>
-              )}
-              <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-purple-600 text-white text-[10px] font-bold px-3 py-0.5 rounded-full uppercase tracking-wider">
-                Chapa
-              </div>
-            </div>
-
-            {/* Payment Details */}
-            <div className="w-full space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Customer</span>
-                <span className="font-medium">{order.customer.firstName} {order.customer.lastName}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Order</span>
-                <span className="font-medium">{order.orderNumber}</span>
-              </div>
-              <Separator />
-              <div className="flex justify-between items-center">
-                <span className="font-semibold">Total</span>
-                <span className="text-lg font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">
-                  ETB {total.toFixed(2)}
-                </span>
-              </div>
-            </div>
-
-            {/* Open payment link */}
-            {chapaCheckoutUrl && (
-              <a
-                href={chapaCheckoutUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 text-sm font-medium text-purple-600 hover:text-purple-700 underline underline-offset-4"
-              >
-                <ExternalLink className="h-4 w-4" />
-                Open payment link
-              </a>
-            )}
-
-            {/* Verification status */}
-            {chapaVerifying && (
-              <div className="w-full space-y-3 pt-2">
-                <div className="flex items-center justify-center gap-2 text-sm text-purple-600">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span className="font-medium">Waiting for payment confirmation...</span>
-                </div>
-                <div className="w-full bg-purple-100 rounded-full h-2 overflow-hidden">
-                  <div
-                    className="bg-gradient-to-r from-purple-500 to-indigo-500 h-2 rounded-full transition-all duration-500"
-                    style={{ width: `${Math.min((chapaPollCount / 60) * 100, 100)}%` }}
-                  />
-                </div>
-                <p className="text-xs text-center text-muted-foreground">
-                  Checking every 5s... (attempt {chapaPollCount}/60)
-                </p>
-              </div>
-            )}
-
-            {!chapaVerifying && chapaTxRef && (
-              <div className="flex items-center gap-2 text-sm text-emerald-600 font-medium bg-emerald-50 px-4 py-2 rounded-xl">
-                <ShieldCheck className="h-4 w-4" />
-                Payment verified!
-              </div>
-            )}
-          </div>
-
-          <DialogFooter>
-            <DialogClose render={<Button variant="outline" />} disabled={chapaVerifying}>
-              Cancel
-            </DialogClose>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       {/* Process button */}
       <div className="fixed bottom-0 left-0 right-0 md:left-64 p-4 bg-white/80 backdrop-blur-lg border-t border-emerald-100/50">
         <Button
-          onClick={processCheckout}
+          onClick={confirmPayment}
           disabled={processing}
           className="w-full h-14 text-lg font-semibold rounded-xl bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-500 hover:from-emerald-600 hover:via-teal-600 hover:to-emerald-600 shadow-lg shadow-emerald-300/30 hover:shadow-emerald-400/40 transition-all duration-300 hover:-translate-y-0.5"
         >
           <CheckCircle className="h-5 w-5 mr-2" />
-          {processing
-            ? paymentMethod === "CHAPA"
-              ? "Initializing Chapa..."
-              : "Processing..."
-            : `Complete Payment — ETB ${total.toFixed(2)}`}
+          {processing ? "Confirming..." : `Confirm Payment — ETB ${total.toFixed(2)}`}
         </Button>
       </div>
     </div>

@@ -33,22 +33,18 @@ export async function POST(
     discountType,
     discountValue = 0,
     tipAmount = 0,
-    paymentMethod,
+    // The till has a single Confirm Payment button and sends no method, so
+    // this defaults to CASH. It stays in the payload because the Chapa routes
+    // still pass CHAPA, and reporting can split by method if that is turned on.
+    paymentMethod = "CASH",
     chapaTxRef,
   }: {
     discountType?: DiscountType;
     discountValue?: number;
     tipAmount?: number;
-    paymentMethod: PaymentMethod;
+    paymentMethod?: PaymentMethod;
     chapaTxRef?: string;
   } = body;
-
-  if (!paymentMethod) {
-    return NextResponse.json(
-      { error: "Payment method is required" },
-      { status: 400 }
-    );
-  }
 
   const order = await db.query.serviceOrders.findFirst({
     where: eq(serviceOrders.id, orderId),

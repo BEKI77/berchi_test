@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import { customerName } from "@/lib/orders";
 
 type ProductDetail = {
   product: {
@@ -46,7 +47,7 @@ type ProductDetail = {
     order: {
       orderNumber: string;
       startedAt: string;
-      customer: { firstName: string; lastName: string };
+      customer: { firstName: string; lastName: string } | null;
       server: { firstName: string; lastName: string };
     };
   }[];
@@ -252,7 +253,7 @@ export default function ProductDetailPage() {
                   <div className="flex items-center justify-between">
                     <div className="min-w-0">
                       <p className="text-sm font-medium">
-                        {u.order.customer.firstName} {u.order.customer.lastName}
+                        {customerName(u.order.customer)}
                       </p>
                       <div className="flex items-center gap-2 text-[10px] text-muted-foreground mt-0.5">
                         <span>{u.order.orderNumber}</span>

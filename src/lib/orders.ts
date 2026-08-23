@@ -25,3 +25,17 @@ export const ORDER_WITH = {
   products: { with: { product: true } },
   invoice: { with: { payment: true } },
 } as const;
+
+/** A ticket opened by reception has no customer until someone attaches one. */
+export type CustomerLike = { firstName: string; lastName: string } | null | undefined;
+
+/** Display name for a ticket's customer, or "Walk-in" when none is attached. */
+export function customerName(c: CustomerLike): string {
+  return c ? `${c.firstName} ${c.lastName}`.trim() : "Walk-in";
+}
+
+/** Avatar initials for a ticket's customer. */
+export function customerInitials(c: CustomerLike): string {
+  if (!c) return "W";
+  return `${c.firstName?.[0] ?? ""}${c.lastName?.[0] ?? ""}` || "?";
+}

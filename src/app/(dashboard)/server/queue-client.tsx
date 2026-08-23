@@ -6,6 +6,7 @@ import { Plus, Scissors, Clock, CheckCircle, Send, Sparkles, ArrowRight } from "
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
+import { customerName } from "@/lib/orders";
 
 type Order = {
   id: string;
@@ -14,7 +15,7 @@ type Order = {
   notes: string | null;
   startedAt: string;
   completedAt: string | null;
-  customer: { id: string; firstName: string; lastName: string; phone: string | null };
+  customer: { id: string; firstName: string; lastName: string; phone: string | null } | null;
   server: { id: string; firstName: string; lastName: string };
   items: { id: string; unitPrice: string; quantity: number; service: { id: string; name: string } }[];
   products: { id: string; unitPrice: string; quantity: number; product: { id: string; name: string } }[];
@@ -139,7 +140,7 @@ export function ServerQueueClient({ userId }: { userId: string }) {
                   <div className="flex items-start justify-between mb-3">
                     <div>
                       <p className="font-semibold text-base">
-                        {order.customer.firstName} {order.customer.lastName}
+                        {customerName(order.customer)}
                       </p>
                       <p className="text-xs text-muted-foreground mt-0.5">{order.orderNumber}</p>
                     </div>
@@ -183,7 +184,7 @@ export function ServerQueueClient({ userId }: { userId: string }) {
                 <CardContent className="pt-4">
                   <div className="flex items-start justify-between mb-2">
                     <div>
-                      <p className="font-semibold">{order.customer.firstName} {order.customer.lastName}</p>
+                      <p className="font-semibold">{customerName(order.customer)}</p>
                       <p className="text-xs text-muted-foreground">{order.orderNumber}</p>
                     </div>
                     <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-amber-50 border border-amber-100">
@@ -219,7 +220,7 @@ export function ServerQueueClient({ userId }: { userId: string }) {
                 <CardContent className="pt-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="font-medium text-sm">{order.customer.firstName} {order.customer.lastName}</p>
+                      <p className="font-medium text-sm">{customerName(order.customer)}</p>
                       <p className="text-xs text-muted-foreground">{order.orderNumber}</p>
                     </div>
                     <div className="text-right">

@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import { customerName, customerInitials } from "@/lib/orders";
 
 type StaffDetail = {
   staff: {
@@ -41,7 +42,7 @@ type StaffDetail = {
     status: string;
     startedAt: string;
     completedAt: string | null;
-    customer: { firstName: string; lastName: string };
+    customer: { firstName: string; lastName: string } | null;
     items: { unitPrice: string; quantity: number; service: { name: string } }[];
     products: { unitPrice: string; quantity: number; product: { name: string } }[];
   }[];
@@ -204,11 +205,11 @@ export default function StaffDetailPage() {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3 min-w-0">
                         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-pink-50 text-pink-600 font-bold text-xs">
-                          {order.customer.firstName[0]}{order.customer.lastName[0]}
+                          {customerInitials(order.customer)}
                         </div>
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
-                            <p className="text-sm font-medium truncate">{order.customer.firstName} {order.customer.lastName}</p>
+                            <p className="text-sm font-medium truncate">{customerName(order.customer)}</p>
                             <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${statusColors[order.status] || ""}`}>
                               {order.status.replace(/_/g, " ")}
                             </Badge>

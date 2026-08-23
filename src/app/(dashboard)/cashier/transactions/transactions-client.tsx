@@ -21,6 +21,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
+import { customerName, customerInitials } from "@/lib/orders";
 
 type Order = {
   id: string;
@@ -28,7 +29,7 @@ type Order = {
   status: string;
   createdAt: string;
   completedAt: string | null;
-  customer: { id: string; firstName: string; lastName: string; phone: string | null };
+  customer: { id: string; firstName: string; lastName: string; phone: string | null } | null;
   server: { id: string; firstName: string; lastName: string };
   items: { id: string; unitPrice: string; quantity: number; service: { id: string; name: string } }[];
   products: { id: string; unitPrice: string; quantity: number; product: { id: string; name: string } }[];
@@ -205,12 +206,12 @@ export function TransactionsClient() {
                   <button onClick={() => toggleExpand(order.id)} className="w-full text-left">
                     <div className="flex items-center gap-3">
                       <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-emerald-100 to-teal-100 text-xs font-bold text-emerald-600">
-                        {order.customer.firstName[0]}{order.customer.lastName?.[0] || ""}
+                        {customerInitials(order.customer)}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <p className="font-semibold text-sm truncate">
-                            {order.customer.firstName} {order.customer.lastName}
+                            {customerName(order.customer)}
                           </p>
                           <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full border text-[9px] font-semibold ${methodColors[payMethod] || "bg-gray-50 text-gray-600 border-gray-200"}`}>
                             {methodIcons[payMethod] || <CreditCard className="h-2.5 w-2.5" />}
@@ -316,7 +317,7 @@ export function TransactionsClient() {
                         <span className="flex items-center gap-1">
                           <CheckCircle className="h-3 w-3 text-emerald-400" /> Paid
                         </span>
-                        {order.customer.phone && (
+                        {order.customer?.phone && (
                           <span>{order.customer.phone}</span>
                         )}
                       </div>

@@ -27,10 +27,18 @@ export function ServerQueueClient({ userId }: { userId: string }) {
 
   const fetchOrders = useCallback(async () => {
     try {
-      const res = await fetch(`/api/orders?serverId=${userId}`);
-      if (!res.ok) throw new Error("Failed to fetch orders");
-      const data = await res.json();
-      setOrders(data);
+      // Open tickets belong to the floor, not to one stylist -- several people
+      // work the same order number. Completed tickets stay personal history.
+      const [openRes, mineRes] = await Promise.all([
+        fetch(`/api/orders?open=true`),
+        fetch(`/api/orders?status=CHECKED_OUT&serverId=${userId}`),
+      ]);
+      if (!openRes.ok || !mineRes.ok) throw new Error("Failed to fetch orders");
+      const [openOrders, myCompleted] = await Promise.all([
+        openRes.json(),
+        mineRes.json(),
+      ]);
+      setOrders([...openOrders, ...myCompleted]);
     } catch {
       toast.error("Failed to load orders");
     } finally {

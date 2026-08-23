@@ -43,6 +43,13 @@
       "when": 1778048419255,
       "tag": "0005_sour_anthem",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1787508573634,
+      "tag": "0006_hesitant_magneto",
+      "breakpoints": true
     }
   ]
 }

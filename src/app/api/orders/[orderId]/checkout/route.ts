@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { eq, gte, count as countFn, sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { hasPermission } from "@/lib/permissions";
 import {
@@ -9,6 +9,8 @@ import {
   productUsageLogs,
 } from "@/db/schema";
 import type { DiscountType, PaymentMethod } from "@/db/schema";
+import { nextInvoiceNumber, getSalonTimezone } from "@/lib/order-numbers";
+import { isOrderEditable } from "@/lib/orders";
 
 // POST: Checkout an order — create invoice + payment, update stock, log commissions
 export async function POST(
@@ -70,10 +72,13 @@ export async function POST(
     return NextResponse.json({ error: "Order not found" }, { status: 404 });
   }
 
-  if (order.status !== "SENT_TO_CASHIER") {
+  // Any ticket that is still open can be paid. Sending to the cashier is a
+  // signal that the stylist is finished, not a precondition -- a walk-in who
+  // only buys a product never gets "sent" at all.
+  if (!isOrderEditable(order.status)) {
     return NextResponse.json(
-      { error: "Order is not ready for checkout" },
-      { status: 400 }
+      { error: "This ticket has already been closed" },
+      { status: 409 }
     );
   }
 
@@ -103,18 +108,15 @@ export async function POST(
 
   const totalAmount = subtotal + taxAmount - discountAmount + tipAmount;
 
-  // Generate invoice number: INV-YYYYMMDD-XXXX
-  const today = new Date();
-  const dateStr = today.toISOString().slice(0, 10).replace(/-/g, "");
-  const [{ value: invoiceCount }] = await db
-    .select({ value: countFn() })
-    .from(invoices)
-    .where(gte(invoices.createdAt, new Date(today.getFullYear(), today.getMonth(), today.getDate())));
-  const invoiceNumber = `INV-${dateStr}-${String(Number(invoiceCount) + 1).padStart(4, "0")}`;
+  const timeZone = await getSalonTimezone();
 
   // Use a transaction to ensure atomicity
   const result = await db.transaction(async (tx) => {
-    // 1. Create invoice
+    // 1. Create invoice. The number is allocated inside the transaction, from a
+    // counter row rather than a count of today's rows, so two tills closing at
+    // the same moment cannot mint the same invoice number.
+    const invoiceNumber = await nextInvoiceNumber(tx, timeZone);
+
     const [invoice] = await tx
       .insert(invoices)
       .values({

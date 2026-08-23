@@ -13,7 +13,8 @@
     "db:migrate": "npx drizzle-kit migrate",
     "db:generate": "npx drizzle-kit generate",
     "db:push": "npx drizzle-kit push",
-    "db:studio": "npx drizzle-kit studio"
+    "db:studio": "npx drizzle-kit studio",
+    "db:verify-orders": "npx tsx src/db/verify_order_workflow.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.4.0",

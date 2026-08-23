@@ -8,6 +8,7 @@ export const salonSettings = pgTable("salon_settings", {
   logoUrl: varchar("logo_url", { length: 500 }),
   taxRate: decimal("tax_rate", { precision: 5, scale: 2 }).default("0").notNull(),
   currency: varchar("currency", { length: 10 }).default("ETB").notNull(),
+  timezone: varchar("timezone", { length: 64 }).default("Africa/Addis_Ababa").notNull(),
   receiptsEnabled: boolean("receipts_enabled").default(true).notNull(),
   businessHours: text("business_hours"),
   createdAt: timestamp("created_at").defaultNow().notNull(),

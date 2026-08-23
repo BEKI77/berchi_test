@@ -1,123 +1,114 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { and, eq, gte, desc, count as countFn, SQL } from "drizzle-orm";
+import { and, eq, inArray, desc, SQL } from "drizzle-orm";
 import { db } from "@/db";
 import { hasPermission } from "@/lib/permissions";
 import { serviceOrders } from "@/db/schema";
+import type { OrderStatus } from "@/db/schema";
+import { ORDER_WITH, EDITABLE_ORDER_STATUSES } from "@/lib/orders";
+import { nextOrderNumber, getSalonTimezone } from "@/lib/order-numbers";
 
-// GET: List orders for the current server (or all for cashier/owner)
+const DEFAULT_LIMIT = 200;
+const MAX_LIMIT = 500;
+
+// GET: Look up orders.
+//
+//   ?orderNumber=ORD-20260823-0001   exact ticket lookup (what tablets use)
+//   ?open=true                       tickets still on the floor
+//   ?status=SENT_TO_CASHIER          single status
+//   ?serverId=<uuid>                 tickets a given stylist worked on
+//
+// Tickets are shared: any stylist may look up any open ticket, because several
+// of them serve the same customer against one number. Attribution lives on the
+// individual line items, not on the ticket.
 export async function GET(req: Request) {
   const session = await auth();
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { searchParams } = new URL(req.url);
-  const status = searchParams.get("status");
-  const serverId = searchParams.get("serverId");
-
-  const conditions: SQL[] = [];
-  if (status) {
-    conditions.push(eq(serviceOrders.status, status as typeof serviceOrders.status.enumValues[number]));
-  }
-  if (serverId) {
-    conditions.push(eq(serviceOrders.serverId, serverId));
-  } else if (session.user.role === "SERVER") {
-    conditions.push(eq(serviceOrders.serverId, session.user.id));
-  }
-
-  // Permission: list orders
-  const canView = await hasPermission(session.user.id, "orders.view");
-  if (!canView) {
+  if (!(await hasPermission(session.user.id, "orders.view"))) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
+  const { searchParams } = new URL(req.url);
+  const orderNumber = searchParams.get("orderNumber");
+  const status = searchParams.get("status");
+  const serverId = searchParams.get("serverId");
+  const open = searchParams.get("open");
+
+  const conditions: SQL[] = [];
+
+  if (orderNumber) {
+    conditions.push(eq(serviceOrders.orderNumber, orderNumber.trim().toUpperCase()));
+  }
+  if (open === "true") {
+    conditions.push(inArray(serviceOrders.status, [...EDITABLE_ORDER_STATUSES]));
+  } else if (status) {
+    conditions.push(eq(serviceOrders.status, status as OrderStatus));
+  }
+  if (serverId) {
+    conditions.push(eq(serviceOrders.serverId, serverId));
+  }
+
+  const requested = Number(searchParams.get("limit"));
+  const limit = Number.isFinite(requested) && requested > 0
+    ? Math.min(requested, MAX_LIMIT)
+    : DEFAULT_LIMIT;
+
   const orders = await db.query.serviceOrders.findMany({
     where: conditions.length > 0 ? and(...conditions) : undefined,
-    with: {
-      customer: { columns: { id: true, firstName: true, lastName: true, phone: true } },
-      server: { columns: { id: true, firstName: true, lastName: true } },
-      items: {
-        with: { 
-          service: {
-            with: { consumables: { with: { product: true } } }
-          },
-          consumablesUsed: { with: { product: true } }
-        },
-      },
-      products: {
-        with: { product: true },
-      },
-      invoice: {
-        with: { payment: true },
-      },
-    },
+    with: ORDER_WITH,
     orderBy: [desc(serviceOrders.createdAt)],
+    limit,
   });
 
   return NextResponse.json(orders);
 }
 
-// POST: Create a new service order
+// POST: Open a new ticket.
+//
+// A customer is optional. Reception issues a bare number when someone walks in,
+// and identity gets attached later at the counter, or never -- most walk-ins
+// never give a name, and forcing one was what pushed staff back to tracking
+// people by name in the first place.
 export async function POST(req: Request) {
   const session = await auth();
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const canCreate = await hasPermission(session.user.id, "orders.create");
-  if (!canCreate) {
+  if (!(await hasPermission(session.user.id, "orders.create"))) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const body = await req.json();
-  const { customerId, notes } = body;
+  const body = await req.json().catch(() => ({}));
+  const { customerId = null, notes = null } = body ?? {};
 
-  if (!customerId) {
-    return NextResponse.json(
-      { error: "Customer is required" },
-      { status: 400 }
-    );
-  }
+  const timeZone = await getSalonTimezone();
 
-  // Generate order number: ORD-YYYYMMDD-XXXX
-  const today = new Date();
-  const dateStr = today.toISOString().slice(0, 10).replace(/-/g, "");
-  const [{ value: orderCount }] = await db
-    .select({ value: countFn() })
-    .from(serviceOrders)
-    .where(gte(serviceOrders.createdAt, new Date(today.getFullYear(), today.getMonth(), today.getDate())));
-  const orderNumber = `ORD-${dateStr}-${String(Number(orderCount) + 1).padStart(4, "0")}`;
+  // Number allocation and insert share a transaction, so a failed insert does
+  // not leave a gap in the day's numbering.
+  const order = await db.transaction(async (tx) => {
+    const orderNumber = await nextOrderNumber(tx, timeZone);
 
-  const [order] = await db
-    .insert(serviceOrders)
-    .values({
-      orderNumber,
-      customerId,
-      serverId: session.user.id,
-      status: "IN_PROGRESS",
-      notes,
-    })
-    .returning();
+    const [created] = await tx
+      .insert(serviceOrders)
+      .values({
+        orderNumber,
+        customerId,
+        serverId: session.user.id, // who opened it; not an ownership claim
+        status: "IN_PROGRESS",
+        notes,
+      })
+      .returning();
 
-  // Re-fetch with relations
+    return created;
+  });
+
   const fullOrder = await db.query.serviceOrders.findFirst({
     where: eq(serviceOrders.id, order.id),
-    with: {
-      customer: { columns: { id: true, firstName: true, lastName: true, phone: true } },
-      server: { columns: { id: true, firstName: true, lastName: true } },
-      items: {
-        with: { 
-          service: {
-            with: { consumables: { with: { product: true } } }
-          },
-          consumablesUsed: { with: { product: true } }
-        },
-      },
-      products: {
-        with: { product: true },
-      },
-    },
+    with: ORDER_WITH,
   });
 
   return NextResponse.json(fullOrder, { status: 201 });

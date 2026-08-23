@@ -8,6 +8,7 @@ export * from "./services";
 export * from "./products";
 export * from "./appointments";
 export * from "./orders";
+export * from "./counters";
 export * from "./billing";
 export * from "./operations";
 export * from "./settings";

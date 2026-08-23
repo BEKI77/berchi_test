@@ -102,12 +102,13 @@ export default function CheckoutPage() {
 
   const fetchOrder = useCallback(async () => {
     try {
-      const res = await fetch(`/api/orders?status=SENT_TO_CASHIER`);
+      const res = await fetch(`/api/orders/${orderId}`);
       if (!res.ok) throw new Error();
-      const data: Order[] = await res.json();
-      const found = data.find((o) => o.id === orderId);
-      if (found) setOrder(found);
-      else throw new Error("Order not found");
+      const found: Order = await res.json();
+      if (found.status === "CHECKED_OUT" || found.status === "CANCELLED") {
+        throw new Error("Order already closed");
+      }
+      setOrder(found);
     } catch {
       toast.error("Order not found or already checked out");
       router.push("/cashier");

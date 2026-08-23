@@ -2,9 +2,16 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
+import { hasPermission } from "@/lib/permissions";
 import { serviceOrders } from "@/db/schema";
+import { ORDER_WITH } from "@/lib/orders";
 
-// POST: Send order to cashier
+// POST: Flag a ticket as ready for the cashier.
+//
+// This is a signal, not a lock -- the ticket stays editable so a second stylist
+// can still add work. Sending an already-sent ticket is harmless and simply
+// refreshes it on the cashier screen, which is what staff expect when they tap
+// the button twice.
 export async function POST(
   _req: Request,
   { params }: { params: Promise<{ orderId: string }> }
@@ -12,6 +19,10 @@ export async function POST(
   const session = await auth();
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (!(await hasPermission(session.user.id, "orders.update"))) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const { orderId } = await params;
@@ -25,16 +36,16 @@ export async function POST(
     return NextResponse.json({ error: "Order not found" }, { status: 404 });
   }
 
-  if (order.status !== "IN_PROGRESS") {
-    return NextResponse.json(
-      { error: "Order has already been sent or completed" },
-      { status: 400 }
-    );
+  if (order.status === "CHECKED_OUT") {
+    return NextResponse.json({ error: "This ticket has already been paid" }, { status: 409 });
+  }
+  if (order.status === "CANCELLED") {
+    return NextResponse.json({ error: "This ticket was cancelled" }, { status: 409 });
   }
 
-  if (order.items.length === 0) {
+  if (order.items.length === 0 && order.products.length === 0) {
     return NextResponse.json(
-      { error: "Order must have at least one service" },
+      { error: "Add at least one service or product before sending" },
       { status: 400 }
     );
   }
@@ -46,16 +57,7 @@ export async function POST(
 
   const updated = await db.query.serviceOrders.findFirst({
     where: eq(serviceOrders.id, orderId),
-    with: {
-      customer: { columns: { id: true, firstName: true, lastName: true } },
-      server: { columns: { id: true, firstName: true, lastName: true } },
-      items: {
-        with: { service: { columns: { id: true, name: true } } },
-      },
-      products: {
-        with: { product: { columns: { id: true, name: true } } },
-      },
-    },
+    with: ORDER_WITH,
   });
 
   return NextResponse.json(updated);

@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   postgres:
     image: postgres:16-alpine
@@ -10,9 +8,20 @@ services:
       POSTGRES_PASSWORD: berchi_secret
       POSTGRES_DB: berchi_salon
     ports:
-      - "5432:5432"
+      # Host 5432 is commonly already taken by a native PostgreSQL install --
+      # this machine has both 13 and 16 running as services. Binding there
+      # silently loses the race and sends every client to the wrong server,
+      # which surfaces as "password authentication failed for user berchi".
+      # This machine also has a second instance on 5433, so the default is 5442.
+      # Override with POSTGRES_PORT if that is busy too.
+      - "${POSTGRES_PORT:-5442}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U berchi -d berchi_salon"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
 volumes:
   postgres_data:

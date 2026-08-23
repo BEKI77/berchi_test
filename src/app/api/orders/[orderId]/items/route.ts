@@ -1,10 +1,17 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { serviceOrders, services, serviceOrderItems } from "@/db/schema";
+import { hasPermission } from "@/lib/permissions";
+import { serviceOrders, services, serviceOrderItems, staff } from "@/db/schema";
+import { isOrderEditable } from "@/lib/orders";
 
-// POST: Add a service item to an order
+// POST: Add a service line to a ticket.
+//
+// Any stylist with orders.update may add to any open ticket -- that is the
+// whole point of numbering tickets instead of tracking customers by name.
+// Credit for the work goes to staffId on the line, which defaults to the
+// caller but may name another stylist (the cashier adding a forgotten service).
 export async function POST(
   req: Request,
   { params }: { params: Promise<{ orderId: string }> }
@@ -14,20 +21,30 @@ export async function POST(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  if (!(await hasPermission(session.user.id, "orders.update"))) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   const { orderId } = await params;
-  const body = await req.json();
-  const { serviceId, quantity = 1 } = body;
+  const body = await req.json().catch(() => ({}));
+  const { serviceId, quantity = 1, staffId } = body ?? {};
 
   if (!serviceId) {
     return NextResponse.json({ error: "Service is required" }, { status: 400 });
   }
+  if (!Number.isInteger(quantity) || quantity < 1) {
+    return NextResponse.json({ error: "Quantity must be a whole number of 1 or more" }, { status: 400 });
+  }
 
   const [order] = await db.select().from(serviceOrders).where(eq(serviceOrders.id, orderId)).limit(1);
 
-  if (!order || order.status !== "IN_PROGRESS") {
+  if (!order) {
+    return NextResponse.json({ error: "Order not found" }, { status: 404 });
+  }
+  if (!isOrderEditable(order.status)) {
     return NextResponse.json(
-      { error: "Order not found or not editable" },
-      { status: 404 }
+      { error: "This ticket has been closed and can no longer be changed" },
+      { status: 409 }
     );
   }
 
@@ -37,6 +54,14 @@ export async function POST(
     return NextResponse.json({ error: "Service not found" }, { status: 404 });
   }
 
+  const creditedTo = staffId ?? session.user.id;
+  if (staffId && staffId !== session.user.id) {
+    const [target] = await db.select({ id: staff.id }).from(staff).where(eq(staff.id, staffId)).limit(1);
+    if (!target) {
+      return NextResponse.json({ error: "Staff member not found" }, { status: 404 });
+    }
+  }
+
   const [item] = await db
     .insert(serviceOrderItems)
     .values({
@@ -44,20 +69,22 @@ export async function POST(
       serviceId,
       unitPrice: service.basePrice,
       quantity,
-      staffId: session.user.id,
+      staffId: creditedTo,
     })
     .returning();
 
-  // Re-fetch with service relation
   const fullItem = await db.query.serviceOrderItems.findFirst({
     where: eq(serviceOrderItems.id, item.id),
-    with: { service: { columns: { id: true, name: true } } },
+    with: {
+      service: { columns: { id: true, name: true } },
+      staff: { columns: { id: true, firstName: true, lastName: true } },
+    },
   });
 
   return NextResponse.json(fullItem, { status: 201 });
 }
 
-// DELETE: Remove a service item from an order
+// DELETE: Remove a service line from a ticket.
 export async function DELETE(
   req: Request,
   { params }: { params: Promise<{ orderId: string }> }
@@ -65,6 +92,10 @@ export async function DELETE(
   const session = await auth();
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (!(await hasPermission(session.user.id, "orders.update"))) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const { orderId } = await params;
@@ -77,14 +108,26 @@ export async function DELETE(
 
   const [order] = await db.select().from(serviceOrders).where(eq(serviceOrders.id, orderId)).limit(1);
 
-  if (!order || order.status !== "IN_PROGRESS") {
+  if (!order) {
+    return NextResponse.json({ error: "Order not found" }, { status: 404 });
+  }
+  if (!isOrderEditable(order.status)) {
     return NextResponse.json(
-      { error: "Order not found or not editable" },
-      { status: 404 }
+      { error: "This ticket has been closed and can no longer be changed" },
+      { status: 409 }
     );
   }
 
-  await db.delete(serviceOrderItems).where(eq(serviceOrderItems.id, itemId));
+  // Scope the delete to this order, so an item id from another ticket cannot
+  // be removed through this route.
+  const deleted = await db
+    .delete(serviceOrderItems)
+    .where(and(eq(serviceOrderItems.id, itemId), eq(serviceOrderItems.orderId, orderId)))
+    .returning({ id: serviceOrderItems.id });
+
+  if (deleted.length === 0) {
+    return NextResponse.json({ error: "Item not found on this ticket" }, { status: 404 });
+  }
 
   return NextResponse.json({ success: true });
 }

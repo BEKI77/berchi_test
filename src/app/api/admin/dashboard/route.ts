@@ -34,9 +34,10 @@ export async function GET() {
       db.query.serviceOrders.findMany({
         where: gte(serviceOrders.startedAt, todayStart),
         with: {
-          items: true,
+          items: {
+            with: { staff: { columns: { id: true, firstName: true, lastName: true } } },
+          },
           products: true,
-          server: { columns: { firstName: true, lastName: true } },
         },
       }),
       db
@@ -72,19 +73,26 @@ export async function GET() {
       0
     );
 
-    // Top server today
+    // Top stylist today, by services performed.
+    //
+    // Counted from the line items, not the ticket. A ticket is shared between
+    // everyone who worked it, and serviceOrders.serverId now records only who
+    // opened it -- crediting the opener would hand one stylist the whole day.
     const serverCounts: Record<string, { name: string; count: number }> = {};
     todaysOrders
       .filter((o) => o.status === "CHECKED_OUT")
       .forEach((o) => {
-        const key = o.serverId;
-        if (!serverCounts[key]) {
-          serverCounts[key] = {
-            name: `${o.server.firstName} ${o.server.lastName}`,
-            count: 0,
-          };
-        }
-        serverCounts[key].count++;
+        o.items.forEach((item) => {
+          if (!item.staff) return;
+          const key = item.staffId;
+          if (!serverCounts[key]) {
+            serverCounts[key] = {
+              name: `${item.staff.firstName} ${item.staff.lastName}`,
+              count: 0,
+            };
+          }
+          serverCounts[key].count += item.quantity;
+        });
       });
     const topServer = Object.values(serverCounts).sort(
       (a, b) => b.count - a.count

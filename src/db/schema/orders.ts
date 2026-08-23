@@ -8,9 +8,9 @@ import { products } from "./products";
 
 export const serviceOrders = pgTable("service_orders", {
   id: uuid("id").primaryKey().defaultRandom(),
-  orderNumber: varchar("order_number", { length: 20 }).unique().notNull(),
-  customerId: uuid("customer_id").notNull().references(() => customers.id),
-  serverId: uuid("server_id").notNull().references(() => staff.id),
+  orderNumber: varchar("order_number", { length: 32 }).unique().notNull(),
+  customerId: uuid("customer_id").references(() => customers.id),
+  serverId: uuid("server_id").references(() => staff.id),
   appointmentId: uuid("appointment_id").references(() => appointments.id),
   status: orderStatusEnum("status").default("IN_PROGRESS").notNull(),
   notes: text("notes"),

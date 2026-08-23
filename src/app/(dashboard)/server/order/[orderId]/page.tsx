@@ -112,12 +112,9 @@ export default function ActiveOrderPage() {
 
   const fetchOrder = useCallback(async () => {
     try {
-      const res = await fetch(`/api/orders?status=`);
+      const res = await fetch(`/api/orders/${orderId}`);
       if (!res.ok) throw new Error();
-      const data: Order[] = await res.json();
-      const found = data.find((o) => o.id === orderId);
-      if (found) setOrder(found);
-      else throw new Error("Order not found");
+      setOrder(await res.json());
     } catch {
       toast.error("Failed to load order");
     }

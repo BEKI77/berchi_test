@@ -4,7 +4,7 @@ import { serviceOrders } from "./orders";
 
 export const invoices = pgTable("invoices", {
   id: uuid("id").primaryKey().defaultRandom(),
-  invoiceNumber: varchar("invoice_number", { length: 20 }).unique().notNull(),
+  invoiceNumber: varchar("invoice_number", { length: 32 }).unique().notNull(),
   orderId: uuid("order_id").unique().notNull().references(() => serviceOrders.id),
   subtotal: decimal("subtotal", { precision: 10, scale: 2 }).notNull(),
   taxRate: decimal("tax_rate", { precision: 5, scale: 2 }).notNull(),

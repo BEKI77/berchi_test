@@ -143,6 +143,37 @@ async function main() {
     check(`${bad} attempt leaves the ticket open`, stillOpen.body?.status !== "CHECKED_OUT");
   }
 
+  console.log("\n6. Closing out a ticket that will not be paid");
+  const stray = await asCashier("/api/orders", { method: "POST", body: JSON.stringify({ name: "Left early" }) });
+  const cancelUrl = `/api/orders/${stray.body.id}/cancel`;
+
+  const byStylist = await asServer(cancelUrl, { method: "POST", body: "{}" });
+  check("a stylist cannot cancel", byStylist.status === 403, `status ${byStylist.status}`);
+  const untouched = await asCashier(`/api/orders/${stray.body.id}`);
+  check("...and the ticket is untouched", untouched.body?.status === "IN_PROGRESS");
+  const anonCancel = await fetch(`${BASE}${cancelUrl}`, { method: "POST", redirect: "manual" });
+  check("no login cannot cancel", anonCancel.status === 401, `status ${anonCancel.status}`);
+
+  const done = await asCashier(cancelUrl, { method: "POST", body: JSON.stringify({ reason: "  customer   left " }) });
+  check("the cashier can cancel", done.status === 200 && done.body?.status === "CANCELLED", `status ${done.status}`);
+  const after = await asCashier(`/api/orders/${stray.body.id}`);
+  check("status is CANCELLED", after.body?.status === "CANCELLED");
+  check("notes say who cancelled and why",
+    /Cancelled by \w+ on \d{4}-\d{2}-\d{2}: customer left/.test(after.body?.notes ?? ""), JSON.stringify(after.body?.notes));
+  const openNow = await asCashier("/api/orders?open=true");
+  check("it leaves the open list", !(openNow.body as any[]).some((o) => o.id === stray.body.id));
+
+  const again = await asCashier(cancelUrl, { method: "POST", body: "{}" });
+  check("cancelling twice is refused", again.status === 409, `status ${again.status}`);
+  const addToCancelled = await asServer(`/api/orders/${stray.body.id}/items`, { method: "POST", body: JSON.stringify({ serviceId }) });
+  check("a cancelled ticket cannot be added to", addToCancelled.status === 409, `status ${addToCancelled.status}`);
+  const paidCancel = await asCashier(`/api/orders/${cash.ticket.id}/cancel`, { method: "POST", body: "{}" });
+  check("a paid ticket cannot be cancelled", paidCancel.status === 409, `status ${paidCancel.status}`);
+  const paidStill = await asCashier(`/api/orders/${cash.ticket.id}`);
+  check("...and stays paid", paidStill.body?.status === "CHECKED_OUT");
+  const ghost = await asCashier("/api/orders/00000000-0000-0000-0000-000000000000/cancel", { method: "POST", body: "{}" });
+  check("unknown ticket is a 404", ghost.status === 404, `status ${ghost.status}`);
+
   console.log(failures === 0 ? "\nAll checks passed.\n" : `\n${failures} check(s) FAILED.\n`);
   process.exit(failures === 0 ? 0 : 1);
 }

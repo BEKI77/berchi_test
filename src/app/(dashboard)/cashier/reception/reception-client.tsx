@@ -2,7 +2,7 @@
 
 import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Ticket, Plus, RefreshCw, Clock, Scissors, ArrowRight, UserPlus, Printer } from "lucide-react";
+import { Ticket, Plus, RefreshCw, Clock, Scissors, ArrowRight, UserPlus, Printer, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -31,10 +31,14 @@ function minutesSince(iso: string): number {
  * A ticket from an earlier day gets its date too: it should have been closed,
  * and its short number can clash with one issued today.
  */
+function isFromEarlierDay(iso: string): boolean {
+  return new Date(iso).toDateString() !== new Date().toDateString();
+}
+
 function arrivalLabel(iso: string): string {
   const d = new Date(iso);
   const time = d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false });
-  if (d.toDateString() === new Date().toDateString()) return time;
+  if (!isFromEarlierDay(iso)) return time;
   return `${d.toLocaleDateString("en-GB", { day: "numeric", month: "short" })} ${time}`;
 }
 
@@ -61,6 +65,7 @@ export function ReceptionClient() {
   const [name, setName] = useState("");
   // Bumped to (re)load the hidden slip frame, which prints itself on load.
   const [printKey, setPrintKey] = useState(0);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
 
   const fetchOpen = useCallback(async () => {
     try {
@@ -102,6 +107,37 @@ export function ReceptionClient() {
       setIssuing(false);
     }
   }
+
+  // Closing a ticket that will not be paid: the customer left, or it was a slip
+  // issued by mistake. The server keeps the ticket and records who cancelled it.
+  async function cancelTicket(t: Order) {
+    const hasWork = t.items.length > 0 || t.products.length > 0;
+    const question = `Cancel ticket ${shortOrderNumber(t.orderNumber)} (${ticketName(t)})?`
+      + (hasWork ? `\n\nIt has ETB ${formatMoney(ticketTotal(t))} of services on it, which will NOT be charged.` : "");
+    if (!window.confirm(question)) return;
+
+    setCancellingId(t.id);
+    try {
+      const res = await fetch(`/api/orders/${t.id}/cancel`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Could not cancel the ticket");
+      }
+      toast.success(`Ticket ${shortOrderNumber(t.orderNumber)} cancelled`);
+      fetchOpen();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not cancel the ticket");
+    } finally {
+      setCancellingId(null);
+    }
+  }
+
+  const todayTickets = openTickets.filter((t) => !isFromEarlierDay(t.startedAt));
+  const earlierTickets = openTickets.filter((t) => isFromEarlierDay(t.startedAt));
 
   return (
     <div className="space-y-6">
@@ -211,13 +247,70 @@ export function ReceptionClient() {
         />
       )}
 
+      {earlierTickets.length > 0 && (
+        <section className="rounded-2xl border border-amber-200 bg-amber-50/60 p-4 space-y-3" aria-labelledby="earlier-heading">
+          <div className="flex items-start gap-2.5">
+            <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+            <div>
+              <h2 id="earlier-heading" className="text-sm font-semibold text-amber-900">
+                {earlierTickets.length} ticket{earlierTickets.length === 1 ? "" : "s"} left open from earlier days
+              </h2>
+              <p className="text-xs text-amber-800/80 mt-0.5">
+                Close these out so today&apos;s numbers are not confused with old ones. Check out if the
+                customer paid, or cancel if they did not.
+              </p>
+            </div>
+          </div>
+          <ul className="space-y-2">
+            {earlierTickets.map((t) => {
+              const hasWork = t.items.length > 0 || t.products.length > 0;
+              return (
+                <li key={t.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl bg-white border border-amber-100 p-3">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-sm font-black tabular-nums text-amber-800">
+                    {shortOrderNumber(t.orderNumber)}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold text-sm truncate">{ticketName(t)}</p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {arrivalLabel(t.startedAt)} · {t.items.length} service{t.items.length === 1 ? "" : "s"}
+                      {hasWork && <> · ETB {formatMoney(ticketTotal(t))}</>}
+                    </p>
+                  </div>
+                  <div className="flex gap-2 shrink-0">
+                    {hasWork && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => router.push(`/cashier/checkout/${t.id}`)}
+                        className="rounded-lg"
+                      >
+                        Check out
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={cancellingId === t.id}
+                      onClick={() => cancelTicket(t)}
+                      className="rounded-lg border-red-200 text-red-600 hover:bg-red-50"
+                    >
+                      {cancellingId === t.id ? "Cancelling..." : "Cancel"}
+                    </Button>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
+
       <div className="space-y-3">
         <div className="flex items-baseline justify-between">
           <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
             On the floor
           </h2>
           <span className="text-xs text-muted-foreground tabular-nums">
-            {openTickets.length} open
+            {todayTickets.length} open
           </span>
         </div>
 
@@ -226,7 +319,7 @@ export function ReceptionClient() {
             <div className="h-9 w-9 rounded-full border-[3px] border-emerald-200 border-t-emerald-500 animate-spin" />
             <p className="text-sm text-muted-foreground">Loading tickets...</p>
           </div>
-        ) : openTickets.length === 0 ? (
+        ) : todayTickets.length === 0 ? (
           <Card className="rounded-xl border-dashed">
             <CardContent className="py-12 flex flex-col items-center gap-2 text-center">
               <UserPlus className="h-8 w-8 text-muted-foreground/40" />
@@ -237,7 +330,7 @@ export function ReceptionClient() {
           </Card>
         ) : (
           <div className="grid gap-2.5 sm:grid-cols-2">
-            {openTickets.map((t) => (
+            {todayTickets.map((t) => (
               <button
                 key={t.id}
                 onClick={() => router.push(`/cashier/checkout/${t.id}`)}

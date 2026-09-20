@@ -5,7 +5,7 @@ import { db } from "@/db";
 import { hasPermission } from "@/lib/permissions";
 import { serviceOrders } from "@/db/schema";
 import type { OrderStatus } from "@/db/schema";
-import { ORDER_WITH, EDITABLE_ORDER_STATUSES } from "@/lib/orders";
+import { ORDER_WITH, EDITABLE_ORDER_STATUSES, cleanWalkInName } from "@/lib/orders";
 import { nextOrderNumber, getSalonTimezone, resolveOrderNumber } from "@/lib/order-numbers";
 import { publishOrderChange } from "@/lib/order-events";
 
@@ -87,7 +87,7 @@ export async function POST(req: Request) {
   }
 
   const body = await req.json().catch(() => ({}));
-  const { customerId = null, notes = null } = body ?? {};
+  const { customerId = null, notes = null, name } = body ?? {};
 
   const timeZone = await getSalonTimezone();
 
@@ -101,6 +101,7 @@ export async function POST(req: Request) {
       .values({
         orderNumber,
         customerId,
+        walkInName: cleanWalkInName(name),
         serverId: session.user.id, // who opened it; not an ownership claim
         status: "IN_PROGRESS",
         notes,

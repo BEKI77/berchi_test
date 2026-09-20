@@ -25,7 +25,7 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
-import { customerName } from "@/lib/orders";
+import { ticketName } from "@/lib/orders";
 import { formatMoney } from "@/lib/money";
 
 type ServiceConsumable = {
@@ -67,6 +67,7 @@ type Order = {
   notes: string | null;
   startedAt: string;
   customer: { id: string; firstName: string; lastName: string; phone: string | null } | null;
+  walkInName: string | null;
   server: { id: string; firstName: string; lastName: string };
   items: OrderItem[];
   products: OrderProduct[];
@@ -383,7 +384,7 @@ export default function ActiveOrderPage() {
         </Button>
         <div className="flex-1">
           <h1 className="text-xl font-bold tracking-tight">
-            {customerName(order.customer)}
+            {ticketName(order)}
           </h1>
           <div className="flex items-center gap-3 text-xs text-muted-foreground">
             <span className="font-medium">{order.orderNumber}</span>

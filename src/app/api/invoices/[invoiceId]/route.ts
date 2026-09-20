@@ -26,7 +26,7 @@ export async function GET(
       where: eq(invoices.id, invoiceId),
       with: {
         order: {
-          columns: { orderNumber: true, startedAt: true },
+          columns: { orderNumber: true, startedAt: true, walkInName: true },
           with: {
             customer: { columns: { firstName: true, lastName: true, phone: true } },
             server: { columns: { firstName: true, lastName: true } },

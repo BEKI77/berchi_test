@@ -7,6 +7,7 @@ import {
   CreditCard,
   Banknote,
   Smartphone,
+  Landmark,
   ChevronDown,
   ChevronUp,
   User,
@@ -17,8 +18,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { customerName, customerInitials } from "@/lib/orders";
+import { ticketName, ticketInitials } from "@/lib/orders";
 import { formatMoney, formatPercent } from "@/lib/money";
+import { paymentMethodLabel } from "@/lib/payment-methods";
 
 type InvoiceItem = {
   id: string;
@@ -58,6 +60,7 @@ type Invoice = {
   order: {
     orderNumber: string;
     customer: { id: string; firstName: string; lastName: string; phone: string | null } | null;
+    walkInName: string | null;
     server: { id: string; firstName: string; lastName: string };
     items: InvoiceItem[];
     products: InvoiceProduct[];
@@ -76,6 +79,7 @@ const methodIcons: Record<string, React.ReactNode> = {
   CASH: <Banknote className="h-3.5 w-3.5" />,
   CARD: <CreditCard className="h-3.5 w-3.5" />,
   MOBILE: <Smartphone className="h-3.5 w-3.5" />,
+  BANK_TRANSFER: <Landmark className="h-3.5 w-3.5" />,
 };
 
 export function InvoicesClient() {
@@ -103,7 +107,7 @@ export function InvoicesClient() {
 
   const filtered = invoices.filter((inv) => {
     const matchSearch =
-      `${inv.invoiceNumber} ${inv.order.orderNumber} ${customerName(inv.order.customer)}`
+      `${inv.invoiceNumber} ${inv.order.orderNumber} ${ticketName(inv.order)}`
         .toLowerCase()
         .includes(search.toLowerCase());
     const matchStatus = filterStatus === "ALL" || inv.status === filterStatus;
@@ -210,7 +214,7 @@ export function InvoicesClient() {
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-emerald-100 to-teal-100 text-emerald-600 font-bold text-xs">
-                      {customerInitials(inv.order.customer)}
+                      {ticketInitials(inv.order)}
                     </div>
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
@@ -222,7 +226,7 @@ export function InvoicesClient() {
                         </Badge>
                       </div>
                       <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
-                        <span>{customerName(inv.order.customer)}</span>
+                        <span>{ticketName(inv.order)}</span>
                         <span className="text-muted-foreground/40">·</span>
                         <span>{date.toLocaleDateString()}</span>
                         <span className="text-muted-foreground/40">·</span>
@@ -236,7 +240,7 @@ export function InvoicesClient() {
                       {inv.payment && (
                         <div className="flex items-center gap-1 text-[10px] text-muted-foreground justify-end mt-0.5">
                           {methodIcons[inv.payment.method]}
-                          <span>{inv.payment.method}</span>
+                          <span>{paymentMethodLabel(inv.payment.method)}</span>
                         </div>
                       )}
                     </div>
@@ -320,7 +324,7 @@ export function InvoicesClient() {
                           {methodIcons[inv.payment.method] || <CreditCard className="h-3.5 w-3.5" />}
                         </div>
                         <div className="text-xs">
-                          <p className="font-medium">Paid via {inv.payment.method}</p>
+                          <p className="font-medium">Paid via {paymentMethodLabel(inv.payment.method)}</p>
                           <p className="text-muted-foreground">
                             {new Date(inv.payment.createdAt).toLocaleString()}
                             {inv.payment.reference && ` · Ref: ${inv.payment.reference}`}

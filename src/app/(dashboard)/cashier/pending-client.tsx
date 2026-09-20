@@ -6,7 +6,7 @@ import { ClipboardList, RefreshCw, User, Scissors, ArrowRight, Receipt, UserPlus
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
-import { customerName, customerInitials } from "@/lib/orders";
+import { ticketName, ticketInitials } from "@/lib/orders";
 import { formatMoney } from "@/lib/money";
 import { useOrderEvents } from "@/lib/use-order-events";
 
@@ -18,6 +18,7 @@ type Order = {
   startedAt: string;
   completedAt: string | null;
   customer: { id: string; firstName: string; lastName: string; phone: string | null } | null;
+  walkInName: string | null;
   server: { id: string; firstName: string; lastName: string };
   items: { id: string; unitPrice: number; quantity: number; service: { id: string; name: string } }[];
   products: { id: string; unitPrice: number; quantity: number; product: { id: string; name: string } }[];
@@ -119,14 +120,14 @@ export function CashierPendingClient() {
                 <div className="flex items-center gap-3">
                   {/* Avatar */}
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-emerald-100 to-teal-100 text-xs font-bold text-emerald-600">
-                    {customerInitials(order.customer)}
+                    {ticketInitials(order)}
                   </div>
 
                   {/* Info */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <p className="font-semibold text-sm truncate">
-                        {customerName(order.customer)}
+                        {ticketName(order)}
                       </p>
                       <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-amber-50 border border-amber-100 shrink-0">
                         <span className="h-1 w-1 rounded-full bg-amber-400 animate-pulse" />

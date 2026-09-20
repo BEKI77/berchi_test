@@ -26,16 +26,48 @@ export const ORDER_WITH = {
   invoice: { with: { payment: true } },
 } as const;
 
-/** A ticket opened by reception has no customer until someone attaches one. */
-export type CustomerLike = { firstName: string; lastName: string } | null | undefined;
+/**
+ * What every screen needs in order to name a ticket. walkInName has no `?` on
+ * purpose: a screen whose order type forgets it fails to compile, instead of
+ * quietly showing "Walk-in" for a customer who gave a name.
+ */
+export type NamedTicket = {
+  customer: { firstName: string; lastName: string } | null | undefined;
+  walkInName: string | null;
+};
 
-/** Display name for a ticket's customer, or "Walk-in" when none is attached. */
-export function customerName(c: CustomerLike): string {
-  return c ? `${c.firstName} ${c.lastName}`.trim() : "Walk-in";
+/**
+ * Who a ticket is for. A registered customer wins; otherwise the name given at
+ * reception; otherwise "Walk-in", because a name is asked for but not forced.
+ */
+export function ticketName(t: NamedTicket): string {
+  if (t.customer) return `${t.customer.firstName} ${t.customer.lastName}`.trim();
+  return t.walkInName?.trim() || "Walk-in";
 }
 
-/** Avatar initials for a ticket's customer. */
-export function customerInitials(c: CustomerLike): string {
-  if (!c) return "W";
-  return `${c.firstName?.[0] ?? ""}${c.lastName?.[0] ?? ""}` || "?";
+const MAX_WALK_IN_NAME = 100;
+
+/** Tidies a name typed at reception: trimmed, one space between words, or null if blank. */
+export function cleanWalkInName(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const name = value.replace(/\s+/g, " ").trim().slice(0, MAX_WALK_IN_NAME);
+  return name || null;
+}
+
+/** Avatar initials for a ticket. */
+export function ticketInitials(t: NamedTicket): string {
+  if (t.customer) {
+    return `${t.customer.firstName?.[0] ?? ""}${t.customer.lastName?.[0] ?? ""}` || "?";
+  }
+  const name = t.walkInName?.trim();
+  return name ? name.slice(0, 2).toUpperCase() : "W";
+}
+
+/**
+ * The trailing sequence, which is what staff actually say and write on the
+ * slip. ORD-20260823-0045 reads as "45".
+ */
+export function shortOrderNumber(orderNumber: string): string {
+  const tail = orderNumber.split("-").pop() ?? orderNumber;
+  return String(Number(tail) || tail);
 }

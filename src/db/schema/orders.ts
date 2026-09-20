@@ -10,6 +10,10 @@ export const serviceOrders = pgTable("service_orders", {
   id: uuid("id").primaryKey().defaultRandom(),
   orderNumber: varchar("order_number", { length: 32 }).unique().notNull(),
   customerId: uuid("customer_id").references(() => customers.id),
+  // The name the customer gave at reception. Kept on the ticket rather than as
+  // a customers row, so a walk-in called "Abebe" does not add another Abebe to
+  // the customer list every day. customerId, when set, takes precedence.
+  walkInName: varchar("walk_in_name", { length: 100 }),
   serverId: uuid("server_id").references(() => staff.id),
   appointmentId: uuid("appointment_id").references(() => appointments.id),
   status: orderStatusEnum("status").default("IN_PROGRESS").notNull(),

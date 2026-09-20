@@ -12,11 +12,8 @@ import type { DiscountType, PaymentMethod } from "@/db/schema";
 import { nextInvoiceNumber, getSalonTimezone } from "@/lib/order-numbers";
 import { isOrderEditable } from "@/lib/orders";
 import { publishOrderChange } from "@/lib/order-events";
+import { MANUAL_PAYMENT_METHODS } from "@/lib/payment-methods";
 
-// There is no online payment: the cashier confirms every payment by hand. The
-// CHAPA value still exists in the database enum for old records, but is not
-// accepted for new payments.
-const MANUAL_PAYMENT_METHODS: PaymentMethod[] = ["CASH", "CARD", "MOBILE"];
 import { toSantim, toBasisPoints, applyRate, sumSantim, formatMoney } from "@/lib/money";
 
 // POST: Checkout an order — create invoice + payment, update stock, log commissions
@@ -40,9 +37,10 @@ export async function POST(
     discountType,
     discountValue = 0,
     tipAmount = 0,
-    // Payment is confirmed by hand at the till. The Confirm Payment button
-    // sends no method, so this defaults to CASH; it stays in the payload so
-    // reporting can split by method if the till ever offers a choice.
+    // Payment is confirmed by hand at the till, and the cashier says how the
+    // customer paid. Cash is the default. There is no online payment, so only
+    // the methods in payment-methods.ts are accepted; CHAPA and CARD remain in
+    // the database enum purely so old records stay valid.
     paymentMethod = "CASH",
   }: {
     discountType?: DiscountType;

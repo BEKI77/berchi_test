@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { customerName, customerInitials } from "@/lib/orders";
+import { ticketName, ticketInitials } from "@/lib/orders";
 import { formatMoney, formatPercent } from "@/lib/money";
 
 type StaffDetail = {
@@ -44,6 +44,7 @@ type StaffDetail = {
     startedAt: string;
     completedAt: string | null;
     customer: { firstName: string; lastName: string } | null;
+    walkInName: string | null;
     items: { unitPrice: number; quantity: number; service: { name: string } }[];
     products: { unitPrice: number; quantity: number; product: { name: string } }[];
   }[];
@@ -206,11 +207,11 @@ export default function StaffDetailPage() {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3 min-w-0">
                         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-pink-50 text-pink-600 font-bold text-xs">
-                          {customerInitials(order.customer)}
+                          {ticketInitials(order)}
                         </div>
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
-                            <p className="text-sm font-medium truncate">{customerName(order.customer)}</p>
+                            <p className="text-sm font-medium truncate">{ticketName(order)}</p>
                             <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${statusColors[order.status] || ""}`}>
                               {order.status.replace(/_/g, " ")}
                             </Badge>

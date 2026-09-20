@@ -14,7 +14,11 @@ router only has to be on.
 
 **Does:** tickets, services, checkout, invoices, commissions and stock, all
 stored on the cashier PC and working with no internet. Payment is always
-confirmed by hand at the till; there is no online payment.
+confirmed by hand at the till, where the cashier taps how the customer paid
+(Cash, Mobile money or Bank transfer; Cash is the default). There is no online
+payment. The owner's reports show revenue split by method, so the cash figure
+can be compared with the drawer. (A dedicated end-of-day drawer summary is not
+built yet.)
 
 **Does not, yet:**
 
@@ -94,7 +98,35 @@ If it will not load:
 2. Is the salon network set to Private on the PC (step 3)?
 3. Is the app healthy? (`docker compose ... ps`)
 
-## 5. Backups
+## 5. Printing the number slip
+
+When the cashier types a name and taps **Issue ticket and print number**, a small
+slip prints with the big number, the name and the time. The customer takes it to
+their stylist, and it also settles who arrived first: the lower number came first.
+
+The slip is laid out 80 mm wide for a receipt printer. To set it up:
+
+1. Install the printer's Windows driver and make it the **default printer**, with
+   its paper size set to the 80 mm roll.
+2. To print without a dialog every time, start Chrome for the cashier with the
+   `--kiosk-printing` option. Right-click the Chrome shortcut, choose Properties,
+   and add it to the end of the Target box:
+
+   ```
+   "C:\Program Files\Google\Chrome\Application\chrome.exe" --kiosk-printing
+   ```
+
+   Then always open the system from that shortcut. Without the option, a print
+   dialog appears and the cashier presses Print.
+3. Issue a test ticket and check the slip. The **Print again** button reprints it.
+
+For a 58 mm printer, change `PAPER_WIDTH_MM` at the top of
+`src/app/slip/[orderId]/page.tsx` to 58 and rebuild.
+
+The slip page itself has been checked at 80 mm, but not yet on a real printer.
+Test with yours before opening day.
+
+## 6. Backups
 
 Everything is on this one PC's disk, so a backup on that same disk is not a
 backup. The nightly backup is copied into a **cloud-synced folder** (OneDrive,
@@ -142,7 +174,7 @@ restored PC will not be able to start.
 To restore from the cloud copy, download the newest `.dump` file to this PC first
 and point `-File` at it.
 
-## 6. Updating
+## 7. Updating
 
 Take a backup first, then:
 
@@ -154,7 +186,7 @@ docker compose -f docker-compose.cashier.yml --env-file .env.cashier up -d --bui
 Database changes are applied automatically. Do this outside opening hours; the app
 is unavailable for a minute while it restarts.
 
-## 7. Prove it survives an outage
+## 8. Prove it survives an outage
 
 Do this once, before relying on it. With a tablet on the Wi-Fi, unplug the
 router's **internet** cable (leave the router powered). Open a ticket on the

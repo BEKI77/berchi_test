@@ -10,13 +10,15 @@ import {
   CreditCard,
   Banknote,
   Smartphone,
+  Landmark,
   CheckCircle2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { customerName } from "@/lib/orders";
+import { ticketName } from "@/lib/orders";
 import { formatMoney, formatPercent } from "@/lib/money";
+import { paymentMethodLabel } from "@/lib/payment-methods";
 
 type ReceiptData = {
   id: string;
@@ -35,6 +37,7 @@ type ReceiptData = {
     orderNumber: string;
     startedAt: string;
     customer: { firstName: string; lastName: string; phone: string | null } | null;
+    walkInName: string | null;
     server: { firstName: string; lastName: string };
     items: { unitPrice: number; quantity: number; service: { name: string } }[];
     products: { unitPrice: number; quantity: number; product: { name: string } }[];
@@ -46,6 +49,7 @@ const methodIcons: Record<string, React.ReactNode> = {
   CASH: <Banknote className="h-4 w-4" />,
   CARD: <CreditCard className="h-4 w-4" />,
   MOBILE: <Smartphone className="h-4 w-4" />,
+  BANK_TRANSFER: <Landmark className="h-4 w-4" />,
 };
 
 export default function ReceiptPage() {
@@ -123,7 +127,7 @@ export default function ReceiptPage() {
           </div>
           <div className="flex justify-between text-xs mt-1">
             <span className="text-muted-foreground">Customer</span>
-            <span className="font-medium">{customerName(receipt.order.customer)}</span>
+            <span className="font-medium">{ticketName(receipt.order)}</span>
           </div>
           <div className="flex justify-between text-xs mt-1">
             <span className="text-muted-foreground">Server</span>
@@ -216,7 +220,7 @@ export default function ReceiptPage() {
                   {methodIcons[receipt.payment.method] || <CreditCard className="h-3.5 w-3.5" />}
                 </div>
                 <div>
-                  <span className="font-medium">Paid via {receipt.payment.method}</span>
+                  <span className="font-medium">Paid via {paymentMethodLabel(receipt.payment.method)}</span>
                   {receipt.payment.reference && (
                     <span className="text-muted-foreground ml-2">Ref: {receipt.payment.reference}</span>
                   )}

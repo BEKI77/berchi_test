@@ -44,7 +44,7 @@ export async function GET(
         columns: { id: true, quantity: true, unitPrice: true },
         with: {
           order: {
-            columns: { orderNumber: true, startedAt: true },
+            columns: { orderNumber: true, startedAt: true, walkInName: true },
             with: {
               customer: { columns: { firstName: true, lastName: true } },
               server: { columns: { firstName: true, lastName: true } },

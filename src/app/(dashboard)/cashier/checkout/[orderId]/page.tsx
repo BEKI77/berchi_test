@@ -10,6 +10,9 @@ import {
   User,
   Percent,
   DollarSign,
+  Banknote,
+  Smartphone,
+  Landmark,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,14 +20,23 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { customerName, customerInitials } from "@/lib/orders";
+import { ticketName, ticketInitials } from "@/lib/orders";
 import { formatMoney, formatPercent, toSantim, toBasisPoints, applyRate, fromSantim } from "@/lib/money";
+import { PAYMENT_METHODS, type ManualPaymentMethod } from "@/lib/payment-methods";
+
+const METHOD_ICONS: Record<ManualPaymentMethod, React.ReactNode> = {
+  CASH: <Banknote className="h-5 w-5" />,
+  MOBILE: <Smartphone className="h-5 w-5" />,
+  BANK_TRANSFER: <Landmark className="h-5 w-5" />,
+};
 
 type OrderItem = {
   id: string;
   unitPrice: number;
   quantity: number;
   service: { id: string; name: string };
+  // Who did the work. Tickets are shared, so this differs line by line.
+  staff: { id: string; firstName: string; lastName: string } | null;
 };
 
 type OrderProduct = {
@@ -47,6 +59,7 @@ type Order = {
     lastName: string;
     phone: string | null;
   } | null;
+  walkInName: string | null;
   server: { id: string; firstName: string; lastName: string };
   items: OrderItem[];
   products: OrderProduct[];
@@ -65,6 +78,8 @@ export default function CheckoutPage() {
   const [discountType, setDiscountType] = useState<DiscountType>(null);
   const [discountValue, setDiscountValue] = useState(0);
   const [tipAmount, setTipAmount] = useState(0);
+  // Cash unless the cashier taps otherwise: most customers pay cash.
+  const [paymentMethod, setPaymentMethod] = useState<ManualPaymentMethod>("CASH");
   // Basis points, as stored. 15% is 1500.
   const [taxRateBp, setTaxRateBp] = useState(0);
 
@@ -122,6 +137,8 @@ export default function CheckoutPage() {
     0
   );
   const subtotal = servicesSubtotal + productsSubtotal;
+  // The stylists who did the work, not whoever opened the ticket at reception.
+  const servedBy = [...new Set(order.items.map((i) => i.staff?.firstName).filter(Boolean))].join(", ");
   const taxAmount = applyRate(subtotal, taxRateBp);
   const discountAmount =
     discountType === "PERCENTAGE"
@@ -132,9 +149,8 @@ export default function CheckoutPage() {
   const tipSantim = toSantim(tipAmount);
   const total = subtotal + taxAmount - discountAmount + tipSantim;
 
-  // One action: record the payment and move on. The cashier does not pick a
-  // method -- the invoice records CASH by default, which is how the salon is
-  // paid. Payment is always confirmed by hand; there is no online payment.
+  // One action: record the payment and move on. The cashier confirms by hand
+  // how the customer paid (Cash unless changed); there is no online payment.
   async function confirmPayment() {
     setProcessing(true);
     try {
@@ -145,6 +161,7 @@ export default function CheckoutPage() {
           discountType,
           discountValue,
           tipAmount,
+          paymentMethod,
         }),
       });
 
@@ -165,7 +182,7 @@ export default function CheckoutPage() {
   }
 
   return (
-    <div className="space-y-5 pb-28">
+    <div className="space-y-5 pb-44">
       {/* Header */}
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="icon" onClick={() => router.push("/cashier")} className="rounded-xl hover:bg-emerald-50">
@@ -186,11 +203,11 @@ export default function CheckoutPage() {
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-linear-to-br from-emerald-100 to-teal-100 text-sm font-bold text-emerald-600 shrink-0">
-                {customerInitials(order.customer)}
+                {ticketInitials(order)}
               </div>
               <div>
                 <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Customer</p>
-                <p className="font-medium text-sm">{customerName(order.customer)}</p>
+                <p className="font-medium text-sm">{ticketName(order)}</p>
               </div>
             </div>
             <div className="flex items-center gap-3">
@@ -198,8 +215,8 @@ export default function CheckoutPage() {
                 <User className="h-4 w-4" />
               </div>
               <div>
-                <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Stylist</p>
-                <p className="font-medium text-sm">{order.server.firstName} {order.server.lastName}</p>
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Served by</p>
+                <p className="font-medium text-sm">{servedBy || "—"}</p>
               </div>
             </div>
           </div>
@@ -222,7 +239,10 @@ export default function CheckoutPage() {
             </div>
             {order.items.map((item) => (
               <div key={item.id} className="flex justify-between text-sm py-0.5">
-                <span>{item.service.name} {item.quantity > 1 && `x${item.quantity}`}</span>
+                <span>
+                  {item.service.name} {item.quantity > 1 && `x${item.quantity}`}
+                  {item.staff && <span className="text-xs text-muted-foreground"> · {item.staff.firstName}</span>}
+                </span>
                 <span className="font-medium">ETB {formatMoney((Number(item.unitPrice) * item.quantity))}</span>
               </div>
             ))}
@@ -359,7 +379,28 @@ export default function CheckoutPage() {
       </Card>
 
       {/* Process button */}
-      <div className="fixed bottom-0 left-0 right-0 md:left-64 p-4 bg-white/80 backdrop-blur-lg border-t border-emerald-100/50">
+      <div className="fixed bottom-0 left-0 right-0 md:left-64 p-4 space-y-3 bg-white/80 backdrop-blur-lg border-t border-emerald-100/50">
+        <div role="radiogroup" aria-label="How the customer paid" className="grid grid-cols-3 gap-2">
+          {PAYMENT_METHODS.map((m) => {
+            const selected = paymentMethod === m.value;
+            return (
+              <button
+                key={m.value}
+                type="button"
+                role="radio"
+                aria-checked={selected}
+                onClick={() => setPaymentMethod(m.value)}
+                className={`flex items-center justify-center gap-2 h-12 rounded-xl border-2 text-sm font-semibold transition-all duration-200 focus-visible:outline-2 focus-visible:outline-emerald-500 ${selected
+                  ? "border-emerald-500 bg-emerald-50 text-emerald-700"
+                  : "border-border text-muted-foreground hover:bg-muted"
+                  }`}
+              >
+                {METHOD_ICONS[m.value]}
+                {m.label}
+              </button>
+            );
+          })}
+        </div>
         <Button
           onClick={confirmPayment}
           disabled={processing}

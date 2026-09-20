@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { hasPermission } from "@/lib/permissions";
 import { serviceOrders } from "@/db/schema";
-import { ORDER_WITH, isOrderEditable } from "@/lib/orders";
+import { ORDER_WITH, isOrderEditable, cleanWalkInName } from "@/lib/orders";
 import { publishOrderChange } from "@/lib/order-events";
 
 // GET: One ticket, by id.
@@ -76,9 +76,10 @@ export async function PATCH(
     );
   }
 
-  const updates: { customerId?: string | null; notes?: string | null } = {};
+  const updates: { customerId?: string | null; notes?: string | null; walkInName?: string | null } = {};
   if ("customerId" in body) updates.customerId = body.customerId ?? null;
   if ("notes" in body) updates.notes = body.notes ?? null;
+  if ("walkInName" in body) updates.walkInName = cleanWalkInName(body.walkInName);
 
   if (Object.keys(updates).length === 0) {
     return NextResponse.json({ error: "Nothing to update" }, { status: 400 });

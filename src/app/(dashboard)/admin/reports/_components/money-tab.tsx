@@ -1,10 +1,11 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { Banknote, CreditCard, Smartphone, Wallet } from "lucide-react";
+import { Banknote, CreditCard, Landmark, Smartphone, Wallet } from "lucide-react";
 import type { ReportData } from "../types";
 import { Section } from "./section";
 import { formatMoney } from "@/lib/money";
+import { paymentMethodLabel } from "@/lib/payment-methods";
 
 type MoneyTabProps = {
   paymentMethods: ReportData["paymentMethods"];
@@ -16,12 +17,14 @@ const methodIcons: Record<string, ReactNode> = {
   CASH: <Banknote className="h-4 w-4" />,
   CARD: <CreditCard className="h-4 w-4" />,
   MOBILE: <Smartphone className="h-4 w-4" />,
+  BANK_TRANSFER: <Landmark className="h-4 w-4" />,
 };
 
 const methodColors: Record<string, string> = {
   CASH: "from-green-400 to-emerald-500",
   CARD: "from-blue-400 to-indigo-500",
   MOBILE: "from-orange-400 to-amber-500",
+  BANK_TRANSFER: "from-violet-400 to-purple-500",
   UNKNOWN: "from-gray-400 to-gray-500",
 };
 
@@ -62,7 +65,7 @@ export function MoneyTab({ paymentMethods, expenseByCategory, thisMonthExpenses 
                         {methodIcons[method] || <CreditCard className="h-3.5 w-3.5" />}
                       </div>
                       <div>
-                        <span className="font-medium">{method}</span>
+                        <span className="font-medium">{paymentMethodLabel(method)}</span>
                         <span className="text-[10px] text-muted-foreground ml-1">({pct.toFixed(0)}%)</span>
                       </div>
                     </div>

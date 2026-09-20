@@ -17,6 +17,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { formatMoney } from "@/lib/money";
+import { paymentMethodLabel } from "@/lib/payment-methods";
 
 type CustomerDetail = {
   customer: {
@@ -301,7 +302,7 @@ export default function CustomerDetailPage() {
                           {inv.payment && (
                             <>
                               <span className="text-muted-foreground/40">·</span>
-                              <span>{inv.payment.method}</span>
+                              <span>{paymentMethodLabel(inv.payment.method)}</span>
                             </>
                           )}
                           {Number(inv.tipAmount) > 0 && (

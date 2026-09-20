@@ -21,7 +21,7 @@ export async function GET() {
       orderBy: [desc(invoices.createdAt)],
       with: {
         order: {
-          columns: { orderNumber: true },
+          columns: { orderNumber: true, walkInName: true },
           with: {
             customer: { columns: { id: true, firstName: true, lastName: true, phone: true } },
             server: { columns: { id: true, firstName: true, lastName: true } },

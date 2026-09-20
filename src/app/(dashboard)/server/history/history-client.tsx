@@ -5,7 +5,7 @@ import { History, CheckCircle, Scissors, Package } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { customerName, customerInitials } from "@/lib/orders";
+import { ticketName, ticketInitials } from "@/lib/orders";
 import { formatMoney } from "@/lib/money";
 
 type Order = {
@@ -15,6 +15,7 @@ type Order = {
   startedAt: string;
   completedAt: string | null;
   customer: { id: string; firstName: string; lastName: string } | null;
+  walkInName: string | null;
   items: { id: string; unitPrice: number; quantity: number; service: { id: string; name: string } }[];
   products: { id: string; unitPrice: number; quantity: number; product: { id: string; name: string } }[];
 };
@@ -108,10 +109,10 @@ export function ServerHistoryClient({ userId }: { userId: string }) {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-pink-100 to-rose-100 text-sm font-bold text-pink-500 shrink-0">
-                        {customerInitials(order.customer)}
+                        {ticketInitials(order)}
                       </div>
                       <div>
-                        <p className="font-medium text-sm">{customerName(order.customer)}</p>
+                        <p className="font-medium text-sm">{ticketName(order)}</p>
                         <p className="text-xs text-muted-foreground">{order.orderNumber}</p>
                       </div>
                     </div>

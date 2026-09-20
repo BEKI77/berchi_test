@@ -41,7 +41,7 @@ export async function GET(
         where: eq(serviceOrders.serverId, staffId),
         orderBy: [desc(serviceOrders.startedAt)],
         limit: 50,
-        columns: { id: true, orderNumber: true, status: true, startedAt: true, completedAt: true },
+        columns: { id: true, orderNumber: true, status: true, startedAt: true, completedAt: true, walkInName: true },
         with: {
           customer: { columns: { firstName: true, lastName: true } },
           items: {

@@ -16,13 +16,20 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+New-Item -ItemType Directory -Force -Path $Dir | Out-Null
+$Dir = (Resolve-Path $Dir).Path
+
+# One line per run, kept next to the dumps, so a backup that quietly stopped
+# working can be spotted (backup-status.ps1 reads the dumps themselves).
+function Log($line) {
+    Add-Content -Path (Join-Path $Dir "backup.log") -Value ("{0}  {1}" -f (Get-Date -Format "yyyy-MM-dd HH:mm:ss"), $line)
+}
+
 function Fail($msg) {
+    Log "FAILED: $msg"
     Write-Host "BACKUP FAILED: $msg" -ForegroundColor Red
     exit 1
 }
-
-New-Item -ItemType Directory -Force -Path $Dir | Out-Null
-$Dir = (Resolve-Path $Dir).Path
 $name = "berchi-{0}.dump" -f (Get-Date -Format "yyyyMMdd-HHmmss")
 $target = Join-Path $Dir $name
 
@@ -44,6 +51,7 @@ if (-not $readable) { Remove-Item $target -Force; Fail "the dump could not be re
 
 $sizeKb = [math]::Round((Get-Item $target).Length / 1KB)
 Write-Host "Backup written: $target ($sizeKb KB)"
+Log "ok $name ($sizeKb KB)"
 
 if ($Copy) {
     try {

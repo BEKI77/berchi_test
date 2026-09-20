@@ -12,6 +12,11 @@ import type { DiscountType, PaymentMethod } from "@/db/schema";
 import { nextInvoiceNumber, getSalonTimezone } from "@/lib/order-numbers";
 import { isOrderEditable } from "@/lib/orders";
 import { publishOrderChange } from "@/lib/order-events";
+
+// There is no online payment: the cashier confirms every payment by hand. The
+// CHAPA value still exists in the database enum for old records, but is not
+// accepted for new payments.
+const MANUAL_PAYMENT_METHODS: PaymentMethod[] = ["CASH", "CARD", "MOBILE"];
 import { toSantim, toBasisPoints, applyRate, sumSantim, formatMoney } from "@/lib/money";
 
 // POST: Checkout an order — create invoice + payment, update stock, log commissions
@@ -35,18 +40,20 @@ export async function POST(
     discountType,
     discountValue = 0,
     tipAmount = 0,
-    // The till has a single Confirm Payment button and sends no method, so
-    // this defaults to CASH. It stays in the payload because the Chapa routes
-    // still pass CHAPA, and reporting can split by method if that is turned on.
+    // Payment is confirmed by hand at the till. The Confirm Payment button
+    // sends no method, so this defaults to CASH; it stays in the payload so
+    // reporting can split by method if the till ever offers a choice.
     paymentMethod = "CASH",
-    chapaTxRef,
   }: {
     discountType?: DiscountType;
     discountValue?: number;
     tipAmount?: number;
     paymentMethod?: PaymentMethod;
-    chapaTxRef?: string;
   } = body;
+
+  if (!MANUAL_PAYMENT_METHODS.includes(paymentMethod)) {
+    return NextResponse.json({ error: "Unknown payment method" }, { status: 400 });
+  }
 
   const order = await db.query.serviceOrders.findFirst({
     where: eq(serviceOrders.id, orderId),
@@ -157,7 +164,6 @@ export async function POST(
         invoiceId: invoice.id,
         method: paymentMethod,
         amount: totalAmount,
-        ...(chapaTxRef ? { chapaTxRef } : {}),
       })
       .returning();
 

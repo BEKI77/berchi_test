@@ -13,7 +13,8 @@ router only has to be on.
 ## What this does and does not do
 
 **Does:** tickets, services, checkout, invoices, commissions and stock, all
-stored on the cashier PC and working with no internet.
+stored on the cashier PC and working with no internet. Payment is always
+confirmed by hand at the till; there is no online payment.
 
 **Does not, yet:**
 
@@ -21,9 +22,6 @@ stored on the cashier PC and working with no internet.
   in the cloud reports, and the cloud app cannot see them. Syncing the two is a
   separate, later piece of work. Until then this PC is the only place today's
   business exists, which is why the backup step below is not optional.
-- **Chapa (online payment) will not complete from here.** Chapa's servers need to
-  call back to a public address, and a PC on the Wi-Fi has none. Cash and other
-  methods work normally.
 - **The public website and its booking form are unaffected** — they stay in the
   cloud.
 
@@ -98,26 +96,41 @@ If it will not load:
 
 ## 5. Backups
 
-Everything is on this one PC's disk. Set up a nightly backup that also copies to
-**a second place**: a USB drive that stays plugged in, a network share, or a
-folder that a cloud-sync app uploads.
+Everything is on this one PC's disk, so a backup on that same disk is not a
+backup. The nightly backup is copied into a **cloud-synced folder** (OneDrive,
+Google Drive or Dropbox), and the sync app uploads it.
 
-Try it once by hand:
+Before you start:
 
-```powershell
-.\scripts\backup.ps1 -Copy E:\berchi-backups
-```
+- Install the sync app on this PC and sign in with the **owner's** account, not
+  one shared with staff. The backups contain customer names and phone numbers.
+- Check the app is running and set to start when Windows starts.
 
-It refuses to call a backup good unless it can read it back, and it exits with an
-error if the second copy fails. Then schedule it (Administrator PowerShell; change
-the paths to match yours):
+Then, in PowerShell in the project folder:
 
 ```powershell
-schtasks /Create /SC DAILY /ST 22:30 /TN "Berchi backup" /TR "powershell -NoProfile -ExecutionPolicy Bypass -File C:\berchi-salon\scripts\backup.ps1 -Copy E:\berchi-backups"
+.\scripts\install-backup-task.ps1
 ```
 
-Old backups are removed after 30 days. Backups do not include `.env.cashier` — keep
-that separately.
+It finds your sync folder (or pass `-Copy "D:\MyDrive\berchi-backups"`), schedules
+a backup for 22:30 every night, and takes one straight away to prove it works. If
+the PC is off at 22:30, the backup runs as soon as it is next switched on. Each
+backup is checked by reading it back, and old ones are cleared after 30 days.
+
+**Look at your cloud account once** and confirm the file really arrived there. The
+scripts can only see this PC's side of the sync.
+
+To check on it any time:
+
+```powershell
+.\scripts\backup-status.ps1
+```
+
+It reports how old the newest backup is in both places, and says so if the
+schedule is missing or a night was missed. Run it every week or two.
+
+Backups do not include `.env.cashier`. Keep a copy of that somewhere safe, or a
+restored PC will not be able to start.
 
 **Practise restoring before you need it.** Restoring replaces everything:
 
@@ -125,6 +138,9 @@ that separately.
 .\scripts\restore.ps1 -File .\backups\berchi-20260920-223000.dump          # only explains
 .\scripts\restore.ps1 -File .\backups\berchi-20260920-223000.dump -Yes     # does it
 ```
+
+To restore from the cloud copy, download the newest `.dump` file to this PC first
+and point `-File` at it.
 
 ## 6. Updating
 

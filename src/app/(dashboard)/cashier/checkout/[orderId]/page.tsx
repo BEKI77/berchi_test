@@ -134,7 +134,7 @@ export default function CheckoutPage() {
 
   // One action: record the payment and move on. The cashier does not pick a
   // method -- the invoice records CASH by default, which is how the salon is
-  // paid. The Chapa routes remain in the repo, unused, if that ever changes.
+  // paid. Payment is always confirmed by hand; there is no online payment.
   async function confirmPayment() {
     setProcessing(true);
     try {

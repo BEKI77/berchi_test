@@ -87,10 +87,33 @@ connection). On a Public network the rule above does nothing.
 
 ## 4. Connect a tablet
 
-On a tablet joined to the salon Wi-Fi, open `http://192.168.1.50:3000` (use your
-own address), sign in, and add the page to the home screen.
+On a tablet joined to the salon Wi-Fi, open `http://192.168.1.50:3000/tablet` (use
+your own address) and add that page to the home screen.
 
-If it will not load:
+### How stylists sign in
+
+Several stylists can share one tablet. Each one taps **their name**, then enters
+their **4-digit PIN**, and they are in. There is no email or password to type.
+
+- **The owner sets each PIN** under **Staff**: edit the stylist and fill in
+  *Tablet PIN*. Stylists without a PIN do not appear on the tablet. Obvious PINs
+  such as 0000 or 1234 are refused.
+- **A PIN opens the stylist screens only.** It can never open the cashier or the
+  owner's screens, so a PIN that gets guessed cannot reach money or reports.
+  Cashiers and the owner keep signing in with email and password (there is a
+  link for that at the bottom of the tablet screen).
+- **Five wrong PINs lock that stylist for 5 minutes.** The tablet says so. The
+  owner can unlock someone straight away by setting them a new PIN.
+- **The tablet hands itself over.** It signs the stylist out when they tap
+  *Finish & Send to Cashier*, or after 3 minutes with no touch, and returns to
+  the names. *Done · switch stylist* at the top does the same by hand. Nothing is
+  lost: every service is saved the moment it is added.
+- **Only on the salon PC.** PIN sign-in is turned on by `ENABLE_PIN_LOGIN=true`
+  in `.env.cashier` (already set in the template). It is deliberately off
+  anywhere reachable from the internet, because a 4-digit PIN is only safe behind
+  the salon's own Wi-Fi. To change the idle time, set `PIN_IDLE_MINUTES`.
+
+If the page will not load:
 
 1. Can the tablet reach the PC at all? Many routers have **AP / client isolation**
    (sometimes called "guest network" or "wireless isolation") that stops devices

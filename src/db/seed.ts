@@ -2,7 +2,7 @@ import bcrypt from "bcryptjs";
 import dotenv from "dotenv";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import * as schema from "./schema";
 import { toSantim, toBasisPoints } from "../lib/money";
 
@@ -35,6 +35,15 @@ async function main() {
           commissionRate: toBasisPoints(s.commissionRate),
         });
       }
+    }
+
+    // Demo PINs for the shared-tablet sign-in. Only fills in a missing PIN.
+    const demoPins: Record<string, string> = { "server1@berchi.com": "2468", "server2@berchi.com": "1357" };
+    for (const [email, pin] of Object.entries(demoPins)) {
+      await db
+        .update(schema.staff)
+        .set({ pinHash: await bcrypt.hash(pin, 10) })
+        .where(and(eq(schema.staff.email, email), isNull(schema.staff.pinHash)));
     }
 
     console.log("✅ Staff created");
@@ -195,8 +204,8 @@ async function main() {
     console.log("\n🎉 Seed completed!");
     console.log("\n📋 Login credentials (all passwords: password123):");
     console.log("   Owner:   owner@berchi.com");
-    console.log("   Server1: server1@berchi.com");
-    console.log("   Server2: server2@berchi.com");
+    console.log("   Server1: server1@berchi.com   (tablet PIN 2468)");
+    console.log("   Server2: server2@berchi.com   (tablet PIN 1357)");
     console.log("   Cashier: cashier@berchi.com");
   } catch (e) {
     console.error(e);

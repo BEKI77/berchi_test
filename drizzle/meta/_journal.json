@@ -71,6 +71,13 @@
       "when": 1789899950599,
       "tag": "0009_walk_in_name_and_bank_transfer",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1789901821226,
+      "tag": "0010_staff_pin",
+      "breakpoints": true
     }
   ]
 }

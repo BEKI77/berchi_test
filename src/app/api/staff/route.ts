@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { hasPermission } from "@/lib/permissions";
 import { staff } from "@/db/schema";
 import { toBasisPoints } from "@/lib/money";
+import { pinProblem } from "@/lib/pin-config";
+import { setStaffPin } from "@/lib/pin";
 
 export async function GET() {
   const session = await auth();
@@ -29,6 +31,8 @@ export async function GET() {
         commissionRate: staff.commissionRate,
         isActive: staff.isActive,
         createdAt: staff.createdAt,
+        // Whether a tablet PIN is set. Never the hash itself.
+        hasPin: sql<boolean>`${staff.pinHash} is not null`,
       })
       .from(staff)
       .orderBy(desc(staff.createdAt));
@@ -52,10 +56,21 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json();
-    const { firstName, lastName, email, phone, role, commissionRate, password } = body;
+    const { firstName, lastName, email, phone, role, commissionRate, password, pin } = body;
 
     if (!firstName || !lastName || !email || !role || !password) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    }
+
+    const settingPin = typeof pin === "string" && pin !== "";
+    if (settingPin) {
+      if (role !== "SERVER") {
+        return NextResponse.json({ error: "PINs are for stylists only" }, { status: 400 });
+      }
+      const problem = pinProblem(pin);
+      if (problem) {
+        return NextResponse.json({ error: problem }, { status: 400 });
+      }
     }
 
     const [existing] = await db.select().from(staff).where(eq(staff.email, email)).limit(1);
@@ -78,6 +93,8 @@ export async function POST(req: Request) {
         passwordHash,
       })
       .returning();
+
+    if (settingPin) await setStaffPin(newStaff.id, pin);
 
     return NextResponse.json({ id: newStaff.id, firstName: newStaff.firstName, lastName: newStaff.lastName });
   } catch (error) {

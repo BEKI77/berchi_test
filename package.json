@@ -18,7 +18,8 @@
     "test:e2e-checkout": "npx tsx scripts/e2e-checkout.mts",
     "test:money": "npx tsx scripts/verify-money.ts",
     "test:sse": "npx tsx scripts/verify-sse.mts",
-    "test:registration": "npx tsx scripts/verify-registration.mts"
+    "test:registration": "npx tsx scripts/verify-registration.mts",
+    "test:pin": "npx tsx scripts/verify-pin.mts"
   },
   "dependencies": {
     "@base-ui/react": "^1.4.0",

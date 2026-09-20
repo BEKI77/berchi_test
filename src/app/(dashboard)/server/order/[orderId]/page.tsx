@@ -27,6 +27,7 @@ import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { ticketName } from "@/lib/orders";
 import { formatMoney } from "@/lib/money";
+import { endTabletSession, useSessionMode } from "@/components/layout/session-mode";
 
 type ServiceConsumable = {
   productId: string;
@@ -93,6 +94,7 @@ type ProductOption = {
 
 export default function ActiveOrderPage() {
   const router = useRouter();
+  const { pinSession } = useSessionMode();
   const params = useParams();
   const orderId = params.orderId as string;
 
@@ -326,6 +328,12 @@ export default function ActiveOrderPage() {
         throw new Error(data.error);
       }
       toast.success("Order sent to cashier!");
+      // On the shared tablet, sending is the end of this stylist's turn: hand
+      // the tablet back to the name picker for whoever is next.
+      if (pinSession) {
+        await endTabletSession();
+        return;
+      }
       router.push("/server");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to send order");

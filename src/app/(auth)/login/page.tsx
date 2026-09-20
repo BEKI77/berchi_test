@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Scissors, Sparkles, Heart } from "lucide-react";
@@ -14,6 +15,15 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  // The tablet sign-in exists only where the salon has turned PIN sign-in on
+  // (the salon PC), so the link appears only there.
+  const [pinAvailable, setPinAvailable] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/tablet/staff", { cache: "no-store" })
+      .then((r) => setPinAvailable(r.ok))
+      .catch(() => setPinAvailable(false));
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -136,6 +146,15 @@ export default function LoginPage() {
                 )}
               </Button>
             </form>
+
+            {pinAvailable && (
+              <p className="mt-6 text-center text-sm text-muted-foreground">
+                Stylist on the shared tablet?{" "}
+                <Link href="/tablet" className="font-semibold text-rose-600 underline underline-offset-2">
+                  Sign in with your PIN
+                </Link>
+              </p>
+            )}
           </div>
         </div>
       </div>

@@ -10,8 +10,9 @@ export const authConfig: NextAuthConfig = {
     maxAge: 8 * 60 * 60, // 8 hours — one shift
   },
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, account }) {
       if (user) {
+        token.signedInWith = account?.provider === "pin" ? "pin" : "password";
         token.id = user.id;
         token.email = user.email!;
         token.firstName = (user as SessionUser).firstName;
@@ -28,6 +29,7 @@ export const authConfig: NextAuthConfig = {
         firstName: token.firstName as string,
         lastName: token.lastName as string,
         role: token.role as SessionUser["role"],
+        signedInWith: token.signedInWith as SessionUser["signedInWith"],
       };
       return session;
     },

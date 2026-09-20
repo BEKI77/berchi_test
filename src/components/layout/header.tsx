@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { MobileNav } from "./mobile-nav";
+import { endTabletSession } from "./session-mode";
 import { cn } from "@/lib/utils";
 import type { SessionUser } from "@/types";
 
@@ -35,6 +36,11 @@ export function Header({ user }: { user: SessionUser }) {
   const role = roleConfig[user.role];
 
   async function handleSignOut() {
+    // On the shared tablet, "done" hands it to the next stylist.
+    if (user.signedInWith === "pin") {
+      await endTabletSession();
+      return;
+    }
     await signOut({ redirect: false });
     router.push("/login");
     router.refresh();
@@ -87,9 +93,11 @@ export function Header({ user }: { user: SessionUser }) {
                   </div>
                   <div className="flex flex-col">
                     <span className="font-semibold">{user.firstName} {user.lastName}</span>
-                    <span className="text-xs text-muted-foreground font-normal">
-                      {user.email}
-                    </span>
+                    {user.signedInWith !== "pin" && (
+                      <span className="text-xs text-muted-foreground font-normal">
+                        {user.email}
+                      </span>
+                    )}
                   </div>
                 </div>
               </DropdownMenuLabel>
@@ -113,7 +121,7 @@ export function Header({ user }: { user: SessionUser }) {
           className="hidden sm:flex items-center gap-2 rounded-xl text-rose-500 border-rose-200/60 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-300 transition-all duration-200"
         >
           <LogOut className="h-3.5 w-3.5" />
-          Log Out
+          {user.signedInWith === "pin" ? "Done · switch stylist" : "Log Out"}
         </Button>
       </div>
     </header>

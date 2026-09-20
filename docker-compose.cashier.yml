@@ -60,6 +60,8 @@ services:
       # Tablets and the cashier reach this server by different addresses, so
       # the host is taken from each request rather than pinned to one AUTH_URL.
       AUTH_TRUST_HOST: "true"
+      ENABLE_PIN_LOGIN: ${ENABLE_PIN_LOGIN:-true}
+      PIN_IDLE_MINUTES: ${PIN_IDLE_MINUTES:-}
       SALON_SITE_CODE: ${SALON_SITE_CODE:-}
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3000/login"]

@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { formatPercent, fromBasisPoints } from "@/lib/money";
+import { PIN_LENGTH } from "@/lib/pin-config";
 
 type Staff = {
   id: string;
@@ -27,6 +28,7 @@ type Staff = {
   role: string;
   commissionRate: number;
   isActive: boolean;
+  hasPin: boolean;
   createdAt: string;
 };
 
@@ -38,6 +40,7 @@ type FormData = {
   role: string;
   commissionRate: number;
   password: string;
+  pin: string;
 };
 
 const emptyForm: FormData = {
@@ -48,6 +51,7 @@ const emptyForm: FormData = {
   role: "SERVER",
   commissionRate: 0,
   password: "",
+  pin: "",
 };
 
 export function StaffClient() {
@@ -92,6 +96,7 @@ export function StaffClient() {
       role: s.role,
       commissionRate: fromBasisPoints(s.commissionRate),
       password: "",
+      pin: "",
     });
     setShowForm(true);
   }
@@ -112,6 +117,7 @@ export function StaffClient() {
       const method = editingId ? "PATCH" : "POST";
       const body: Record<string, unknown> = { ...form };
       if (!body.password) delete body.password;
+      if (!body.pin) delete body.pin;
 
       const res = await fetch(url, {
         method,
@@ -131,6 +137,22 @@ export function StaffClient() {
       toast.error(err instanceof Error ? err.message : "Failed");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function removePin(s: Staff) {
+    if (!window.confirm(`Remove ${s.firstName}'s PIN? They will not be able to sign in on the shared tablet.`)) return;
+    try {
+      const res = await fetch(`/api/staff/${s.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clearPin: true }),
+      });
+      if (!res.ok) throw new Error();
+      toast.success("PIN removed");
+      await fetchStaff();
+    } catch {
+      toast.error("Failed to remove PIN");
     }
   }
 
@@ -252,6 +274,39 @@ export function StaffClient() {
                 <Input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder={editingId ? "Leave blank to keep" : ""} className="rounded-xl border-violet-100" />
               </div>
             </div>
+            {form.role === "SERVER" && (
+              <div className="space-y-1.5 rounded-xl border border-violet-100 bg-violet-50/40 p-3">
+                <Label htmlFor="staff-pin" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  Tablet PIN
+                </Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    id="staff-pin"
+                    inputMode="numeric"
+                    autoComplete="off"
+                    maxLength={PIN_LENGTH}
+                    value={form.pin}
+                    onChange={(e) => setForm({ ...form, pin: e.target.value.replace(/\D/g, "").slice(0, PIN_LENGTH) })}
+                    placeholder={`${PIN_LENGTH} digits`}
+                    className="w-32 rounded-xl border-violet-100 bg-white text-center text-lg tracking-[0.4em]"
+                  />
+                  {editingId && staff.find((x) => x.id === editingId)?.hasPin && (
+                    <button
+                      type="button"
+                      onClick={() => { const s = staff.find((x) => x.id === editingId); if (s) removePin(s); }}
+                      className="text-xs font-medium text-red-500 hover:underline"
+                    >
+                      Remove PIN
+                    </button>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {editingId && staff.find((x) => x.id === editingId)?.hasPin
+                    ? "A PIN is set. Type a new one to change it or to unlock this stylist."
+                    : "Lets this stylist sign in on the shared tablet by picking their name."}
+                </p>
+              </div>
+            )}
             <Button onClick={handleSubmit} disabled={saving} className="w-full h-11 rounded-xl bg-gradient-to-r from-violet-500 to-purple-500 hover:from-violet-600 hover:to-purple-600 shadow-md shadow-violet-200/30">
               {saving ? "Saving..." : editingId ? "Update Staff" : "Create Staff"}
             </Button>
@@ -278,6 +333,11 @@ export function StaffClient() {
                   <span className={`text-[10px] font-semibold px-2 py-1 rounded-full border ${roleColors[s.role] || "bg-gray-50 text-gray-600 border-gray-200"}`}>
                     {s.role}
                   </span>
+                  {s.role === "SERVER" && (
+                    <span className={`text-[10px] font-medium ${s.hasPin ? "text-emerald-600" : "text-muted-foreground"}`}>
+                      {s.hasPin ? "PIN set" : "no PIN"}
+                    </span>
+                  )}
                   {s.commissionRate > 0 && (
                     <span className="text-[10px] font-medium text-muted-foreground">{formatPercent(s.commissionRate)}</span>
                   )}

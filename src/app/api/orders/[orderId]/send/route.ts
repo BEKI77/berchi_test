@@ -5,6 +5,7 @@ import { db } from "@/db";
 import { hasPermission } from "@/lib/permissions";
 import { serviceOrders } from "@/db/schema";
 import { ORDER_WITH } from "@/lib/orders";
+import { publishOrderChange } from "@/lib/order-events";
 
 // POST: Flag a ticket as ready for the cashier.
 //
@@ -60,5 +61,6 @@ export async function POST(
     with: ORDER_WITH,
   });
 
+  publishOrderChange();
   return NextResponse.json(updated);
 }

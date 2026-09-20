@@ -5,6 +5,7 @@ import { db } from "@/db";
 import { hasPermission } from "@/lib/permissions";
 import { serviceOrders } from "@/db/schema";
 import { ORDER_WITH, isOrderEditable } from "@/lib/orders";
+import { publishOrderChange } from "@/lib/order-events";
 
 // GET: One ticket, by id.
 //
@@ -90,5 +91,6 @@ export async function PATCH(
     with: ORDER_WITH,
   });
 
+  publishOrderChange();
   return NextResponse.json(updated);
 }

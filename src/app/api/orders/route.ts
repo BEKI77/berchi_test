@@ -7,6 +7,7 @@ import { serviceOrders } from "@/db/schema";
 import type { OrderStatus } from "@/db/schema";
 import { ORDER_WITH, EDITABLE_ORDER_STATUSES } from "@/lib/orders";
 import { nextOrderNumber, getSalonTimezone, resolveOrderNumber } from "@/lib/order-numbers";
+import { publishOrderChange } from "@/lib/order-events";
 
 const DEFAULT_LIMIT = 200;
 const MAX_LIMIT = 500;
@@ -114,5 +115,6 @@ export async function POST(req: Request) {
     with: ORDER_WITH,
   });
 
+  publishOrderChange();
   return NextResponse.json(fullOrder, { status: 201 });
 }

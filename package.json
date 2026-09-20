@@ -16,7 +16,8 @@
     "db:studio": "npx drizzle-kit studio",
     "db:verify-orders": "npx tsx src/db/verify_order_workflow.ts",
     "test:e2e-checkout": "npx tsx scripts/e2e-checkout.mts",
-    "test:money": "npx tsx scripts/verify-money.ts"
+    "test:money": "npx tsx scripts/verify-money.ts",
+    "test:sse": "npx tsx scripts/verify-sse.mts"
   },
   "dependencies": {
     "@base-ui/react": "^1.4.0",

@@ -5,6 +5,7 @@ import { db } from "@/db";
 import { hasPermission } from "@/lib/permissions";
 import { serviceOrders, services, serviceOrderItems, staff } from "@/db/schema";
 import { isOrderEditable } from "@/lib/orders";
+import { publishOrderChange } from "@/lib/order-events";
 
 // POST: Add a service line to a ticket.
 //
@@ -81,6 +82,7 @@ export async function POST(
     },
   });
 
+  publishOrderChange();
   return NextResponse.json(fullItem, { status: 201 });
 }
 
@@ -129,5 +131,6 @@ export async function DELETE(
     return NextResponse.json({ error: "Item not found on this ticket" }, { status: 404 });
   }
 
+  publishOrderChange();
   return NextResponse.json({ success: true });
 }

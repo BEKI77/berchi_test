@@ -11,6 +11,7 @@ import {
 import type { DiscountType, PaymentMethod } from "@/db/schema";
 import { nextInvoiceNumber, getSalonTimezone } from "@/lib/order-numbers";
 import { isOrderEditable } from "@/lib/orders";
+import { publishOrderChange } from "@/lib/order-events";
 import { toSantim, toBasisPoints, applyRate, sumSantim, formatMoney } from "@/lib/money";
 
 // POST: Checkout an order — create invoice + payment, update stock, log commissions
@@ -264,5 +265,6 @@ export async function POST(
     return { invoice, payment };
   });
 
+  publishOrderChange();
   return NextResponse.json(result);
 }

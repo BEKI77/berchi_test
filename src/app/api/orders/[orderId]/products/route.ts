@@ -5,6 +5,7 @@ import { db } from "@/db";
 import { hasPermission } from "@/lib/permissions";
 import { serviceOrders, products, serviceOrderProducts } from "@/db/schema";
 import { isOrderEditable } from "@/lib/orders";
+import { publishOrderChange } from "@/lib/order-events";
 
 // POST: Add a retail product to a ticket.
 export async function POST(
@@ -101,6 +102,7 @@ export async function POST(
     with: { product: { columns: { id: true, name: true } } },
   });
 
+  publishOrderChange();
   return NextResponse.json(orderProduct, { status: 201 });
 }
 
@@ -152,5 +154,6 @@ export async function DELETE(
     return NextResponse.json({ error: "Product not found on this ticket" }, { status: 404 });
   }
 
+  publishOrderChange();
   return NextResponse.json({ success: true });
 }

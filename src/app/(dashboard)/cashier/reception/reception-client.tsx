@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Ticket, Plus, RefreshCw, Clock, Scissors, ArrowRight, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
 import { formatMoney } from "@/lib/money";
 import { customerName } from "@/lib/orders";
+import { useOrderEvents } from "@/lib/use-order-events";
 
 type Order = {
   id: string;
@@ -57,11 +58,8 @@ export function ReceptionClient() {
     }
   }, []);
 
-  useEffect(() => {
-    fetchOpen();
-    const interval = setInterval(fetchOpen, 15000);
-    return () => clearInterval(interval);
-  }, [fetchOpen]);
+  // Fires on connect and on every ticket change, so no separate initial fetch.
+  useOrderEvents(fetchOpen);
 
   async function issueTicket() {
     setIssuing(true);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { ClipboardList, RefreshCw, User, Scissors, ArrowRight, Receipt, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
 import { customerName, customerInitials } from "@/lib/orders";
 import { formatMoney } from "@/lib/money";
+import { useOrderEvents } from "@/lib/use-order-events";
 
 type Order = {
   id: string;
@@ -40,11 +41,8 @@ export function CashierPendingClient() {
     }
   }, []);
 
-  useEffect(() => {
-    fetchOrders();
-    const interval = setInterval(fetchOrders, 15000);
-    return () => clearInterval(interval);
-  }, [fetchOrders]);
+  // Fires on connect and on every ticket change, so no separate initial fetch.
+  useOrderEvents(fetchOrders);
 
   function getOrderTotal(order: Order) {
     const services = order.items.reduce((s, i) => s + Number(i.unitPrice) * i.quantity, 0);

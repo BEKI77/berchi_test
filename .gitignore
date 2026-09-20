@@ -44,3 +44,7 @@ next-env.d.ts
 
 # Keep the documented template in version control
 !.env.example
+!.env.cashier.example
+
+# Database backups hold business data
+/backups/

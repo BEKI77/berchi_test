@@ -4,4 +4,6 @@ node_modules
 .gitignore
 *.md
 .env*
-drizzle
+!.env.example
+docs
+backups

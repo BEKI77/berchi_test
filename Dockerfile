@@ -8,23 +8,20 @@ COPY package.json package-lock.json* ./
 RUN npm ci
 
 # ── Build ───────────────────────────────────────────────────
+# No secrets are baked in here: the app reads DATABASE_URL and AUTH_SECRET when
+# it starts, so the image can be built once and configured per machine.
 FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-
-# Build-time env vars (override via docker-compose or --build-arg)
-ARG DATABASE_URL
-ARG NEXTAUTH_SECRET
-ARG NEXTAUTH_URL
-ARG WEBSITE_URL
-
-ENV DATABASE_URL=$DATABASE_URL
-ENV NEXTAUTH_SECRET=$NEXTAUTH_SECRET
-ENV NEXTAUTH_URL=$NEXTAUTH_URL
-ENV WEBSITE_URL=$WEBSITE_URL
-
 RUN npm run build
+
+# ── Tools ───────────────────────────────────────────────────
+# One-shot jobs that run before the app: apply migrations, create the owner.
+# Kept out of the runtime image because they need drizzle-kit and tsx.
+FROM builder AS tools
+ENV NODE_ENV=production
+CMD ["sh", "-c", "npx drizzle-kit migrate && npx tsx src/db/bootstrap.ts"]
 
 # ── Runner ──────────────────────────────────────────────────
 FROM base AS runner

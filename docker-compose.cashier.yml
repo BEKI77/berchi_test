@@ -1,0 +1,72 @@
+# The full stack for the cashier PC: database, one-time setup, and the app.
+#
+#   docker compose -f docker-compose.cashier.yml --env-file .env.cashier up -d --build
+#
+# The other docker-compose.yml is for development and runs only Postgres.
+# Setup steps and the reasoning behind them are in docs/CASHIER_PC.md.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: berchi-cashier-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: berchi
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env.cashier}
+      POSTGRES_DB: berchi_salon
+    # Deliberately not published. Only the app, on this compose network, can
+    # reach the database -- tablets and other PCs on the Wi-Fi cannot.
+    volumes:
+      - cashier_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U berchi -d berchi_salon"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Runs once per `up`: applies migrations, creates the owner if there is none,
+  # then exits. Both steps are safe to repeat.
+  setup:
+    build:
+      context: .
+      target: tools
+    container_name: berchi-cashier-setup
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://berchi:${POSTGRES_PASSWORD}@postgres:5432/berchi_salon
+      OWNER_EMAIL: ${OWNER_EMAIL:-}
+      OWNER_PASSWORD: ${OWNER_PASSWORD:-}
+      OWNER_FIRST_NAME: ${OWNER_FIRST_NAME:-}
+      OWNER_LAST_NAME: ${OWNER_LAST_NAME:-}
+      SALON_NAME: ${SALON_NAME:-}
+
+  app:
+    build:
+      context: .
+      target: runner
+    container_name: berchi-cashier-app
+    restart: unless-stopped
+    depends_on:
+      setup:
+        condition: service_completed_successfully
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    environment:
+      DATABASE_URL: postgres://berchi:${POSTGRES_PASSWORD}@postgres:5432/berchi_salon
+      AUTH_SECRET: ${AUTH_SECRET:?set AUTH_SECRET in .env.cashier}
+      # Tablets and the cashier reach this server by different addresses, so
+      # the host is taken from each request rather than pinned to one AUTH_URL.
+      AUTH_TRUST_HOST: "true"
+      SALON_SITE_CODE: ${SALON_SITE_CODE:-}
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3000/login"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+volumes:
+  cashier_pgdata:

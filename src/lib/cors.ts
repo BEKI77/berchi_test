@@ -6,8 +6,11 @@ const ALLOWED_ORIGINS = [
   "https://berchibeauty.com", // production website
   "http://localhost:3001", // local website dev
   "http://localhost:3002",
-  "*",
 ].filter(Boolean);
+
+// Only the public website's routes use this. Staff screens are served by the
+// same server that answers their API calls, so tablets on the salon LAN are
+// same-origin and never need an entry here.
 
 export function corsHeaders(origin?: string | null) {
   const headers: Record<string, string> = {

@@ -1,0 +1,24 @@
+[package]
+name = "berchi-cashier"
+version = "0.1.0"
+description = "The Berchi Salon cashier's desktop window"
+authors = ["Berchi"]
+edition = "2021"
+
+[lib]
+name = "berchi_cashier_lib"
+crate-type = ["rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-single-instance = "2"
+
+[profile.release]
+codegen-units = 16
+lto = "thin"
+opt-level = "s"
+panic = "abort"
+strip = true

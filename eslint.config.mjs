@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // The Tauri cashier app: its own project, not part of the web app.
+    "desktop/**",
   ]),
 ]);
 

@@ -1,0 +1,80 @@
+/* Offline on purpose: no web fonts, no images fetched from anywhere. */
+* { box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #fdf2f8 0%, #fff1f2 50%, #fdf4ff 100%);
+  color: #1f2937;
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+}
+
+main {
+  max-width: 34rem;
+  padding: 2rem;
+  text-align: center;
+}
+
+.logo {
+  width: 5rem;
+  height: 5rem;
+  margin: 0 auto 1.25rem;
+  padding: 1.15rem;
+  border-radius: 1.4rem;
+  color: #fff;
+  background: linear-gradient(135deg, #f472b6, #e11d48);
+  box-shadow: 0 10px 25px rgba(225, 29, 72, 0.25);
+}
+
+.logo svg { width: 100%; height: 100%; }
+
+h1 {
+  margin: 0 0 1.75rem;
+  font-size: 1.9rem;
+  color: #be185d;
+}
+
+.spinner {
+  width: 2.5rem;
+  height: 2.5rem;
+  margin: 0 auto 1.25rem;
+  border: 3px solid #fbcfe8;
+  border-top-color: #ec4899;
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.status { margin: 0; font-size: 1.15rem; }
+
+.hint {
+  margin: 1.75rem 0 0;
+  padding: 1rem 1.25rem;
+  border: 1px solid #fde68a;
+  border-radius: 0.9rem;
+  background: #fffbeb;
+  color: #92400e;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  text-align: left;
+}
+
+.hint[hidden] { display: none; }
+
+code {
+  padding: 0.1rem 0.35rem;
+  border-radius: 0.3rem;
+  background: rgba(0, 0, 0, 0.06);
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 0.9em;
+}
+
+/* The page shown when berchi-url.txt does not hold a usable address. */
+.problem { border-color: #fecaca; background: #fef2f2; color: #991b1b; }

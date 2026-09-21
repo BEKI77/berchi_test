@@ -1,0 +1,13 @@
+{
+  "name": "berchi-cashier-desktop",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "tauri": "tauri",
+    "verify": "node scripts/verify-shell.mjs"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2"
+  }
+}

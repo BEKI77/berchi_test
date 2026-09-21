@@ -1,0 +1,170 @@
+// Launches the real berchi-cashier.exe and checks how it behaves, by driving its
+// web view through WebView2's debug port. (BERCHI_WEBVIEW_ARGS is the program's
+// own knob for passing that port in.)
+//
+//   cd desktop
+//   cargo build --manifest-path src-tauri/Cargo.toml     # once, or after a change
+//   SALON_URL=http://localhost:3000 npm run verify        # the salon system must be running
+//
+// Windows only. Silent printing is deliberately NOT exercised: it would print on
+// the default printer. The test only checks that the option is passed.
+import { spawn, execSync } from "node:child_process";
+import fs from "node:fs";
+import http from "node:http";
+import net from "node:net";
+import os from "node:os";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+const EXE = process.env.SHELL_EXE ?? path.join(HERE, "../src-tauri/target/debug/berchi-cashier.exe");
+const SALON = process.env.SALON_URL ?? "http://localhost:3000";
+const SALON_ORIGIN = new URL(SALON).origin;
+const DEBUG_PORT = 9444;
+const which = process.argv[2] ?? "all";
+
+if (!fs.existsSync(EXE)) {
+  console.error(`Cannot find ${EXE}. Build it first (see the top of this file).`);
+  process.exit(2);
+}
+
+let failures = 0;
+const check = (name, ok, detail = "") => {
+  console.log(`  ${ok ? "PASS" : "FAIL"}  ${name}${ok ? "" : "  <- " + detail}`);
+  if (!ok) failures++;
+};
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const killApp = () => { try { execSync("taskkill /IM berchi-cashier.exe /F", { stdio: "ignore" }); } catch { /* not running */ } };
+
+function launch(env = {}, exe = EXE) {
+  killApp();
+  return spawn(exe, [], {
+    env: { ...process.env, BERCHI_WEBVIEW_ARGS: `--remote-debugging-port=${DEBUG_PORT}`, ...env },
+    stdio: "ignore",
+  });
+}
+
+async function attach() {
+  for (let i = 0; i < 60; i++) {
+    try {
+      const list = await (await fetch(`http://127.0.0.1:${DEBUG_PORT}/json/list`)).json();
+      const page = list.find((t) => t.type === "page");
+      if (page) {
+        const ws = new WebSocket(page.webSocketDebuggerUrl);
+        await new Promise((resolve, reject) => { ws.onopen = resolve; ws.onerror = reject; });
+        let id = 0;
+        const pending = new Map();
+        ws.onmessage = (e) => { const m = JSON.parse(e.data); if (m.id && pending.has(m.id)) { pending.get(m.id)(m); pending.delete(m.id); } };
+        const send = (method, params = {}) => new Promise((res) => { const i2 = ++id; pending.set(i2, res); ws.send(JSON.stringify({ id: i2, method, params })); });
+        const evalJs = async (expr) => (await send("Runtime.evaluate", { expression: expr, returnByValue: true, awaitPromise: true })).result?.result?.value;
+        return { evalJs, close: () => ws.close() };
+      }
+    } catch { /* not up yet */ }
+    await sleep(500);
+  }
+  throw new Error("could not attach to the web view");
+}
+
+async function waitFor(fn, ms) {
+  const start = Date.now();
+  while (Date.now() - start < ms) {
+    try { if (await fn()) return Date.now() - start; } catch { /* keep trying */ }
+    await sleep(400);
+  }
+  return null;
+}
+
+// A port nothing is listening on.
+const freePort = () => new Promise((resolve) => {
+  const s = net.createServer().listen(0, "127.0.0.1", () => { const { port } = s.address(); s.close(() => resolve(port)); });
+});
+
+const powershell = (command) => execSync(`powershell -NoProfile -ExecutionPolicy Bypass -Command "${command.replace(/"/g, '\\"')}"`).toString().trim();
+
+// ---------------------------------------------------------------------------
+if (which === "all" || which === "A") {
+  console.log(`\nA. The salon system is up (${SALON}): the window opens it`);
+  const app = launch({ BERCHI_URL: SALON });
+  const page = await attach();
+  const took = await waitFor(async () => (await page.evalJs("location.origin")) === SALON_ORIGIN, 20000);
+  check("hands over from the Starting screen to the salon system", took !== null, await page.evalJs("location.href"));
+  await sleep(1500);
+  check("it is the real app (login screen)", (await page.evalJs("document.body.innerText")).includes("Sign In"));
+
+  const win = execSync(`powershell -NoProfile -ExecutionPolicy Bypass -File "${path.join(HERE, "winstate.ps1")}"`).toString().trim();
+  check("the window opens maximized (Windows says so)", win.includes("maximized=True"), win);
+  check("the window is titled Berchi Cashier", win.includes("title=Berchi Cashier"), win);
+
+  await page.evalJs("location.href = 'https://example.com/'");
+  await sleep(3000);
+  check("it refuses to navigate away from the salon system", (await page.evalJs("location.origin")) === SALON_ORIGIN, await page.evalJs("location.href"));
+
+  const args = powershell("(Get-CimInstance Win32_Process -Filter \"Name='msedgewebview2.exe'\" | Where-Object { $_.CommandLine -like '*com.berchi.cashier*' } | Select-Object -First 1).CommandLine");
+  check("web view was started with silent printing (--kiosk-printing)", args.includes("--kiosk-printing"), args.slice(0, 200));
+  check("...and kept Tauri's own default options", args.includes("--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection"), args.slice(0, 200));
+
+  console.log("\nB. A second launch does not open a second cashier");
+  spawn(EXE, [], { env: { ...process.env, BERCHI_URL: SALON }, stdio: "ignore" });
+  await sleep(4000);
+  const count = powershell("@(Get-Process berchi-cashier -ErrorAction SilentlyContinue).Count");
+  check("only one program is running", count === "1", `count=${count}`);
+  page.close(); app.kill(); killApp();
+}
+
+if (which === "all" || which === "C") {
+  console.log("\nC. The salon system is down, then comes up, then goes away");
+  const port = await freePort();
+  let fake = null;
+  const startFake = () => new Promise((r) => {
+    fake = http.createServer((q, s) => { s.writeHead(200, { "content-type": "text/html" }); s.end("<title>fake salon</title><h1>fake salon system</h1>"); }).listen(port, "127.0.0.1", r);
+  });
+  const stopFake = () => new Promise((r) => { fake.closeAllConnections?.(); fake.close(r); });
+
+  const app = launch({ BERCHI_URL: `http://localhost:${port}` });
+  const page = await attach();
+  await sleep(2500);
+  check("with nothing answering, it shows the Starting screen", (await page.evalJs("document.body.innerText")).includes("Starting the salon system"), await page.evalJs("location.href"));
+  check("the hint is not shown yet", (await page.evalJs("document.getElementById('hint').hidden")) === true);
+
+  await startFake();
+  const up = await waitFor(async () => (await page.evalJs("location.origin")) === `http://localhost:${port}`, 15000);
+  check("it carries on by itself once the server answers", up !== null, await page.evalJs("location.href"));
+
+  await stopFake();
+  const back = await waitFor(async () => (await page.evalJs("document.body.innerText")).includes("Starting the salon system"), 30000);
+  check("it goes back to the Starting screen when the server goes away", back !== null, await page.evalJs("location.href"));
+  if (back !== null) console.log(`     noticed after ${(back / 1000).toFixed(1)}s`);
+
+  console.log("     waiting 32s to see the hint...");
+  await sleep(32000);
+  check("after 30 seconds a hint appears", (await page.evalJs("document.getElementById('hint').hidden")) === false);
+  page.close(); app.kill(); killApp();
+}
+
+if (which === "all" || which === "D") {
+  console.log("\nD. A bad address");
+  const app = launch({ BERCHI_URL: "not an address" });
+  const page = await attach();
+  await sleep(2500);
+  const text = await page.evalJs("document.body.innerText");
+  check("it says the address cannot be used, and does not sit waiting", text.includes("not one this program can use"), text.slice(0, 120));
+  page.close(); app.kill(); killApp();
+}
+
+if (which === "all" || which === "E") {
+  console.log("\nE. The address can come from berchi-url.txt next to the program");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "berchi-exe-"));
+  const copy = path.join(dir, "berchi-cashier.exe");
+  fs.copyFileSync(EXE, copy);
+  fs.writeFileSync(path.join(dir, "berchi-url.txt"), `# the salon computer\n\n${SALON}\n`);
+  const app = launch({ BERCHI_URL: "" }, copy);
+  const page = await attach();
+  const took = await waitFor(async () => (await page.evalJs("location.origin")) === SALON_ORIGIN, 20000);
+  check("the file's address is used", took !== null, await page.evalJs("location.href"));
+  page.close(); app.kill(); killApp();
+  fs.rmSync(dir, { recursive: true, force: true });
+}
+
+killApp();
+console.log(failures === 0 ? "\nAll checks passed.\n" : `\n${failures} check(s) FAILED.\n`);
+process.exit(failures === 0 ? 0 : 1);

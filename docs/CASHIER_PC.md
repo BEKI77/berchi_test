@@ -132,8 +132,9 @@ The slip is laid out 80 mm wide for a receipt printer. To set it up:
 1. Install the printer's Windows driver and make it the **default printer**, with
    its paper size set to the 80 mm roll.
 2. To print without a dialog every time, start Chrome for the cashier with the
-   `--kiosk-printing` option. Right-click the Chrome shortcut, choose Properties,
-   and add it to the end of the Target box:
+   `--kiosk-printing` option. (If you use the desktop window in the next section,
+   it already prints without a dialog, so skip this step.) Right-click the Chrome
+   shortcut, choose Properties, and add it to the end of the Target box:
 
    ```
    "C:\Program Files\Google\Chrome\Application\chrome.exe" --kiosk-printing
@@ -149,7 +150,43 @@ For a 58 mm printer, change `PAPER_WIDTH_MM` at the top of
 The slip page itself has been checked at 80 mm, but not yet on a real printer.
 Test with yours before opening day.
 
-## 6. Backups
+## 6. The desktop window (optional)
+
+Instead of a browser tab, the cashier can use **Berchi Cashier**, a small desktop
+program that shows the same screens in its own window. It is built and described in
+[desktop/README.md](../desktop/README.md); in short, on a PC with Rust installed:
+
+```powershell
+cd desktop
+npm install
+npm run tauri build
+```
+
+That produces an installer (`Berchi Cashier_0.1.0_x64-setup.exe`) to run on the
+cashier PC. It installs for that Windows user only, and needs no administrator
+rights.
+
+What it gives over a browser tab:
+
+- It shows **Starting the salon system...** while the PC is still starting, and
+  carries on by itself when the system is ready. If the system restarts (an
+  update), it goes back to that screen within about 10 seconds instead of showing
+  a browser error.
+- The number slip prints **straight to the default printer, with no dialog**.
+- It only ever shows the salon system, opens once, and has no address bar to
+  wander off with.
+
+To have it start with Windows, put a shortcut to it in the folder that
+`Win + R`, `shell:startup` opens. If the salon system is not on port 3000, put its
+address in a file called `berchi-url.txt` next to the program.
+
+**This is a window, not the offline rewrite.** The database and the server still
+run in Docker on the same PC, and the window needs them. The earlier idea of a
+Tauri program with its own database and no Docker has not been started.
+
+The stylists' tablets keep using the browser (`/tablet`); this is for the PC.
+
+## 7. Backups
 
 Everything is on this one PC's disk, so a backup on that same disk is not a
 backup. The nightly backup is copied into a **cloud-synced folder** (OneDrive,
@@ -197,7 +234,7 @@ restored PC will not be able to start.
 To restore from the cloud copy, download the newest `.dump` file to this PC first
 and point `-File` at it.
 
-## 7. Updating
+## 8. Updating
 
 Take a backup first, then:
 
@@ -209,7 +246,7 @@ docker compose -f docker-compose.cashier.yml --env-file .env.cashier up -d --bui
 Database changes are applied automatically. Do this outside opening hours; the app
 is unavailable for a minute while it restarts.
 
-## 8. Prove it survives an outage
+## 9. Prove it survives an outage
 
 Do this once, before relying on it. With a tablet on the Wi-Fi, unplug the
 router's **internet** cable (leave the router powered). Open a ticket on the

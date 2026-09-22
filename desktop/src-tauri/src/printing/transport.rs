@@ -21,9 +21,9 @@ use super::settings::Connection;
 /// is not left watching a spinner when it is switched off.
 const NETWORK_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
 
-/// The name Windows shows in the print queue for one of our tickets. (On Linux
-/// the queue is CUPS, which names the job itself.)
-#[cfg_attr(not(windows), allow(dead_code))]
+/// The name Windows shows in the print queue for one of our tickets. CUPS is
+/// told the same thing, in [`super::cups`].
+#[cfg(windows)]
 const JOB_NAME: &str = "Berchi ticket";
 
 /// Any of the ways a printer can be attached, as one type.
@@ -115,9 +115,7 @@ pub fn open(connection: &Connection) -> Result<Transport, String> {
                 .map_err(|err| format!("Cannot open {path} at {baud_rate} baud: {err}"))
         }
 
-        Connection::Device { path } => FileDriver::open(std::path::Path::new(path))
-            .map(Transport::Device)
-            .map_err(|err| format!("Cannot write to {path}: {err}")),
+        Connection::Device { path } => open_device(path),
 
         #[cfg(windows)]
         Connection::UsbClass { device_path } => {
@@ -138,6 +136,49 @@ pub fn open(connection: &Connection) -> Result<Transport, String> {
                 .into(),
         ),
     }
+}
+
+/// Opens a printer that is written to as a file.
+///
+/// On unix this is how a USB receipt printer with no queue is reached
+/// (`/dev/usb/lp0`), and it is opened **write only**. `escpos` would open it for
+/// reading as well, which a printer node need not allow -- a parallel port in
+/// the usual mode does not -- and nothing here ever reads from a printer, so
+/// asking for it can only turn a working printer into a failure.
+fn open_device(path: &str) -> Result<Transport, String> {
+    let location = std::path::Path::new(path);
+
+    #[cfg(unix)]
+    let opened = {
+        let mut options = std::fs::OpenOptions::new();
+        // Append rather than write: a device node ignores the difference, and a
+        // plain file used for diagnosing collects the tickets instead of each
+        // one wiping the last.
+        options.append(true);
+        FileDriver::open_with_options(location, &options)
+    };
+    #[cfg(not(unix))]
+    let opened = FileDriver::open(location);
+
+    opened.map(Transport::Device).map_err(|err| explain_device(path, err))
+}
+
+/// Why a device path would not open, in words the till can act on.
+fn explain_device(path: &str, err: escpos::errors::PrinterError) -> String {
+    let plain = format!("Cannot write to {path}: {err}");
+
+    // The one failure worth naming the cure for. On Fedora, Debian and nearly
+    // every other distribution these nodes belong to the `lp` group, and an
+    // account outside it is refused with nothing to say what would fix it.
+    #[cfg(unix)]
+    if path.starts_with("/dev/") && err.to_string().to_lowercase().contains("permission denied") {
+        return format!(
+            "{plain}. This account is not allowed to use that printer. Add it to the printer \
+             group and sign in again:  sudo usermod -aG lp $USER"
+        );
+    }
+
+    plain
 }
 
 // ---------------------------------------------------------------------------
@@ -299,43 +340,14 @@ unsafe fn write_job(
     result
 }
 
-/// Hands one finished ticket to CUPS.
+/// Hands one finished ticket to CUPS, on Linux and macOS.
 ///
-/// The salon runs on Windows; this exists so the whole printing path can be
-/// built and tried on the machine it is developed on, rather than only being
-/// discovered to be wrong once it is on a till.
+/// Everything about the conversation -- the raw option, the job name, and the
+/// check that the queue has not been stopped -- lives in [`super::cups`], so
+/// that the settings window and the till agree about what a queue is doing.
 #[cfg(not(windows))]
 fn send_to_queue(printer: &str, ticket: &[u8]) -> Result<(), String> {
-    use std::io::Write;
-    use std::process::{Command, Stdio};
-
-    let mut child = Command::new("lp")
-        .args(["-d", printer, "-o", "raw"])
-        .stdin(Stdio::piped())
-        .stdout(Stdio::null())
-        .stderr(Stdio::piped())
-        .spawn()
-        .map_err(|err| format!("Cannot run lp to print to \"{printer}\": {err}"))?;
-
-    child
-        .stdin
-        .take()
-        .ok_or_else(|| "lp would not take the ticket".to_string())?
-        .write_all(ticket)
-        .map_err(|err| format!("Cannot send the ticket to \"{printer}\": {err}"))?;
-
-    let finished = child
-        .wait_with_output()
-        .map_err(|err| format!("lp did not finish: {err}"))?;
-
-    if finished.status.success() {
-        Ok(())
-    } else {
-        Err(format!(
-            "lp refused the ticket: {}",
-            String::from_utf8_lossy(&finished.stderr).trim()
-        ))
-    }
+    super::cups::send(printer, ticket)
 }
 
 /// A Rust string as Windows wants it: UTF-16, null terminated.

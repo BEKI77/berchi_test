@@ -23,9 +23,12 @@ browser handles badly:
   on this PC, in a window the program opens itself: see
   [Setting up the printer](#setting-up-the-printer).
 - **With no printer set up it still prints**, the older way: the page goes
-  straight to whichever printer Windows has as its default, with no dialog.
-  That is also what happens if the receipt printer is switched off or out of
-  paper, so a half-finished setup never stops reception issuing tickets.
+  straight to the computer's default printer. That is also what happens if the
+  receipt printer is switched off or out of paper, so a half-finished setup
+  never stops reception issuing tickets. **On Windows** it goes with no dialog.
+  **On Linux and macOS** the web view has no silent-printing option, so that
+  path stops to ask for every customer &mdash; which makes setting a printer up
+  here the thing to do on those tills, not an optional extra.
 - **It cannot wander off:** the window only ever shows the salon server. The
   only thing the salon's pages may ask the program to do is print a ticket,
   open the cash drawer or open the printer settings window &mdash; they cannot
@@ -47,15 +50,21 @@ off, or a deployed domain and the internet is down, so is everything.
 
 ## Build and install
 
-You need Rust, the Visual Studio C++ build tools and the WebView2 runtime (all
-already on the development PC). From this folder:
+The same command builds it everywhere; what comes out is whatever that
+operating system installs:
 
-```powershell
+```bash
 npm install
 npm run tauri build
 ```
 
-The first build takes several minutes. It produces:
+The first build takes several minutes. For development, `cd src-tauri; cargo
+build` makes a faster debug build, on any platform.
+
+### Windows
+
+Needs Rust, the Visual Studio C++ build tools and the WebView2 runtime (all
+already on the development PC). It produces:
 
 - `src-tauri\target\release\berchi-cashier.exe`: the program on its own.
 - `src-tauri\target\release\bundle\nsis\Berchi Cashier_0.1.0_x64-setup.exe`: an
@@ -65,7 +74,55 @@ The first build takes several minutes. It produces:
 The installer is not code-signed, so Windows SmartScreen may say "unknown
 publisher": choose *More info*, then *Run anyway*.
 
-For development, `cd src-tauri; cargo build` makes a faster debug build.
+### Linux
+
+Needs Rust and the web view Tauri builds against. On Fedora:
+
+```bash
+sudo dnf install webkit2gtk4.1-devel libsoup3-devel gtk3-devel \
+                 openssl-devel curl wget file
+# and, to print at all:
+sudo dnf install cups cups-client
+sudo systemctl enable --now cups
+```
+
+On Debian and Ubuntu the same packages are `libwebkit2gtk-4.1-dev`,
+`libsoup-3.0-dev`, `libgtk-3-dev`, `libssl-dev` and `cups`.
+
+The build produces `src-tauri/target/release/berchi-cashier` and, under
+`src-tauri/target/release/bundle/`, an `.rpm` and a `.deb`.
+
+An AppImage is not built by default because on a current Fedora it fails: the
+`strip` that `linuxdeploy` carries is older than the `.relr.dyn` section modern
+libraries use, and it stops the whole build after the other bundles are already
+made. Skipping the strip builds it fine, so it is one command away when it is
+wanted:
+
+```bash
+NO_STRIP=true npm run tauri build -- --bundles appimage
+```
+
+**Put the cashier's account in the printer group**, once, on every Linux till:
+
+```bash
+sudo usermod -aG lp $USER    # then sign out and back in
+```
+
+Without it a receipt printer reached by device path (`/dev/usb/lp0`) is refused
+with *permission denied*. Printing through a CUPS queue does not need it. The
+*Add* list says which of the two a printer is, and says so against any device it
+cannot write to.
+
+### macOS
+
+Needs Rust and the Xcode command line tools (`xcode-select --install`). The
+build produces a `.app` and a `.dmg` under
+`src-tauri/target/release/bundle/`. A USB receipt printer is added under *System
+Settings → Printers & Scanners* first, and then appears under **Add**.
+
+The Linux and macOS bundle targets are set in `src-tauri/tauri.linux.conf.json`
+and `src-tauri/tauri.macos.conf.json`, which Tauri merges over
+`tauri.conf.json` for the platform being built.
 
 ### Or let GitHub build it
 
@@ -169,11 +226,15 @@ receipt printer is actually wired:
 
 | What is offered | When it is the right one |
 |---|---|
-| A printer installed in Windows | Its vendor driver is installed and it appears in *Printers & scanners*. The bytes go through the print queue, so the queue, the offline warning and every other program's access to it keep working. This is the usual answer, and the Windows default printer is offered first. |
+| A printer installed on this computer | Its driver is installed and it has a print queue &mdash; *Printers & scanners* on Windows, a CUPS queue on Linux and macOS. The bytes go through the queue as a raw job, so the queue, the offline warning and every other program's access to it keep working. This is the usual answer, and the system default printer is offered first. |
 | On the network | It has an Ethernet socket or Wi-Fi. Port 9100 on nearly every receipt printer. Set up by hand, because a printer on the network cannot be found by looking at this PC. |
-| Plugged in by USB, no driver installed | Windows picked it up with its own `usbprint.sys` class driver because nobody installed the disc. It has no print queue, but it is a perfectly good ESC/POS printer. |
-| On a serial (COM) port | Older tills. The baud rate has to match the printer, which is usually set with dip switches underneath it. |
-| A device path | The escape hatch, written to directly as a file. |
+| Plugged in by USB, no driver installed | **Windows only.** Windows picked it up with its own `usbprint.sys` class driver because nobody installed the disc. It has no print queue, but it is a perfectly good ESC/POS printer. On Linux the same printer is a device path; the option is greyed out there rather than hidden, so a settings file copied from a Windows till still reads correctly. |
+| On a serial port | Older tills. `COM1` on Windows, `/dev/ttyUSB0` or `/dev/ttyS0` on Linux. The baud rate has to match the printer, which is usually set with dip switches underneath it. Linux declares 32 serial ports whether or not the hardware exists, so only the ones with a real UART behind them are offered. |
+| A device path, or plugged in by USB on Linux | Written to directly as a file. On Windows this is the escape hatch. **On Linux it is a main road**: a USB receipt printer with no CUPS queue is `/dev/usb/lp0`, and for many tills it is the only thing that works. The list says when this account is not allowed to write to one. |
+
+The words in the window follow the computer it is running on, so a Fedora till
+is not told about *Printers & scanners* and a Windows one is not told about
+`cupsenable`.
 
 ### The settings that matter
 
@@ -346,6 +407,10 @@ page to the Windows default printer, and the rows about the dialog apply.
 | Every ticket wastes a hand's length of paper | The cut amount is too large. Lower it the same way. |
 | Strange characters where a name should be | A thermal printer holds a 256-character table and **Amharic is in none of them**, on any printer. Names in Amharic print as `?`. Accented Latin letters print without their accents, so `René` comes out as `Rene`. |
 | Nothing comes out, and the message mentions the print queue | *Settings → Printers & scanners* — the printer is offline, out of paper, or has a job stuck in its queue. |
+| **Linux:** "The print queue … is stopped, so nothing sent to it will print" | CUPS stops a queue as soon as one job fails, and then goes on *accepting* jobs into the void. Fix whatever failed, then `cupsenable <queue>`. The *Add* list also marks a stopped queue, and a ticket is refused rather than silently swallowed. `lpstat -p` shows the state and `journalctl -u cups` the reason. |
+| **Linux:** "This account is not allowed to use that printer" | A device path such as `/dev/usb/lp0` belongs to the `lp` group. `sudo usermod -aG lp $USER`, then sign out and back in — a new terminal is not enough, the group is read at login. |
+| **Linux:** the ticket prints as pages of `ESC @` gibberish | Something sent it without `-o raw`, so CUPS ran it through the `texttotext` filter and typeset the ESC/POS. Printing from *Printer setup* always passes raw; printing the ticket by hand with `lp` does not unless you say so. |
+| **Linux:** the printer disappears from *Add* after a failed job | The CUPS `usb` backend detaches the `usblp` kernel driver while it prints and sometimes fails to put it back, which takes `/dev/usb/lp0` with it. Unplugging and replugging the printer brings it back; so does `sudo modprobe -r usblp && sudo modprobe usblp`. |
 | Nothing comes out, and the message mentions a port or an address | A network printer that is off or has changed address, or a USB printer another program is holding open. |
 | The ticket prints as readable gibberish, full of `ESC` and `@` | The printer is being driven as a page rather than raw. For a Windows printer the job is sent as RAW, so this points at a driver that does not pass raw data through — set that printer up as *plugged in by USB* or *on the network* instead. |
 | The ticket is too wide, or wraps in odd places | The characters per line is wrong for the roll. Print a test: it has a ruler across it, and if the last digits fall off the edge or wrap, the number is too high. |
@@ -450,9 +515,12 @@ paper rather than by the screen.
 - `src-tauri/src/printing/`: everything about printing a ticket.
   - `settings.rs`: what this PC knows about its printers, and reading and
     writing `printers.json`.
-  - `discovery.rs`: what printers this PC can see.
+  - `discovery.rs`: what printers this PC can see, on all three platforms.
   - `transport.rs`: getting bytes to a printer, including the Windows print
     spooler, which `escpos` has no driver for.
+  - `cups.rs`: the Linux and macOS half of that — the `lp` and `lpstat`
+    conversation, run in the C locale so it can be read back on a PC set up in
+    any language, and the check that refuses a queue CUPS has stopped.
   - `doc.rs`: a ticket described rather than printed, and the column arithmetic.
   - `ticket.rs`: what the salon system sends, and the two templates.
   - `render.rs`: a described ticket as ESC/POS, or as characters for the

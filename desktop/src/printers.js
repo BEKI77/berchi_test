@@ -18,9 +18,101 @@ const state = {
   chosen: null, // printer id
   sample: "receipt",
   unsaved: false,
+  // Until the program says otherwise. Asked for in start(), and every word on
+  // this page that differs between operating systems comes from it.
+  platform: "windows",
 };
 
 const $ = (id) => document.getElementById(id);
+
+// ---------------------------------------------------------------------------
+// The words for this computer
+// ---------------------------------------------------------------------------
+
+// The same window runs on a Windows till, a Fedora one and a Mac, and the three
+// do not share a vocabulary. A printer is installed in *Printers & scanners* or
+// it is a CUPS queue; a serial port is COM1 or /dev/ttyUSB0; a USB printer with
+// no driver is a Windows class-driver device or a node under /dev/usb.
+//
+// Getting this wrong is not cosmetic. A page that says "Windows" on a Fedora PC
+// reads as a program that does not support the computer it is running on, and
+// the setting somebody needed -- a device path -- is the one they never try.
+const WORDS = {
+  windows: {
+    systemPrinter: "A printer installed in Windows",
+    describeSystem: (name) => `Windows printer "${name}"`,
+    systemHint:
+      "Exactly as it is spelt in Windows, under Printers & scanners. " +
+      "Add is the easier way to get this right.",
+    defaultBadge: "Windows default",
+    serial: "On a serial (COM) port",
+    serialPlaceholder: "COM1",
+    serialHint: "COM1, COM3, and so on.",
+    device: "A device path",
+    devicePlaceholder: "\\\\.\\LPT1",
+    deviceHint: "Written to directly, as a file.",
+    nothingFound:
+      "Nothing found attached to this computer. A printer on the network is set up by hand.",
+    noPrinters:
+      "No printer set up yet. Until one is, tickets print the old way — through the " +
+      "window, to whichever printer Windows has as its default.",
+  },
+
+  linux: {
+    systemPrinter: "A print queue on this computer (CUPS)",
+    describeSystem: (name) => `print queue "${name}"`,
+    systemHint:
+      "The queue name, exactly as CUPS spells it -- lpstat -a lists them. " +
+      "Add is the easier way to get this right.",
+    defaultBadge: "System default",
+    serial: "On a serial port",
+    serialPlaceholder: "/dev/ttyUSB0",
+    serialHint: "/dev/ttyUSB0 for a USB adapter, /dev/ttyS0 for a built-in port.",
+    // On Linux this is not the escape hatch it is on Windows: a receipt printer
+    // plugged in with no CUPS queue is reached exactly this way, and for many
+    // tills it is the only way that works.
+    device: "Plugged in by USB, or another device path",
+    devicePlaceholder: "/dev/usb/lp0",
+    deviceHint:
+      "/dev/usb/lp0 for a USB receipt printer with no queue. If printing is refused, " +
+      "this account needs the printer group:  sudo usermod -aG lp $USER  then sign in again.",
+    nothingFound:
+      "Nothing found attached to this computer. Check the printer is switched on and plugged " +
+      "in, or set one up by hand from its network address or device path.",
+    // Worth saying outright rather than leaving to be discovered: silent
+    // printing through the window is a Windows-only web view option, so on
+    // Linux the fallback stops to ask which printer, for every customer.
+    noPrinters:
+      "No printer set up yet, so tickets fall back to printing through the window — which " +
+      "on Linux stops to ask, for every customer. Set a printer up here and they print by " +
+      "themselves.",
+  },
+
+  macos: {
+    systemPrinter: "A printer set up on this Mac",
+    describeSystem: (name) => `print queue "${name}"`,
+    systemHint:
+      "The queue name, as it appears under System Settings -> Printers & Scanners. " +
+      "Add is the easier way to get this right.",
+    defaultBadge: "System default",
+    serial: "On a serial port",
+    serialPlaceholder: "/dev/cu.usbserial",
+    serialHint: "Usually /dev/cu.something for a USB adapter.",
+    device: "A device path",
+    devicePlaceholder: "/dev/cu.usbmodem",
+    deviceHint: "Written to directly, as a file.",
+    nothingFound:
+      "Nothing found attached to this computer. A USB receipt printer on macOS is added under " +
+      "System Settings -> Printers & Scanners first, or set one up by its network address.",
+    noPrinters:
+      "No printer set up yet, so tickets fall back to printing through the window — which " +
+      "on macOS stops to ask, for every customer. Set a printer up here and they print by " +
+      "themselves.",
+  },
+};
+
+/** The words for the computer this is running on. */
+const words = () => WORDS[state.platform] ?? WORDS.windows;
 
 // ---------------------------------------------------------------------------
 // Talking to the program
@@ -50,7 +142,7 @@ const chosenPrinter = () => state.settings.printers.find((p) => p.id === state.c
 function describe(connection) {
   switch (connection.kind) {
     case "systemPrinter":
-      return `Windows printer "${connection.name}"`;
+      return words().describeSystem(connection.name);
     case "network":
       return `${connection.host} on port ${connection.port}`;
     case "usbClass":
@@ -156,12 +248,7 @@ function drawConnectionFields() {
 
   switch (connection.kind) {
     case "systemPrinter":
-      text(
-        "Printer name",
-        "name",
-        "Exactly as it is spelt in Windows, under Printers & scanners. " +
-          "Add is the easier way to get this right.",
-      );
+      text("Printer name", "name", words().systemHint);
       break;
 
     case "network":
@@ -184,7 +271,7 @@ function drawConnectionFields() {
       break;
 
     case "serial":
-      text("Port", "path", "COM1, COM3, and so on.", { placeholder: "COM1" });
+      text("Port", "path", words().serialHint, { placeholder: words().serialPlaceholder });
       text(
         "Baud rate",
         "baudRate",
@@ -194,7 +281,7 @@ function drawConnectionFields() {
       break;
 
     case "device":
-      text("Path", "path", "Written to directly, as a file.", { placeholder: "/dev/usb/lp0" });
+      text("Path", "path", words().deviceHint, { placeholder: words().devicePlaceholder });
       break;
   }
 }
@@ -359,8 +446,7 @@ async function openAddDialog() {
   }
 
   if (found.printers.length === 0) {
-    $("looking").textContent =
-      "Nothing found attached to this computer. A printer on the network is set up by hand.";
+    $("looking").textContent = words().nothingFound;
     $("looking").hidden = false;
     return;
   }
@@ -375,7 +461,7 @@ async function openAddDialog() {
     if (candidate.isDefault) {
       const badge = document.createElement("span");
       badge.className = "is-default";
-      badge.textContent = "Windows default";
+      badge.textContent = words().defaultBadge;
       who.append(badge);
     }
 
@@ -567,15 +653,41 @@ window.addEventListener("keydown", (event) => {
 
 // ---------------------------------------------------------------------------
 
+/** Makes the ways-to-attach-a-printer list say what this computer can do. */
+function applyPlatform() {
+  const option = (value) =>
+    $("connection-kind").querySelector(`option[value="${value}"]`);
+
+  option("systemPrinter").textContent = words().systemPrinter;
+  option("serial").textContent = words().serial;
+  option("device").textContent = words().device;
+  $("no-printers").textContent = words().noPrinters;
+
+  // "Plugged in by USB, no driver installed" is reached through a Windows
+  // driver, so off Windows it can only ever fail. It stays in the list rather
+  // than vanishing -- a settings file copied from a Windows till has to still
+  // show what it says -- but it cannot be chosen, and it says why.
+  const usb = option("usbClass");
+  if (state.platform === "windows") {
+    usb.disabled = false;
+    usb.textContent = "Plugged in by USB, no driver installed";
+  } else {
+    usb.disabled = true;
+    usb.textContent = "Plugged in by USB, no driver installed (Windows only)";
+  }
+}
+
 async function start() {
   try {
     const stored = await invoke("printer_settings");
     state.settings = stored.settings;
     state.path = stored.path;
+    state.platform = stored.platform ?? state.platform;
     state.chosen = state.settings.printers[0]?.id ?? null;
   } catch (error) {
     say(reason(error), "bad");
   }
+  applyPlatform();
   $("path").textContent = state.path ? `Kept in ${state.path}` : "";
   draw();
 }

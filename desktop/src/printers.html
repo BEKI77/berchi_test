@@ -33,7 +33,7 @@
           <ul id="printer-list" class="printer-list"></ul>
           <p id="no-printers" class="note" hidden>
             No printer set up yet. Until one is, tickets print the old way &mdash;
-            through the window, to whichever printer Windows has as its default.
+            through the window, to this computer's default printer.
           </p>
         </section>
 
@@ -69,7 +69,10 @@
           <label class="field">
             <span>How it is attached</span>
             <select id="connection-kind">
-              <option value="systemPrinter">A printer installed in Windows</option>
+              <!-- These four are reworded for the operating system this is
+                   running on, in printers.js. What is here is the neutral
+                   version, shown for the moment before that happens. -->
+              <option value="systemPrinter">A printer installed on this computer</option>
               <option value="network">On the network (Ethernet or Wi-Fi)</option>
               <option value="usbClass">Plugged in by USB, no driver installed</option>
               <option value="serial">On a serial (COM) port</option>

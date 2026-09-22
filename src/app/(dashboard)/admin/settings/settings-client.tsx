@@ -375,7 +375,8 @@ export function SettingsClient() {
                     ) : (
                       <>
                         No printer set up on this computer, so tickets print through the window to
-                        whichever printer Windows has as its default.
+                        its default printer. The salon system runs on Windows, Linux and macOS
+                        tills, so it does not name one here.
                       </>
                     )}
                   </p>

@@ -47,9 +47,10 @@ const MAX_CHARACTERS_PER_LINE: u8 = 64;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum Connection {
-    /// A printer installed in Windows the ordinary way, with its own driver.
-    /// The bytes go to the print spooler as a RAW job, so the queue, the
-    /// offline warning and "Printers & scanners" all keep working.
+    /// A printer installed on this computer the ordinary way, with its own
+    /// driver: the Windows spooler, or a CUPS queue on Linux and macOS. The
+    /// bytes go to the queue as a raw job, so the queue, the offline warning
+    /// and every other program's access to the printer all keep working.
     #[serde(rename_all = "camelCase")]
     SystemPrinter { name: String },
 
@@ -93,7 +94,11 @@ impl Connection {
     /// How the connection reads on screen and in an error message.
     pub fn describe(&self) -> String {
         match self {
-            Connection::SystemPrinter { name } => format!("Windows printer \"{name}\""),
+            // "print queue" rather than naming an operating system: this text is
+            // read back on whichever one the till runs, and a Fedora salon being
+            // told about its "Windows printer" is how a fixable problem starts
+            // looking like the wrong program.
+            Connection::SystemPrinter { name } => format!("print queue \"{name}\""),
             Connection::Network { host, port } => format!("{host} on port {port}"),
             Connection::UsbClass { device_path } => format!("USB printer ({device_path})"),
             Connection::Serial { path, baud_rate } => format!("{path} at {baud_rate} baud"),
@@ -107,7 +112,7 @@ impl Connection {
     fn problem(&self) -> Option<String> {
         match self {
             Connection::SystemPrinter { name } if name.trim().is_empty() => {
-                Some("Choose which Windows printer to use.".into())
+                Some("Choose which of this computer's printers to use.".into())
             }
             Connection::Network { host, .. } if host.trim().is_empty() => {
                 Some("Give the printer's address on the network.".into())
@@ -398,7 +403,9 @@ impl Settings {
             printer.name = printer.name.trim().to_string();
 
             if printer.id.is_empty() {
-                return Err("A printer was saved without an id. Close the window and try again.".into());
+                return Err(
+                    "A printer was saved without an id. Close the window and try again.".into()
+                );
             }
             if printer.name.is_empty() {
                 return Err("Give every printer a name, so the list means something later.".into());
@@ -470,8 +477,9 @@ pub fn load(path: &Path) -> Result<Settings, String> {
         Err(err) => return Err(format!("Cannot read {}: {err}", path.display())),
     };
 
-    serde_json::from_str(&text)
-        .map_err(|err| format!("{} is not settings this program understands: {err}", path.display()))
+    serde_json::from_str(&text).map_err(|err| {
+        format!("{} is not settings this program understands: {err}", path.display())
+    })
 }
 
 /// Writes the settings, creating the folder if this is the first time.
@@ -589,10 +597,11 @@ mod tests {
     #[test]
     fn a_printer_needs_a_name_and_somewhere_to_send_to() {
         let mut nameless = Settings::default();
-        nameless.printers.push(Printer::new("p1".into(), "   ".into(), Connection::Network {
-            host: "192.168.1.60".into(),
-            port: 9100,
-        }));
+        nameless.printers.push(Printer::new(
+            "p1".into(),
+            "   ".into(),
+            Connection::Network { host: "192.168.1.60".into(), port: 9100 },
+        ));
         assert!(nameless.tidied().is_err());
 
         let mut nowhere = Settings::default();
@@ -626,10 +635,10 @@ mod tests {
         let settings: Settings = serde_json::from_str(json).unwrap();
         let printer = &settings.printers[0];
 
-        assert_eq!(printer.connection, Connection::Network {
-            host: "192.168.1.60".into(),
-            port: 9100,
-        });
+        assert_eq!(
+            printer.connection,
+            Connection::Network { host: "192.168.1.60".into(), port: 9100 }
+        );
         assert_eq!(printer.paper, Paper::default());
         assert_eq!(printer.cut, Cut::default());
         assert_eq!(printer.copies, 1);

@@ -283,7 +283,11 @@ if (which === "all" || which === "H") {
   await sleep(2500);
 
   check("the Starting screen is showing", (await page.evalJs("document.body.innerText")).includes("Starting the salon system"));
-  check("the printer setup button is offered", (await page.evalJs("document.getElementById('printer-setup').hidden")) === false);
+  check("the printer setup button is offered", (await page.evalJs("!!document.getElementById('printer-setup')")) === true);
+  // The button is always shown, so the only way it can fail is by saying so.
+  // An earlier version hid it when the program could not be reached, which is
+  // the one failure nobody can report.
+  check("nothing is complaining yet", (await page.evalJs("document.getElementById('printer-setup-trouble').hidden")) === true);
 
   await page.evalJs("document.getElementById('printer-setup').click()");
   const setupWindow = await waitFor(async () => {

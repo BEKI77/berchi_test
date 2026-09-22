@@ -17,17 +17,33 @@ if (hint) {
 // Docker stack is not running yet, and the rest of the setup lives behind a
 // login on a server that may not be answering. Waiting for the salon to come up
 // before the printer can be chosen would be the wrong way round.
+// The button is always shown. An earlier version hid it unless the way into the
+// program could be found, which turned "something is wrong" into "there is no
+// such button" -- the one failure nobody can report, because there is nothing on
+// screen to report. Better to offer it and say what went wrong when it is
+// pressed.
 const setup = document.getElementById("printer-setup");
+const trouble = document.getElementById("printer-setup-trouble");
+
+function explain(text) {
+  if (!trouble) return;
+  trouble.textContent = text;
+  trouble.hidden = false;
+}
+
 if (setup) {
-  // Only offered once it is known to work. On the off chance this page is ever
-  // opened outside the program, a button that does nothing is worse than none.
-  const open = window.__TAURI__?.core?.invoke;
-  if (open) {
-    setup.hidden = false;
-    setup.addEventListener("click", () => {
-      open("open_printer_settings").catch((error) => {
-        setup.textContent = typeof error === "string" ? error : "Could not open the printer setup";
-      });
+  setup.addEventListener("click", () => {
+    const open = window.__TAURI__?.core?.invoke;
+    if (!open) {
+      explain(
+        "This window cannot reach the program, so the printer setup cannot open. " +
+          "That usually means an older Berchi Cashier is installed: close it completely " +
+          "and install the newest one over the top.",
+      );
+      return;
+    }
+    open("open_printer_settings").catch((error) => {
+      explain(`Could not open the printer setup: ${typeof error === "string" ? error : error}`);
     });
-  }
+  });
 }

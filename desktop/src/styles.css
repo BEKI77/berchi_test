@@ -96,4 +96,3 @@ code {
 }
 
 .aside button:hover { background: #fff; border-color: #ec4899; }
-.aside button[hidden] { display: none; }

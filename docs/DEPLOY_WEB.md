@@ -80,3 +80,33 @@ salon LAN with no proxy in front. Do not copy it to a public deployment.
 
 Leave `ENABLE_PIN_LOGIN` off here for the same reason — a 4-digit PIN belongs
 behind the salon's own Wi-Fi, not on the open internet.
+
+## "Too many redirects" after a successful login
+
+Different problem, same deploy. Sign-in works, and then the browser gives up:
+
+```
+ERR_TOO_MANY_REDIRECTS
+```
+
+The migrations create the `permissions`, `roles` and `role_permissions` tables
+but put nothing in them — the rows come from `seedPermissions()`, which runs as
+part of first-run setup, not as part of `drizzle-kit migrate`. With those tables
+empty every permission check returns false, including the owner's.
+
+That used to be invisible. `/` sent an OWNER to `/admin`, `/admin` found no
+`dashboard.view` and sent them back to `/`, and around it went. `/` now checks
+the permission before redirecting and shows a message instead, so the symptom is
+readable — but the cure is the same:
+
+```bash
+npm run db:bootstrap            # or: docker compose run --rm setup
+```
+
+Then **restart the app**. `hasPermission` memoises its answers in a plain
+module-level `Map` that is never invalidated, so a running container holds on to
+the `false` it learned before the seed and keeps refusing everything.
+
+Worth knowing: `npm run db:seed` is the demo seeder. It creates an owner but no
+permissions, so seeding with it alone produces exactly this dead end. Real
+installs use `db:bootstrap`, which seeds permissions first and then the owner.

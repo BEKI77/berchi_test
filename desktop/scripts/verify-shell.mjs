@@ -6,9 +6,8 @@
 //   cargo build --manifest-path src-tauri/Cargo.toml     # once, or after a change
 //   SALON_URL=http://localhost:3000 npm run verify        # the salon system must be running
 //
-// Windows only. Silent printing (BERCHI_SILENT_PRINT=1) is deliberately NOT
-// exercised: it would print on the default printer. The test only checks that
-// the dialog shows by default and the flag is passed when asked for.
+// Windows only. Silent printing is deliberately NOT exercised: it would print on
+// the default printer. The test only checks that the option is passed.
 import { spawn, execSync } from "node:child_process";
 import fs from "node:fs";
 import http from "node:http";
@@ -82,6 +81,11 @@ const freePort = () => new Promise((resolve) => {
 
 const powershell = (command) => execSync(`powershell -NoProfile -ExecutionPolicy Bypass -Command "${command.replace(/"/g, '\\"')}"`).toString().trim();
 
+// The options the web view was actually started with. This is the only way to
+// see them: they are handed to WebView2 at creation and are not readable from
+// the page.
+const webviewArgs = () => powershell("(Get-CimInstance Win32_Process -Filter \"Name='msedgewebview2.exe'\" | Where-Object { $_.CommandLine -like '*com.berchi.cashier*' } | Select-Object -First 1).CommandLine");
+
 // ---------------------------------------------------------------------------
 if (which === "all" || which === "A") {
   console.log(`\nA. The salon system is up (${SALON}): the window opens it`);
@@ -100,8 +104,8 @@ if (which === "all" || which === "A") {
   await sleep(3000);
   check("it refuses to navigate away from the salon system", (await page.evalJs("location.origin")) === SALON_ORIGIN, await page.evalJs("location.href"));
 
-  const args = powershell("(Get-CimInstance Win32_Process -Filter \"Name='msedgewebview2.exe'\" | Where-Object { $_.CommandLine -like '*com.berchi.cashier*' } | Select-Object -First 1).CommandLine");
-  check("the print dialog shows by default (no --kiosk-printing)", !args.includes("--kiosk-printing"), args.slice(0, 200));
+  const args = webviewArgs();
+  check("web view was started with silent printing (--kiosk-printing)", args.includes("--kiosk-printing"), args.slice(0, 200));
   check("...and kept Tauri's own default options", args.includes("--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection"), args.slice(0, 200));
 
   console.log("\nB. A second launch does not open a second cashier");
@@ -163,6 +167,42 @@ if (which === "all" || which === "E") {
   const took = await waitFor(async () => (await page.evalJs("location.origin")) === SALON_ORIGIN, 20000);
   check("the file's address is used", took !== null, await page.evalJs("location.href"));
   page.close(); app.kill(); killApp();
+  fs.rmSync(dir, { recursive: true, force: true });
+}
+
+if (which === "all" || which === "F") {
+  console.log("\nF. Choosing a printer: berchi-print.txt brings the dialog back");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "berchi-print-"));
+  const copy = path.join(dir, "berchi-cashier.exe");
+  const printFile = path.join(dir, "berchi-print.txt");
+  fs.copyFileSync(EXE, copy);
+
+  // Reading the options back needs the web view to exist, so each case launches
+  // the program and waits for it rather than just starting the process.
+  const argsAfterLaunch = async (env) => {
+    const app = launch(env, copy);
+    const page = await attach();
+    await sleep(1500);
+    const args = webviewArgs();
+    page.close(); app.kill(); killApp();
+    return args;
+  };
+
+  fs.writeFileSync(printFile, "# reception picks the printer by hand\n\ndialog\n");
+  let args = await argsAfterLaunch({ BERCHI_URL: SALON });
+  check("the file turns silent printing off, so Windows lists the printers", !args.includes("--kiosk-printing"), args.slice(0, 200));
+  check("...and Tauri's own default options are still there", args.includes("--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection"), args.slice(0, 200));
+
+  // For trying silent printing on a PC whose file asks for the dialog.
+  args = await argsAfterLaunch({ BERCHI_URL: SALON, BERCHI_SILENT_PRINT: "1" });
+  check("the environment variable overrules the file", args.includes("--kiosk-printing"), args.slice(0, 200));
+
+  // A typo must not quietly stop the slip printing: reception would go on
+  // tapping the button with nothing coming out and no reason on screen.
+  fs.writeFileSync(printFile, "dailog\n");
+  args = await argsAfterLaunch({ BERCHI_URL: SALON });
+  check("a misspelt setting leaves the slip printing by itself", args.includes("--kiosk-printing"), args.slice(0, 200));
+
   fs.rmSync(dir, { recursive: true, force: true });
 }
 

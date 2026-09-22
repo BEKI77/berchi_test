@@ -48,3 +48,6 @@ next-env.d.ts
 
 # Database backups hold business data
 /backups/
+
+
+.claude

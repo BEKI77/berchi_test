@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "db:bootstrap": "npx tsx src/db/bootstrap.ts",
     "db:seed": "npx tsx src/db/seed.ts",
     "db:seed-services": "npx tsx src/db/reset_and_seed_services.ts",
     "db:clear-test-data": "npx tsx src/db/clear_test_data.ts",

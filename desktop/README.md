@@ -54,11 +54,15 @@ For development, `cd src-tauri; cargo build` makes a faster debug build.
 `.github/workflows/desktop.yml` builds the same installer on a Windows runner, so
 a PC without Rust can still get one.
 
-- **Any push or pull request touching `desktop/`** builds it and keeps the
-  installer under the run's *Artifacts* for 30 days. *Actions* → *Desktop app* →
-  *Run workflow* does the same on demand.
+- **Any push or pull request touching `desktop/`** builds it and tries to keep
+  the installer under the run's *Artifacts* for 30 days. *Actions* → *Desktop
+  app* → *Run workflow* does the same on demand. Artifact storage is a quota
+  shared across the whole GitHub account, so that upload can be refused with
+  *"Artifact storage quota has been hit"* — the build is still marked green,
+  because it built. Tag a release if you need the installer regardless.
 - **A tag** publishes a release with the installer attached, which is the easiest
-  thing to point the salon at:
+  thing to point the salon at, and the one that keeps working when artifact
+  storage is full (release assets are not in that quota):
 
   ```bash
   # the tag must match the version in src-tauri/tauri.conf.json, or the build stops

@@ -166,6 +166,10 @@ That produces an installer (`Berchi Cashier_0.1.0_x64-setup.exe`) to run on the
 cashier PC. It installs for that Windows user only, and needs no administrator
 rights.
 
+If no PC here has Rust, GitHub builds the same installer: push a tag like
+`desktop-v0.1.0` and download it from the release, or take it from the *Artifacts*
+of any run under *Actions* → *Desktop app*.
+
 What it gives over a browser tab:
 
 - It shows **Starting the salon system...** while the PC is still starting, and

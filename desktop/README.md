@@ -47,6 +47,25 @@ publisher": choose *More info*, then *Run anyway*.
 
 For development, `cd src-tauri; cargo build` makes a faster debug build.
 
+### Or let GitHub build it
+
+`.github/workflows/desktop.yml` builds the same installer on a Windows runner, so
+a PC without Rust can still get one.
+
+- **Any push or pull request touching `desktop/`** builds it and keeps the
+  installer under the run's *Artifacts* for 30 days. *Actions* → *Desktop app* →
+  *Run workflow* does the same on demand.
+- **A tag** publishes a release with the installer attached, which is the easiest
+  thing to point the salon at:
+
+  ```bash
+  # the tag must match the version in src-tauri/tauri.conf.json, or the build stops
+  git tag desktop-v0.1.0 && git push origin desktop-v0.1.0
+  ```
+
+To release a new version, bump `version` in both `src-tauri/tauri.conf.json` and
+`src-tauri/Cargo.toml` first, then tag.
+
 ## Settings
 
 | Setting | What it does |
@@ -59,6 +78,73 @@ For development, `cd src-tauri; cargo build` makes a faster debug build.
 Only `http://` addresses are supported: the salon system runs on the salon's own
 network. If the address cannot be used, the window says so instead of waiting
 forever.
+
+## Connecting it to the salon system
+
+The window does not start the salon system; it looks for one that is already
+running. Start that first
+(`docker compose -f docker-compose.cashier.yml --env-file .env.cashier up -d`,
+see [docs/CASHIER_PC.md](../docs/CASHIER_PC.md)) and check
+`docker compose -f docker-compose.cashier.yml ps` says `berchi-cashier-app` is
+`healthy`.
+
+**On the cashier PC itself** there is nothing to configure: the default address
+is `http://localhost:3000`, which is where the Docker stack publishes the app.
+Install, start, and it connects on its own.
+
+**On another PC on the salon network**, three things have to line up:
+
+1. Give the cashier PC a fixed address (reserve it in the router) and note it,
+   e.g. `192.168.1.50`.
+2. On the cashier PC, let that port through the Windows firewall, as an
+   Administrator, with the salon network set to *Private*:
+
+   ```powershell
+   New-NetFirewallRule -DisplayName "Berchi salon" -Direction Inbound -Protocol TCP -LocalPort 3000 -Action Allow -Profile Private
+   ```
+
+3. Next to the installed program (*Start menu* → right-click *Berchi Cashier* →
+   *Open file location* → right-click → *Open file location* again), create
+   `berchi-url.txt` holding that address:
+
+   ```
+   # the salon computer
+   http://192.168.1.50:3000
+   ```
+
+   Use the port from `APP_PORT` in `.env.cashier` if it is not 3000. Then start
+   the program again: the address is read once, at start-up.
+
+### Checking the connection
+
+Before blaming the window, confirm the server answers the page it actually polls:
+
+```powershell
+curl.exe -i http://192.168.1.50:3000/api/auth/csrf     # expect 200
+```
+
+That page is used rather than a bare open port because Docker accepts
+connections on a published port seconds before the app inside is listening. If it
+answers 200, the window will hand over from *Starting the salon system* within a
+couple of seconds.
+
+### When it stays on the Starting screen
+
+| What you see | Usually means |
+|---|---|
+| *Starting the salon system* forever | Nothing answers that address. Check `docker compose ... ps`, the port, and the firewall rule. The hint under the spinner appears after 30 seconds. |
+| Blank or "cannot be used" screen | The address in `berchi-url.txt` is not a valid `http://` URL. `https://` is refused on purpose. |
+| Connects, then a blank page on sign-in | The address spelling must match the one the app redirects to. The window only allows its own origin, so `http://localhost:3000` and `http://127.0.0.1:3000` are two different places — pick one and use it everywhere. |
+| It drops back to *Starting* mid-sale | The server stopped answering twice in a row (about 10 seconds). It returns by itself; check `docker compose ... logs app --tail 50`. |
+| Tablets work, this PC does not | Router AP/client isolation, or the salon network is set to *Public* on the cashier PC. |
+
+`BERCHI_URL` overrides the file if you want to try an address without editing
+anything. From the folder the shortcut points at:
+
+```powershell
+$env:BERCHI_URL = "http://192.168.1.50:3000"
+.\berchi-cashier.exe
+```
 
 ## Start with Windows
 

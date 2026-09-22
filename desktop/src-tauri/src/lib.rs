@@ -35,7 +35,7 @@ const BAKED_IN_SALON_URL: Option<&str> = option_env!("BERCHI_DEFAULT_URL");
 
 /// Where the salon system lives when nothing else says otherwise: the cashier
 /// PC's own port 3000, which is what a developer running the Docker stack wants.
-const FALLBACK_SALON_URL: &str = "http://localhost:3002";
+const FALLBACK_SALON_URL: &str = "http://localhost:3000";
 
 /// A file next to the program that can name a different address, for a PC set up
 /// on another port. The BERCHI_URL environment variable does the same and wins.
@@ -216,7 +216,11 @@ fn supervise(window: WebviewWindow, salon: Url) {
             }
         }
 
-        std::thread::sleep(if showing_app { POLL_WHILE_SHOWING } else { POLL_WHILE_WAITING });
+        std::thread::sleep(if showing_app {
+            POLL_WHILE_SHOWING
+        } else {
+            POLL_WHILE_WAITING
+        });
     }
 }
 
@@ -354,12 +358,17 @@ pub fn run() {
         ])
         .setup(|app| {
             let salon = salon_url();
-            let first_screen = if salon.is_ok() { "index.html" } else { "problem.html" };
+            let first_screen = if salon.is_ok() {
+                "index.html"
+            } else {
+                "problem.html"
+            };
 
-            let builder = WebviewWindowBuilder::new(app, "main", WebviewUrl::App(first_screen.into()))
-                .title("Berchi Cashier")
-                .maximized(true)
-                .min_inner_size(1024.0, 700.0);
+            let builder =
+                WebviewWindowBuilder::new(app, "main", WebviewUrl::App(first_screen.into()))
+                    .title("Berchi Cashier")
+                    .maximized(true)
+                    .min_inner_size(1024.0, 700.0);
             #[cfg(windows)]
             let builder = builder.additional_browser_args(&browser_args());
 
@@ -446,8 +455,14 @@ mod tests {
     fn the_most_specific_printing_setting_wins() {
         // The variable is set for one run, to try the dialog on a PC whose file
         // says silent -- and the other way about.
-        assert!(!choose_silent_printing(Some("0".into()), Some("silent".into())));
-        assert!(choose_silent_printing(Some("1".into()), Some("dialog".into())));
+        assert!(!choose_silent_printing(
+            Some("0".into()),
+            Some("silent".into())
+        ));
+        assert!(choose_silent_printing(
+            Some("1".into()),
+            Some("dialog".into())
+        ));
     }
 
     /// A typo must not quietly stop the slip printing: reception would go on
@@ -458,28 +473,46 @@ mod tests {
         assert!(choose_silent_printing(None, Some("dailog".into())));
         assert!(choose_silent_printing(Some("".into()), None));
         // An unreadable variable still lets the file underneath be heard.
-        assert!(!choose_silent_printing(Some("maybe".into()), Some("dialog".into())));
+        assert!(!choose_silent_printing(
+            Some("maybe".into()),
+            Some("dialog".into())
+        ));
     }
 
     #[test]
     fn the_window_stays_on_the_salon() {
         let salon = url("https://salon.example.com");
-        assert!(navigation_allowed(&url("https://salon.example.com/checkout"), &salon));
+        assert!(navigation_allowed(
+            &url("https://salon.example.com/checkout"),
+            &salon
+        ));
         assert!(!navigation_allowed(&url("https://example.com/"), &salon));
         // A look-alike host is somebody else.
-        assert!(!navigation_allowed(&url("https://salon.example.com.evil.test/"), &salon));
+        assert!(!navigation_allowed(
+            &url("https://salon.example.com.evil.test/"),
+            &salon
+        ));
     }
 
     #[test]
     fn follows_its_own_servers_jump_to_https() {
         let insecure = url("http://salon.example.com");
-        assert!(navigation_allowed(&url("https://salon.example.com/login"), &insecure));
-        assert!(!navigation_allowed(&url("https://elsewhere.example.com/"), &insecure));
+        assert!(navigation_allowed(
+            &url("https://salon.example.com/login"),
+            &insecure
+        ));
+        assert!(!navigation_allowed(
+            &url("https://elsewhere.example.com/"),
+            &insecure
+        ));
 
         // Never the other way round: a salon reached over https is not allowed
         // to be dragged back down to http.
         let secure = url("https://salon.example.com");
-        assert!(!navigation_allowed(&url("http://salon.example.com/"), &secure));
+        assert!(!navigation_allowed(
+            &url("http://salon.example.com/"),
+            &secure
+        ));
     }
 
     /// Printing is allowed from exactly the addresses the window may show, and
@@ -487,32 +520,42 @@ mod tests {
     /// redirects; too wide and somewhere that is not the salon drives the till.
     #[test]
     fn printing_is_allowed_from_the_salon_and_nowhere_else() {
-        assert_eq!(salon_origins(&url("https://salon.example.com")), vec![
-            "https://salon.example.com".to_string()
-        ]);
+        assert_eq!(
+            salon_origins(&url("https://salon.example.com")),
+            vec!["https://salon.example.com".to_string()]
+        );
 
         // http:// on a bare domain may be redirected to https:// by its own
         // server, and the window follows it, so both can print.
-        assert_eq!(salon_origins(&url("http://salon.example.com")), vec![
-            "http://salon.example.com".to_string(),
-            "https://salon.example.com".to_string(),
-        ]);
+        assert_eq!(
+            salon_origins(&url("http://salon.example.com")),
+            vec![
+                "http://salon.example.com".to_string(),
+                "https://salon.example.com".to_string(),
+            ]
+        );
 
         // An address carrying a port was written deliberately and is left alone,
         // exactly as navigation_allowed leaves it alone.
-        assert_eq!(salon_origins(&url("http://192.168.1.50:3000")), vec![
-            "http://192.168.1.50:3000".to_string()
-        ]);
-        assert_eq!(salon_origins(&url("http://localhost:3000")), vec![
-            "http://localhost:3000".to_string()
-        ]);
+        assert_eq!(
+            salon_origins(&url("http://192.168.1.50:3000")),
+            vec!["http://192.168.1.50:3000".to_string()]
+        );
+        assert_eq!(
+            salon_origins(&url("http://localhost:3000")),
+            vec!["http://localhost:3000".to_string()]
+        );
     }
 
     /// The two have to agree: an address that may print but may not be shown, or
     /// the other way about, is a bug in one of them.
     #[test]
     fn what_may_print_matches_what_may_be_shown() {
-        for address in ["https://salon.example.com", "http://salon.example.com", "http://192.168.1.50:3000"] {
+        for address in [
+            "https://salon.example.com",
+            "http://salon.example.com",
+            "http://192.168.1.50:3000",
+        ] {
             let salon = url(address);
             for origin in salon_origins(&salon) {
                 let target = url(&format!("{origin}/cashier"));
@@ -536,9 +579,18 @@ mod tests {
         let file = || Some("http://from-file:3000".to_string());
         let baked = Some("https://salon.example.com");
 
-        assert_eq!(choose_salon_url(env(), file(), baked), "http://from-env:3000");
-        assert_eq!(choose_salon_url(None, file(), baked), "http://from-file:3000");
-        assert_eq!(choose_salon_url(None, None, baked), "https://salon.example.com");
+        assert_eq!(
+            choose_salon_url(env(), file(), baked),
+            "http://from-env:3000"
+        );
+        assert_eq!(
+            choose_salon_url(None, file(), baked),
+            "http://from-file:3000"
+        );
+        assert_eq!(
+            choose_salon_url(None, None, baked),
+            "https://salon.example.com"
+        );
         assert_eq!(choose_salon_url(None, None, None), FALLBACK_SALON_URL);
     }
 
@@ -548,7 +600,10 @@ mod tests {
     #[test]
     fn a_blank_setting_counts_as_unset() {
         assert_eq!(choose_salon_url(None, None, Some("")), FALLBACK_SALON_URL);
-        assert_eq!(choose_salon_url(Some("   ".into()), None, None), FALLBACK_SALON_URL);
+        assert_eq!(
+            choose_salon_url(Some("   ".into()), None, None),
+            FALLBACK_SALON_URL
+        );
         assert_eq!(
             choose_salon_url(Some("".into()), None, Some("https://salon.example.com")),
             "https://salon.example.com"
@@ -573,7 +628,10 @@ mod tests {
         };
         std::env::remove_var("BERCHI_URL");
         let chosen = salon_url().expect("the baked-in address should be usable");
-        assert_eq!(chosen.host_str(), parse_salon_url(baked).unwrap().host_str());
+        assert_eq!(
+            chosen.host_str(),
+            parse_salon_url(baked).unwrap().host_str()
+        );
     }
 
     /// "localhost" resolves to both ::1 and 127.0.0.1, and the salon system may

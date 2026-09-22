@@ -9,34 +9,73 @@ export async function seedServices() {
 
   // Define categories based on the menu structure
   const categories = [
-    { name: "እጥበት", description: "Basic hair treatments" },
-    { name: "ፍሪዝ", description: "Hair styling and treatments" },
-    { name: "ፔስትራ", description: "Pasta and hair treatments" },
-    { name: "ቅንድብ", description: "Braiding services" },
-    { name: "ሬላክሰር", description: "Relaxer treatments" },
-    { name: "ቀለም ጥቁር", description: "Black hair coloring" },
-    { name: "ቤዝ", description: "Beige hair coloring" },
-    { name: "ሃይ ላይት", description: "Highlight services" },
-    { name: "ሁማን እና ረጅም ፀጉር", description: "Human and long hair treatments" },
-    { name: "የልጆች ሽሩባ", description: "Children's braiding" },
-    { name: "በፀጉር ያዋቁ ሽሩባ", description: "Hair braiding services" },
-    { name: "ኬንያ", description: "Kenyan style braiding" },
-    { name: "በሆ", description: "Special hair treatments" },
-    { name: "ፍሬንች ከርል", description: "French curl services" },
-    { name: "ሀበሻ", description: "Habesha services" },
-    { name: "ዋክስ", description: "Waxing services" },
-    { name: "አይላሽ", description: "Eyelash services" },
-    { name: "ኔይል", description: "Nail services" },
+    { name: "ፓስትራ", description: "Pastra hair styling and ponytail services" },
+    { name: "ፀጉር የአዋቂ ሽሩባ", description: "Adult hair braiding and styling" },
+    { name: "ኬንያ", description: "Kenya wig and extensions braiding" },
+    {
+      name: "ፍሬንች ከርል",
+      description: "French curl extensions and wig services",
+    },
+    {
+      name: "ቅንድብ",
+      description: "Eyebrow shaping, threading, and facial hair removal",
+    },
+    {
+      name: "የልጆች ሽሩባ",
+      description: "Kids hair braiding and styled extensions",
+    },
+    {
+      name: "ፖሽ ትዊስት እና ኪንኪ ከርል",
+      description: "Posh twist and kinky curl styling",
+    },
+    { name: "ሀበሻ", description: "Traditional Ethiopian hair braiding styles" },
+    {
+      name: "ኔይል/ጥፍር/",
+      description: "Manicure, pedicure, nail extensions, and gel services",
+    },
+    {
+      name: "እጥበት",
+      description: "Hair washing, treatments, blowing, and masks",
+    },
+    {
+      name: "ቀለም",
+      description: "Hair coloring services for frontals, roots, and full hair",
+    },
+    {
+      name: "አይላሽ",
+      description: "Eyelash extensions and premium lash services",
+    },
+    { name: "ፍሪዝ", description: "Freeze styling and conditioning treatments" },
+    {
+      name: "ሂዩማን እና ረጅም ፀጉር",
+      description: "Human hair extensions and long hair coloring",
+    },
+    { name: "ቡህ", description: "Buh hair extension braiding" },
+    { name: "ሃይ ላይት", description: "Full head and partial hair highlighting" },
+    { name: "ሪላክሰር", description: "Hair relaxing and smoothing treatments" },
+    { name: "ዋክስ", description: "Waxing services for body and facial hair" },
+    { name: "ክሊፕ", description: "Clip-in hair extension services" },
+    {
+      name: "የወንዶች ፀጉር አስተካካይ",
+      description: "Men's haircut, beard trimming, wash, and hair dye services",
+    },
   ];
 
   // Insert categories
   const insertedCategories = [];
   for (const category of categories) {
     // Check if category already exists
-    const existing = await db.select().from(serviceCategories).where(eq(serviceCategories.name, category.name)).limit(1);
-    
+    const existing = await db
+      .select()
+      .from(serviceCategories)
+      .where(eq(serviceCategories.name, category.name))
+      .limit(1);
+
     if (existing.length === 0) {
-      const [inserted] = await db.insert(serviceCategories).values(category).returning();
+      const [inserted] = await db
+        .insert(serviceCategories)
+        .values(category)
+        .returning();
       insertedCategories.push(inserted);
       console.log(`Created category: ${category.name}`);
     } else {
@@ -47,137 +86,176 @@ export async function seedServices() {
 
   // Parse service data from the menu
   const serviceData = [
-    // እጥበት
-    { name: "እጥበት", price: 300, categoryName: "እጥበት" },
-    { name: "ትሪትመንት እጥበት", price: 350, categoryName: "እጥበት" },
-    { name: "ብሎው ድራይ", price: 200, categoryName: "እጥበት" },
-    { name: "ካስክ", price: 500, categoryName: "እጥበት" },
-    { name: "ሃማን ካስክ", price: 600, categoryName: "እጥበት" }, // Assumed price
+    { name: "ፓስትራ በፀጉር", price: 600, categoryName: "ፓስትራ" },
+    { name: "ፓስትራ በሂዩማን", price: 800, categoryName: "ፓስትራ" },
+    { name: "ፓስትራ ሲንቴቲክ", price: 1000, categoryName: "ፓስትራ" },
+    { name: "ፓስትራ ኮፍያ", price: 1000, categoryName: "ፓስትራ" },
+    { name: "ፓስትራ በክስ ሙሉ ፖኒቴል", price: 1500, categoryName: "ፓስትራ" },
+    { name: "ፓስትራ በክስ ፖኒቴል", price: 1200, categoryName: "ፓስትራ" },
+    { name: "ግማሽ ፖኒቴል በስፌት", price: 2000, categoryName: "ፓስትራ" },
+    { name: "ሌስ ግሉ", price: 2000, categoryName: "ፓስትራ" },
 
-    // ፍሪዝ
-    { name: "ፍሪዝ በኮንዲሽነር", price: 400, categoryName: "ፍሪዝ" },
-    { name: "ፍሪዝ በካንቱ", price: 850, categoryName: "ፍሪዝ" },
-    { name: "ፍሪዝ በኮንዲት", price: 1000, categoryName: "ፍሪዝ" },
-    { name: "ፍሪዝ በኮንዲት ሃማን", price: 1200, categoryName: "ፍሪዝ" },
+    { name: "ፀጉር ወደ ታች", price: 650, categoryName: "ፀጉር የአዋቂ ሽሩባ" },
+    { name: "ፀጉር ቁጥጥር", price: 800, categoryName: "ፀጉር የአዋቂ ሽሩባ" },
+    { name: "ፀጉር ትዊስት", price: 900, categoryName: "ፀጉር የአዋቂ ሽሩባ" },
 
-    // ፔስትራ
-    { name: "ፔስትራ በፀጉር", price: 700, categoryName: "ፔስትራ" },
-    { name: "ፔስትራ በሃማን", price: 900, categoryName: "ፔስትራ" },
-    { name: "ፔስትራ ሴንታቲክ", price: 950, categoryName: "ፔስትራ" },
-    { name: "ፔስትራ ኮፍያ", price: 1000, categoryName: "ፔስትራ" },
-    { name: "ሙሉ ፓኒተል", price: 1500, categoryName: "ፔስትራ" },
-    { name: "ገማሽ ፓኒተል በስሬት", price: 2000, categoryName: "ፔስትራ" },
-    { name: "ሌስ ግሉ", price: 2000, categoryName: "ፔስትራ" },
+    { name: "ኬንያ ዊግ", price: 350, categoryName: "ኬንያ" },
+    {
+      name: "ወይ ታች በኬንያ ዊግ",
+      price: 800,
+      categoryName: "ኬንያ",
+      description: "800+400 እያለ ይጨምራል",
+    },
+    {
+      name: "ቁጥጥር በኬንያ ኖሮማል",
+      price: 900,
+      categoryName: "ኬንያ",
+      description: "900+400 እያለ ይጨምራል",
+    },
+    {
+      name: "ቁጥጥር በኬንያ ዊግ በቀሚስ",
+      price: 1000,
+      categoryName: "ኬንያ",
+      description: "1000+500 እያለ ይጨምራል",
+    },
+    {
+      name: "ትዊስት በኬንያ ዊግ በጣም በቀሚሱ",
+      price: 1200,
+      categoryName: "ኬንያ",
+      description: "1200+700 እያለ ይጨምራል",
+    },
+    {
+      name: "ትዊስት በኬንያ ዊግ",
+      price: 1000,
+      categoryName: "ኬንያ",
+      description: "1000+600 እያለ ይጨምራል",
+    },
 
-    // ቅንድብ
+    { name: "ፍሬንች ከርል የኤጅ", price: 1500, categoryName: "ፍሬንች ከርል" },
+    { name: "ፍሬንች ከርል ዊግ", price: 3000, categoryName: "ፍሬንች ከርል" },
+    { name: "ፍሬንች ከርል አንድ ጭማሪ ዊግ", price: 750, categoryName: "ፍሬንች ከርል" },
+    { name: "ፍሬንች ከርል ሁለት ጭማሪ ዊግ", price: 1500, categoryName: "ፍሬንች ከርል" },
+
     { name: "ቅንድብ በምላጭ", price: 200, categoryName: "ቅንድብ" },
     { name: "ቅንድብ በክር", price: 300, categoryName: "ቅንድብ" },
-    { name: "ቅንድብ በክር", price: 400, categoryName: "ቅንድብ" },
+    { name: "ኮንቱር በክር", price: 300, categoryName: "ቅንድብ" },
     { name: "ሙሉ ፊት በክር", price: 900, categoryName: "ቅንድብ" },
-    { name: "ሂና", price: 400, categoryName: "ቅንድብ" },
-    { name: "ቅንድብ መስተካከል እና ሂና", price: 700, categoryName: "ቅንድብ" },
+    { name: "ሃይ", price: 400, categoryName: "ቅንድብ" },
+    { name: "ቅንድብ ማስተካከል እና ሃይ", price: 700, categoryName: "ቅንድብ" },
 
-    // ሬላክሰር
-    { name: "ሬላክሰር ሪታች ከራሳቸው", price: 990, categoryName: "ሬላክሰር" },
-    { name: "ሙሉ ሬላክሰር ከራሳቸው", price: 1500, categoryName: "ሬላክሰር" }, // Assumed price
-    { name: "ሬላክሰር ሪታች ከቤቱ", price: 1200, categoryName: "ሬላክሰር" }, // Assumed price
-    { name: "ሙሉ ሬላክሰር ከቤቱ", price: 1800, categoryName: "ሬላክሰር" }, // Assumed price
-
-    // ቀለም ጥቁር
-    { name: "ከራሳቸው ሪታች (ፍሮት)", price: 800, categoryName: "ቀለም ጥቁር" }, // Assumed price
-    { name: "ከራሳቸው ሙሉ", price: 1200, categoryName: "ቀለም ጥቁር" }, // Assumed price
-    { name: "ከቤቱ ሪታች", price: 1000, categoryName: "ቀለም ጥቁር" }, // Assumed price
-    { name: "ከቤቱ ሙሉ", price: 1500, categoryName: "ቀለም ጥቁር" }, // Assumed price
-
-    // ቤዝ
-    { name: "ከራሳቸው ሪታች", price: 900, categoryName: "ቤዝ" }, // Assumed price
-    { name: "ከራሳቸው ሙሉ", price: 1300, categoryName: "ቤዝ" }, // Assumed price
-    { name: "ከቤቱ ሪታች", price: 1100, categoryName: "ቤዝ" }, // Assumed price
-    { name: "ከቤቱ ሙሉ", price: 1600, categoryName: "ቤዝ" }, // Assumed price
-
-    // ሃይ ላይት
-    { name: "ከራሳቸው ሪታች", price: 1000, categoryName: "ሃይ ላይት" }, // Assumed price
-    { name: "ከራሳቸው ሙሉ", price: 1400, categoryName: "ሃይ ላይት" }, // Assumed price
-    { name: "ከቤቱ ሪታች", price: 1200, categoryName: "ሃይ ላይት" }, // Assumed price
-    { name: "ከቤቱ ሙሉ", price: 1700, categoryName: "ሃይ ላይት" }, // Assumed price
-
-    // ሁማን እና ረጅም ፀጉር
-    { name: "ጥቁር", price: 500, categoryName: "ሁማን እና ረጅም ፀጉር" }, // Assumed price
-    { name: "ቤዝ", price: 600, categoryName: "ሁማን እና ረጅም ፀጉር" }, // Assumed price
-    { name: "ሃይ ላይት", price: 700, categoryName: "ሁማን እና ረጅም ፀጉር" }, // Assumed price
-
-    // የልጆች ሽሩባ
     { name: "የልጆች ሽሩባ በዲዛይን", price: 650, categoryName: "የልጆች ሽሩባ" },
-    { name: "ጬሌ", price: 500, categoryName: "የልጆች ሽሩባ" },
+    { name: "ጨሌ ሽሩባ በዲዛይን", price: 500, categoryName: "የልጆች ሽሩባ" },
     { name: "የልጆች ሽሩባ በአንድ ዊግ", price: 900, categoryName: "የልጆች ሽሩባ" },
-    { name: "በሁለት ዊግ", price: 1200, categoryName: "የልጆች ሽሩባ" },
+    { name: "የልጆች ሽሩባ በሁለት ዊግ", price: 1200, categoryName: "የልጆች ሽሩባ" },
 
-    // በፀጉር ያዋቁ ሽሩባ
-    { name: "በፀጉር ወደ ታች", price: 650, categoryName: "በፀጉር ያዋቁ ሽሩባ" },
-    { name: "በፀጉር ቁጥጥር", price: 800, categoryName: "በፀጉር ያዋቁ ሽሩባ" },
-    { name: "በፀጉር ትዊስት", price: 900, categoryName: "በፀጉር ያዋቁ ሽሩባ" },
+    {
+      name: "ፖሽ ትዊስት እና ኪንኪ ከርል የኤጅ",
+      price: 2000,
+      categoryName: "ፖሽ ትዊስት እና ኪንኪ ከርል",
+    },
+    {
+      name: "ፖሽ ትዊስት እና ኪንኪ ከርል በዊግ",
+      price: 3500,
+      categoryName: "ፖሽ ትዊስት እና ኪንኪ ከርል",
+    },
+    {
+      name: "ፖሽ ትዊስት እና ኪንኪ ከርል ስፌት",
+      price: 800,
+      categoryName: "ፖሽ ትዊስት እና ኪንኪ ከርል",
+    },
+    {
+      name: "ግማሽ ስፌት ግማሽ ሽሩባ",
+      price: 1200,
+      categoryName: "ፖሽ ትዊስት እና ኪንኪ ከርል",
+    },
 
-    // ኬንያ
-    { name: "ኬንያ ዊግ", price: 300, categoryName: "ኬንያ" },
-    { name: "ወደታች በኬንያ ዊግ", price: 300, categoryName: "ኬንያ" },
-    { name: "ቁጥጥር በኬንያ ዊግ", price: 300, categoryName: "ኬንያ" },
-    { name: "ትዊስት በኬንያ ዊግ", price: 350, categoryName: "ኬንያ" },
-
-    // በሆ
-    { name: "በሆ በኬንያ ዊግ", price: 350, categoryName: "በሆ" },
-    { name: "በሆ ሚወጣ ፀጉር", price: 2000, categoryName: "በሆ" },
-
-    // ፍሬንች ከርል
-    { name: "ፍሬንች ከርል የእጅ", price: 2000, categoryName: "ፍሬንች ከርል" },
-    { name: "ፍሬንች ከርል ዊግ", price: 3000, categoryName: "ፍሬንች ከርል" },
-    { name: "ፍሬንች አንድ ጭማሬ ዊግ", price: 750, categoryName: "ፍሬንች ከርል" },
-    { name: "ፍሬንች ሁለት ጭማሬ ዊግ", price: 1500, categoryName: "ፍሬንች ከርል" },
-    { name: "ፓሽን ትዊስት እና ኪንኪ ከርል", price: 1000, categoryName: "ፍሬንች ከርል" }, // Assumed price
-    { name: "የጃጅ", price: 2000, categoryName: "ፍሬንች ከርል" },
-    { name: "የእጅ", price: 1500, categoryName: "ፍሬንች ከርል" }, // Assumed price
-    { name: "ለዊጉ", price: 3500, categoryName: "ፍሬንች ከርል" },
-    { name: "ስፌት", price: 900, categoryName: "ፍሬንች ከርል" },
-
-    // ሀበሻ
-    { name: "አልባስ", price: 1200, categoryName: "ሀበሻ" },
-    { name: "ጋሜ", price: 1500, categoryName: "ሀበሻ" },
-    { name: "ዱላ በፍሬ (Pc)", price: 50, categoryName: "ሀበሻ" },
+    { name: "አላባባ", price: 2000, categoryName: "ሀበሻ" },
+    { name: "ጋሜ", price: 2000, categoryName: "ሀበሻ" },
+    { name: "ዱላ በፍራ", price: 50, categoryName: "ሀበሻ" },
     { name: "ልዋም", price: 3500, categoryName: "ሀበሻ" },
-    { name: "ዳልድ", price: 3000, categoryName: "ሀበሻ" },
+    { name: "ጎንደር", price: 3000, categoryName: "ሀበሻ" },
 
-    // ዋክስ
-    { name: "ብብት", price: 600, categoryName: "ዋክስ" },
-    { name: "ግማሽ እግር", price: 1000, categoryName: "ዋክስ" },
-    { name: "ሙሉ እግር", price: 2300, categoryName: "ዋክስ" },
-    { name: "ግማሽ እጅ", price: 800, categoryName: "ዋክስ" },
-    { name: "ሙሉ እጅ", price: 1200, categoryName: "ዋክስ" },
+    { name: "ሜዲ cure", price: 600, categoryName: "ኔይል/ጥፍር/" },
+    { name: "ኖሮማል ሜዲ cure", price: 1200, categoryName: "ኔይል/ጥፍር/" },
+    { name: "ስፔሻል ፔዲኪዩር", price: 2000, categoryName: "ኔይል/ጥፍር/" },
+    { name: "ልጥፍ", price: 600, categoryName: "ኔይል/ጥፍር/" },
+    { name: "ጄልስ", price: 700, categoryName: "ኔይል/ጥፍር/" },
+    { name: "ጄል ሙሉት", price: 1500, categoryName: "ኔይል/ጥፍር/" },
+    { name: "ፊልል", price: 1000, categoryName: "ኔይል/ጥፍር/" },
+    { name: "ጄል ማሰለቀቅ", price: 200, categoryName: "ኔይል/ጥፍር/" },
+    { name: "ጄልስ ማሰለቀቅ", price: 100, categoryName: "ኔይል/ጥፍር/" },
+    { name: "አክሪሊክ እና ፖሊጄል ማሰለቀቅ", price: 300, categoryName: "ኔይል/ጥፍር/" },
+    { name: "ኖሮማል ጥፍር ቀለም", price: 200, categoryName: "ኔይል/ጥፍር/" },
 
-    // አይላሽ
-    { name: "አይላሽ ዋን ባይ ዋን", price: 4000, categoryName: "አይላሽ" },
-    { name: "አይላሽ ስሪ ዋን", price: 2700, categoryName: "አይላሽ" },
-    { name: "አይላሽ ችሪ ሜድ ፍን", price: 4000, categoryName: "አይላሽ" },
+    { name: "እጥበት", price: 300, categoryName: "እጥበት" },
+    { name: "ትሪትመንት እጥበት", price: 350, categoryName: "እጥበት" },
+    { name: "ብሎ ድራይ (ፎም)", price: 200, categoryName: "እጥበት" },
+    { name: "ካስክ", price: 500, categoryName: "እጥበት" },
+    { name: "ሂዩማን ካስክ", price: 600, categoryName: "እጥበት" },
+
+    { name: "ጥቁር ከራሳቸው ራሶች (ፍሮንታል)", price: 700, categoryName: "ቀለም" },
+    { name: "ጥቁር ከራሳቸው ሙሉ", price: 1500, categoryName: "ቀለም" },
+    { name: "ጥቁር ከቤቱ ራሶች", price: 2000, categoryName: "ቀለም" },
+    { name: "ጥቁር ከቤቱ ሙሉ", price: 3000, categoryName: "ቀለም" },
+    { name: "ቡኒ ከራሳቸው ራሶች", price: 700, categoryName: "ቀለም" },
+    { name: "ቡኒ ከራሳቸው ሙሉ", price: 1500, categoryName: "ቀለም" },
+    { name: "ቡኒ ከቤቱ ራሶች", price: 4000, categoryName: "ቀለም" },
+    { name: "ቡኒ ከቤቱ ሙሉ", price: 7000, categoryName: "ቀለም" },
+
+    { name: "አይላሽ ቆንጣይ ዊግ", price: 4000, categoryName: "አይላሽ" },
+    { name: "አይላሽ ሰራ ቆንጣይ ዊግ", price: 2700, categoryName: "አይላሽ" },
+    { name: "አይላሽ ፕራሚየም 4D", price: 4000, categoryName: "አይላሽ" },
     { name: "ክላስተር ላሽ", price: 1500, categoryName: "አይላሽ" },
 
-    // ኔይል
-    { name: "ሚኒ ኪያር", price: 600, categoryName: "ኔይል" },
-    { name: "ኖርማል ፐይዲ ኪያር", price: 1200, categoryName: "ኔይል" },
-    { name: "ስፔሻል ፐይዲ ኪያር", price: 2000, categoryName: "ኔይል" },
-    { name: "ልጥፍ", price: 600, categoryName: "ኔይል" },
-    { name: "ሺላክ", price: 600, categoryName: "ኔይል" },
-    { name: "ጄል ሙሌት", price: 1300, categoryName: "ኔይል" },
+    { name: "ፍሪዝ በኮንደሽነር", price: 400, categoryName: "ፍሪዝ" },
+    { name: "ፍሪዝ በኮንቱ", price: 850, categoryName: "ፍሪዝ" },
+    { name: "ፍሪዝ በኮንዲሽነር", price: 1000, categoryName: "ፍሪዝ" },
+    { name: "ፍሪዝ በኮንዲሽነር ሂዩማን", price: 1200, categoryName: "ፍሪዝ" },
+
+    { name: "ጥቁር ከቤቱ", price: 4000, categoryName: "ሂዩማን እና ረጅም ፀጉር" },
+    { name: "ቡኒ ከቤቱ", price: 7000, categoryName: "ሂዩማን እና ረጅም ፀጉር" },
+    { name: "ሃይ ላይት ከቤቱ", price: 6000, categoryName: "ሂዩማን እና ረጅም ፀጉር" },
+
+    { name: "ቡህ በኬንያ አንድ ዊግ", price: 2000, categoryName: "ቡህ" },
+    { name: "ቡህ በኬንያ ሁለት ዊግ", price: 3500, categoryName: "ቡህ" },
+    { name: "ቡህ በሁለት ፀጉር", price: 3500, categoryName: "ቡህ" },
+
+    { name: "ሃይ ላይት ከራሳቸው ሙሉ", price: 2000, categoryName: "ሃይ ላይት" },
+    { name: "ሃይ ላይት ከቤቱ ሙሉ", price: 6000, categoryName: "ሃይ ላይት" },
+
+    { name: "ሪላክሰር ፊትፎ ከራሳቸው", price: 800, categoryName: "ሪላክሰር" },
+    { name: "ሙሉ ሪላክሰር ከራሳቸው", price: 1500, categoryName: "ሪላክሰር" },
+    { name: "ሪላክሰር ፊትፎ ከቤቱ", price: 2000, categoryName: "ሪላክሰር" },
+    { name: "ሪላክሰር ሙሉ ከቤቱ", price: 3000, categoryName: "ሪላክሰር" },
+
+    { name: "ብብት ዋክስ", price: 600, categoryName: "ዋክስ" },
+    { name: "ግማሽ እግር ዋክስ", price: 1000, categoryName: "ዋክስ" },
+    { name: "ሙሉ እግር ዋክስ", price: 2300, categoryName: "ዋክስ" },
+    { name: "ግማሽ እጅ ዋክስ", price: 800, categoryName: "ዋክስ" },
+    { name: "ሙሉ እጅ ዋክስ", price: 1200, categoryName: "ዋክስ" },
+
+    { name: "አንድ ክሊፕ ዊግ", price: 200, categoryName: "ክሊፕ" },
+    { name: "ሁለት ክሊፕ ዊግ", price: 400, categoryName: "ክሊፕ" },
+    { name: "ሶስት ክሊፕ ዊግ", price: 500, categoryName: "ክሊፕ" },
   ];
 
   // Insert services
   for (const service of serviceData) {
-    const category = insertedCategories.find(cat => cat.name === service.categoryName);
+    const category = insertedCategories.find(
+      (cat) => cat.name === service.categoryName,
+    );
     if (!category) {
       console.error(`Category not found: ${service.categoryName}`);
       continue;
     }
 
     // Check if service already exists
-    const existing = await db.select().from(services).where(eq(services.name, service.name)).limit(1);
-    
+    const existing = await db
+      .select()
+      .from(services)
+      .where(eq(services.name, service.name))
+      .limit(1);
+
     if (existing.length === 0) {
       // Estimate duration based on price (simple heuristic)
       let durationMinutes = 30;

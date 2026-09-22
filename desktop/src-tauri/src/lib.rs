@@ -11,7 +11,9 @@
 //!   it goes back to that screen instead of leaving a browser error page for the
 //!   cashier to puzzle over.
 //! - The number slip at reception prints straight to the default printer, with no
-//!   print dialog to tap through.
+//!   print dialog to tap through. There is no printer chooser: the printer is the
+//!   Windows default one, and berchi-print.txt brings the dialog back for the one
+//!   time somebody needs to see the list.
 //! - It will not wander off: the window only ever shows the salon server.
 
 use std::time::Duration;
@@ -35,6 +37,15 @@ const FALLBACK_SALON_URL: &str = "http://localhost:3000";
 /// A file next to the program that can name a different address, for a PC set up
 /// on another port. The BERCHI_URL environment variable does the same and wins.
 const URL_FILE: &str = "berchi-url.txt";
+
+/// A file next to the program that chooses whether the slip prints by itself or
+/// the cashier gets the print dialog. The BERCHI_SILENT_PRINT environment
+/// variable does the same and wins.
+///
+/// It exists because an installed program is started from the Start menu, where
+/// there is nowhere to put an environment variable. Seeing which printers
+/// Windows offers should not need one.
+const PRINT_FILE: &str = "berchi-print.txt";
 
 /// A light page that only answers when the whole system is up, unlike a bare
 /// open port: Docker accepts connections on a published port before the app
@@ -65,7 +76,7 @@ const MISSES_BEFORE_STARTING_SCREEN: u32 = 2;
 fn salon_url() -> Result<Url, String> {
     let raw = choose_salon_url(
         std::env::var("BERCHI_URL").ok(),
-        read_url_file(),
+        read_setting_file(URL_FILE),
         BAKED_IN_SALON_URL,
     );
     parse_salon_url(&raw)
@@ -96,9 +107,10 @@ fn parse_salon_url(raw: &str) -> Result<Url, String> {
     Ok(url)
 }
 
-/// First line of berchi-url.txt that is not blank or a # comment.
-fn read_url_file() -> Option<String> {
-    let path = std::env::current_exe().ok()?.parent()?.join(URL_FILE);
+/// First line of a settings file next to the program that is not blank or a
+/// # comment.
+fn read_setting_file(name: &str) -> Option<String> {
+    let path = std::env::current_exe().ok()?.parent()?.join(name);
     let text = std::fs::read_to_string(path).ok()?;
     text.lines()
         .map(str::trim)
@@ -205,6 +217,41 @@ fn supervise(window: WebviewWindow, salon: Url) {
     }
 }
 
+/// Whether the web view prints straight to the default printer.
+///
+/// Silent unless something says otherwise: the number slip has to come out at
+/// reception without an extra tap. Most specific wins, as with the address --
+/// the environment variable, then the file next to the program.
+///
+/// Turning it off is how a printer gets chosen on this PC. There is no printer
+/// chooser inside the salon system: with the dialog back, Windows lists the
+/// printers it knows and the cashier picks one per print.
+#[cfg_attr(not(windows), allow(dead_code))]
+fn silent_printing() -> bool {
+    choose_silent_printing(
+        std::env::var("BERCHI_SILENT_PRINT").ok(),
+        read_setting_file(PRINT_FILE),
+    )
+}
+
+/// Reads the printing setting out of the places one can be written down.
+///
+/// A value nobody recognises is passed over rather than guessed at, so a typo in
+/// the file cannot quietly stop the slip printing: the next place down is tried,
+/// and failing that it stays silent, which is what reception needs.
+#[cfg_attr(not(windows), allow(dead_code))]
+fn choose_silent_printing(from_env: Option<String>, from_file: Option<String>) -> bool {
+    [from_env, from_file]
+        .into_iter()
+        .flatten()
+        .find_map(|value| match value.trim().to_ascii_lowercase().as_str() {
+            "0" | "dialog" | "off" | "false" | "no" => Some(false),
+            "1" | "silent" | "on" | "true" | "yes" => Some(true),
+            _ => None,
+        })
+        .unwrap_or(true)
+}
+
 /// Windows only: the web view's start-up options.
 #[cfg(windows)]
 fn browser_args() -> String {
@@ -212,9 +259,15 @@ fn browser_args() -> String {
     let mut args = String::from("--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection");
 
     // Print straight to the default printer, no dialog: the number slip has to
-    // come out at reception without an extra tap. BERCHI_SILENT_PRINT=0 brings
-    // the dialog back, for setting up a printer.
-    if std::env::var("BERCHI_SILENT_PRINT").as_deref() != Ok("0") {
+    // come out at reception without an extra tap.
+    //
+    // Chromium flashes the print dialog up for about a second before printing
+    // anyway (crbug.com/169004), so a dialog that appears and vanishes by itself
+    // is this option working, not a fault. What it is not is a printer chooser:
+    // the printer is whichever one Windows has as the default. berchi-print.txt
+    // saying "dialog" brings the chooser back, which is how a printer is picked
+    // while setting the PC up.
+    if silent_printing() {
         args.push_str(" --kiosk-printing");
     }
 
@@ -313,6 +366,45 @@ mod tests {
         assert!(parse_salon_url("not an address").is_err());
         assert!(parse_salon_url("salon.example.com").is_err()); // no scheme
         assert!(parse_salon_url("file:///C:/salon").is_err());
+    }
+
+    /// Nothing written down anywhere means the slip prints by itself. Reception
+    /// depends on that: a dialog waiting for a tap holds up the queue.
+    #[test]
+    fn prints_by_itself_unless_told_otherwise() {
+        assert!(choose_silent_printing(None, None));
+    }
+
+    /// Asking for the dialog is how a printer is chosen on the PC, so both
+    /// places have to be able to ask for it.
+    #[test]
+    fn either_place_can_ask_for_the_print_dialog() {
+        assert!(!choose_silent_printing(Some("0".into()), None));
+        assert!(!choose_silent_printing(None, Some("dialog".into())));
+        // The words people actually write, however they cased them, and with the
+        // trailing newline a text editor leaves behind.
+        assert!(!choose_silent_printing(None, Some("Dialog\n".into())));
+        assert!(!choose_silent_printing(None, Some("  OFF  ".into())));
+        assert!(!choose_silent_printing(None, Some("no".into())));
+    }
+
+    #[test]
+    fn the_most_specific_printing_setting_wins() {
+        // The variable is set for one run, to try the dialog on a PC whose file
+        // says silent -- and the other way about.
+        assert!(!choose_silent_printing(Some("0".into()), Some("silent".into())));
+        assert!(choose_silent_printing(Some("1".into()), Some("dialog".into())));
+    }
+
+    /// A typo must not quietly stop the slip printing: reception would go on
+    /// tapping the button with nothing coming out and no reason on screen.
+    #[test]
+    fn a_setting_nobody_recognises_is_passed_over() {
+        assert!(choose_silent_printing(Some("maybe".into()), None));
+        assert!(choose_silent_printing(None, Some("dailog".into())));
+        assert!(choose_silent_printing(Some("".into()), None));
+        // An unreadable variable still lets the file underneath be heard.
+        assert!(!choose_silent_printing(Some("maybe".into()), Some("dialog".into())));
     }
 
     #[test]

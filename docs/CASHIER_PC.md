@@ -144,6 +144,27 @@ The slip is laid out 80 mm wide for a receipt printer. To set it up:
    dialog appears and the cashier presses Print.
 3. Issue a test ticket and check the slip. The **Print again** button reprints it.
 
+**There is no "choose a printer" step, on purpose.** The slip goes to whichever
+printer Windows has as its default — that is why step 1 sets one. Reception
+cannot stop to answer a dialog for every customer.
+
+Two things surprise people the first time:
+
+- **The print dialog flashes up and vanishes before you can read it.** That is
+  silent printing working: Chromium shows the dialog for about a second before
+  printing by itself ([crbug.com/169004](https://crbug.com/169004)). Judge it by
+  what comes out of the printer, not by what the screen does.
+- **No printer list appears.** There is nothing to pick from; see above. If
+  nothing prints, the wrong printer is the Windows default, or it is offline or
+  out of paper — *Settings → Printers & scanners* shows both.
+
+To see the printers Windows offers and pick one by hand — worth doing once, to
+confirm the right one is the default — turn silent printing off for that run. In
+Chrome, open the system from an ordinary shortcut without `--kiosk-printing`. In
+the desktop window, put a file called `berchi-print.txt` next to
+`berchi-cashier.exe` holding the single line `dialog`, and restart it. Put it
+back before opening day.
+
 For a 58 mm printer, change `PAPER_WIDTH_MM` at the top of
 `src/app/slip/[orderId]/page.tsx` to 58 and rebuild.
 
@@ -167,10 +188,17 @@ cashier PC. It installs for that Windows user only, and needs no administrator
 rights.
 
 If no PC here has Rust, GitHub builds the same installer: push a tag like
+<<<<<<< HEAD
 `desktop-v0.1.0` and download it from the release. Builds of untagged branches
 put it under *Artifacts* on the run (*Actions* → *Desktop app*), but that upload
 is refused when the account's artifact storage is full, so a tag is the reliable
 way to get one.
+=======
+`desktop-v0.1.0` and download it from that release. Every push to a branch that
+changes `desktop/` also replaces the branch's pre-release (`desktop-latest-main`
+for `main`) with its newest installer, but that moves on with every build, so
+install the salon from a tagged version.
+>>>>>>> worktree-db-indexes
 
 What it gives over a browser tab:
 
@@ -178,7 +206,9 @@ What it gives over a browser tab:
   carries on by itself when the system is ready. If the system restarts (an
   update), it goes back to that screen within about 10 seconds instead of showing
   a browser error.
-- The number slip prints **straight to the default printer, with no dialog**.
+- The number slip prints **straight to the default printer, with no dialog**
+  (section 5 explains why there is no printer to choose, and how to get a
+  printer list when you do want one).
 - It only ever shows the salon system, opens once, and has no address bar to
   wander off with.
 

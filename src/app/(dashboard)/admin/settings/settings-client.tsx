@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Settings, Save, Shield } from "lucide-react";
+import { Settings, Save, Shield, Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { DEFAULT_BUSINESS_HOURS } from "@/lib/constants";
+import { openPrinterSettings, printerStatus } from "@/lib/desktop-print";
 
 export function SettingsClient() {
   const [loading, setLoading] = useState(true);
@@ -24,6 +25,21 @@ export function SettingsClient() {
   });
 
   const DAY_NAMES = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
+
+  /**
+   * Which printers this PC prints tickets on, or null when the salon system is
+   * open in an ordinary browser rather than the desktop window.
+   *
+   * Printers belong to the PC, not to the salon, so they are not among the
+   * settings saved on this page -- a second till would answer differently. This
+   * is only a way in, and it is only shown where there is something to open.
+   * Read after mount, because it depends on `window`.
+   */
+  const [printers, setPrinters] = useState<{ slip: string | null; receipt: string | null } | null>(null);
+
+  useEffect(() => {
+    printerStatus().then(setPrinters).catch(() => {});
+  }, []);
 
   useEffect(() => {
     fetch("/api/settings")
@@ -336,6 +352,50 @@ export function SettingsClient() {
               </Button>
             </CardContent>
           </Card>
+
+          {/* The receipt printer, which belongs to this PC rather than to the
+              salon: only offered inside the desktop window, where there is
+              something to open. */}
+          {printers && (
+            <Card className="border border-border/60 bg-card shadow-sm">
+              <CardContent className="flex items-start justify-between gap-4 p-6">
+                <div>
+                  <div className="inline-flex items-center gap-2 rounded-full bg-muted px-2.5 py-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                    <Printer className="h-3.5 w-3.5" />
+                    This computer
+                  </div>
+                  <h3 className="mt-3 text-sm font-medium text-foreground">Receipt printer</h3>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {printers.slip || printers.receipt ? (
+                      <>
+                        Number slip: <span className="font-medium">{printers.slip ?? "through the window"}</span>
+                        {" · "}
+                        Receipt: <span className="font-medium">{printers.receipt ?? "through the window"}</span>
+                      </>
+                    ) : (
+                      <>
+                        No printer set up on this computer, so tickets print through the window to
+                        whichever printer Windows has as its default.
+                      </>
+                    )}
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={async () => {
+                    await openPrinterSettings();
+                    // The setup window writes its own settings file, so pick up
+                    // what changed when the admin comes back to this page.
+                    printerStatus().then(setPrinters).catch(() => {});
+                  }}
+                  className="inline-flex items-center gap-2 rounded-full px-4 text-xs font-medium"
+                >
+                  <Printer className="h-4 w-4" />
+                  Printer setup
+                </Button>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
 

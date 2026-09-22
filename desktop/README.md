@@ -17,11 +17,19 @@ browser handles badly:
 - **The server goes away** (an update, Docker restarting, the internet dropping):
   within about 10 seconds it goes back to that screen, instead of leaving a
   browser error page.
-- **The number slip prints with no dialog**, straight to whichever printer
-  Windows has as its default. There is no printer chooser; see
-  [Choosing a printer](#choosing-a-printer).
-- **It cannot wander off:** the window only ever shows the salon server. The page
-  it shows has no way to call into the program or the computer.
+- **Tickets print on a real receipt printer.** The number slip and the receipt
+  are laid out for an 80 mm roll and sent as ESC/POS, so the paper is cut at the
+  end and the cash drawer can be kicked on a cash sale. Which printer is chosen
+  on this PC, in a window the program opens itself: see
+  [Setting up the printer](#setting-up-the-printer).
+- **With no printer set up it still prints**, the older way: the page goes
+  straight to whichever printer Windows has as its default, with no dialog.
+  That is also what happens if the receipt printer is switched off or out of
+  paper, so a half-finished setup never stops reception issuing tickets.
+- **It cannot wander off:** the window only ever shows the salon server. The
+  only thing the salon's pages may ask the program to do is print a ticket,
+  open the cash drawer or open the printer settings window &mdash; they cannot
+  read or change the printer settings, or touch anything else on the PC.
 - **A second launch** brings the first window forward instead of opening another.
 
 **It is not the offline rewrite.** The earlier plan for a Tauri app with its own
@@ -106,8 +114,10 @@ Other settings:
 
 | Setting | What it does |
 |---|---|
-| `berchi-print.txt` next to the program | `dialog` to print through the print dialog, `silent` to print by itself. Silent if the file is missing. |
+| **Printer setup**, in the program | Which printer prints which ticket, the roll width, the cut and the cash drawer. Kept in `printers.json`; see [Setting up the printer](#setting-up-the-printer). This is the one to use. |
+| `berchi-print.txt` next to the program | Only affects the older way of printing (a web page to the Windows default printer). `dialog` to print through the print dialog, `silent` to print by itself. Silent if the file is missing. |
 | `BERCHI_SILENT_PRINT` | `0` for the dialog, `1` for silent. Beats the file, for trying one without committing to it. |
+| `BERCHI_PRINTERS_FILE` | Points the printer settings at another file, for one run. Used by the tests so they cannot overwrite a real till's setup. |
 | `BERCHI_WEBVIEW_ARGS` | Extra web view options, for diagnosing. |
 
 `http://` and `https://` are both supported. If the address cannot be used, the
@@ -116,15 +126,67 @@ window says so instead of waiting forever.
 A word nobody recognises in `berchi-print.txt` is passed over rather than guessed
 at, so a typo cannot quietly stop the slip printing.
 
-### Choosing a printer
+## Setting up the printer
 
-There is no printer chooser in the salon system, by design. The slip prints
-straight to **whichever printer Windows has as its default**, because reception
-cannot stop to answer a dialog for every customer.
+Open **Printer setup** and the program does the rest. There are two ways in:
 
-So the printer is chosen in Windows, under *Settings → Bluetooth & devices →
-Printers & scanners → Set as default*, and it should be the receipt printer with
-its paper size set to the 80 mm roll.
+- The button on the *Starting the salon system* screen, which is deliberately
+  reachable while the salon system is **down** &mdash; setting a printer up is
+  work for before opening, often on a PC whose Docker stack has not started yet.
+- From the salon system itself, once it is up.
+
+The window has three parts: the printers this PC knows about, the settings for
+the one being edited, and a preview of what will come out. The preview is laid
+out by the same code that drives the printer, at the width set in the form, so a
+service name that wraps awkwardly on screen wraps awkwardly on paper.
+
+### Adding a printer
+
+**Add** looks for what is attached and offers it. Between them these cover how a
+receipt printer is actually wired:
+
+| What is offered | When it is the right one |
+|---|---|
+| A printer installed in Windows | Its vendor driver is installed and it appears in *Printers & scanners*. The bytes go through the print queue, so the queue, the offline warning and every other program's access to it keep working. This is the usual answer, and the Windows default printer is offered first. |
+| On the network | It has an Ethernet socket or Wi-Fi. Port 9100 on nearly every receipt printer. Set up by hand, because a printer on the network cannot be found by looking at this PC. |
+| Plugged in by USB, no driver installed | Windows picked it up with its own `usbprint.sys` class driver because nobody installed the disc. It has no print queue, but it is a perfectly good ESC/POS printer. |
+| On a serial (COM) port | Older tills. The baud rate has to match the printer, which is usually set with dip switches underneath it. |
+| A device path | The escape hatch, written to directly as a file. |
+
+### The settings that matter
+
+- **Roll width.** 80 mm is the usual one. Changing it fills in the usual number
+  of characters per line (42 for 80 mm, 32 for 58 mm), which stays editable
+  because a printer set to a smaller font fits more. The test print has a ruler
+  across it for counting.
+- **Cutting, and the cut amount.** The cut amount is how much paper is rolled
+  out before the blade comes down. It is not decoration: the cutter sits above
+  the print head by a centimetre or two, so with no feed the cut lands in the
+  middle of the last line of the ticket. Too much and every sale throws paper
+  away. Four lines suits most printers. Find the right number for yours by
+  printing a test, looking at the paper, and moving the slider &mdash; the test
+  prints the printer being edited, unsaved changes and all, so it is quick to go
+  round a few times. A printer with no cutter is set to *tear it off by hand*,
+  and then no cut command is sent at all.
+- **Cash drawer.** Only a cash sale opens it; a card or transfer popping the
+  drawer is how a till loses count of what should be in it.
+- **What prints where.** The number slip and the receipt are assigned
+  separately, because a salon may want the slip at reception and the receipt at
+  the till. Both can be the same printer, and the first one added takes both.
+  Anything left as *print through the window* keeps working the older way.
+
+Settings are kept in `printers.json` in this program's own settings folder,
+under the Windows user's profile. The window shows the full path along the
+bottom. They belong to **this PC**: a second till is set up separately.
+
+### Printing the older way
+
+With no printer set up, the ticket is printed as a web page, straight to
+**whichever printer Windows has as its default**, with no dialog &mdash;
+reception cannot stop to answer one for every customer. The printer is then
+chosen in Windows, under *Settings → Bluetooth & devices → Printers & scanners →
+Set as default*, and it should be the receipt printer with its paper size set to
+the 80 mm roll.
 
 **Chromium flashes the print dialog up for about a second before printing
 anyway** ([crbug.com/169004](https://crbug.com/169004)). A dialog that appears
@@ -251,10 +313,24 @@ seeing too.
 
 | What you see | Usually means |
 |---|---|
-| The print dialog appears and vanishes before you can read it, with no printer list | Silent printing, working. Chromium flashes the dialog up for about a second before printing by itself ([crbug.com/169004](https://crbug.com/169004)). It is not a chooser: the slip goes to the Windows default printer. To pick a printer, see [Choosing a printer](#choosing-a-printer). |
+First, which way is it printing? If *Printer setup* has a printer assigned to
+that ticket, it is going there as ESC/POS. If not, it is being printed as a web
+page to the Windows default printer, and the rows about the dialog apply.
+
+| What you see | Usually means |
+|---|---|
+| A message at the till naming the printer, and the slip came out of the *wrong* printer | The receipt printer could not be reached, so it fell back to the web view and the Windows default printer. The message says why. The slip still came out, which is the point. |
+| The cut lands in the middle of the last line | The cut amount is too small. Raise it in *Printer setup* and print a test; the cutter sits above the print head, so some feed is always needed. |
+| Every ticket wastes a hand's length of paper | The cut amount is too large. Lower it the same way. |
+| Strange characters where a name should be | A thermal printer holds a 256-character table and **Amharic is in none of them**, on any printer. Names in Amharic print as `?`. Accented Latin letters print without their accents, so `René` comes out as `Rene`. |
+| Nothing comes out, and the message mentions the print queue | *Settings → Printers & scanners* — the printer is offline, out of paper, or has a job stuck in its queue. |
+| Nothing comes out, and the message mentions a port or an address | A network printer that is off or has changed address, or a USB printer another program is holding open. |
+| The ticket prints as readable gibberish, full of `ESC` and `@` | The printer is being driven as a page rather than raw. For a Windows printer the job is sent as RAW, so this points at a driver that does not pass raw data through — set that printer up as *plugged in by USB* or *on the network* instead. |
+| The ticket is too wide, or wraps in odd places | The characters per line is wrong for the roll. Print a test: it has a ruler across it, and if the last digits fall off the edge or wrap, the number is too high. |
+| The print dialog appears and vanishes before you can read it, with no printer list | Printing the older way, working. Chromium flashes the dialog up for about a second before printing by itself ([crbug.com/169004](https://crbug.com/169004)). It is not a chooser: the ticket goes to the Windows default printer. |
 | The dialog flashes and nothing comes out | The Windows default printer is the wrong one, offline, or out of paper. *Settings → Printers & scanners* shows which one is the default and whether it has a job stuck in its queue. |
 | A printer list would help, but the file is ignored | `berchi-print.txt` has to sit **next to `berchi-cashier.exe`**, not in the folder the shortcut starts in, and the window has to be restarted. Check `BERCHI_SILENT_PRINT` is not also set, because it beats the file. |
-| The slip prints, but too wide or cut off | The default printer's paper size is not the 80 mm roll. Set it in the printer's Windows properties. For a 58 mm roll, change `PAPER_WIDTH_MM` in `src/app/slip/[orderId]/page.tsx` and rebuild the salon system. |
+| The slip prints the older way, but too wide or cut off | The default printer's paper size is not the 80 mm roll. Set it in the printer's Windows properties. For a 58 mm roll, change `PAPER_WIDTH_MM` in `src/app/slip/[orderId]/page.tsx` and rebuild the salon system. (Set up a printer properly instead and the roll width is a setting, with no rebuild.) |
 
 `BERCHI_URL` overrides everything if you want to try an address without editing
 or rebuilding anything. From the folder the shortcut points at:
@@ -304,16 +380,53 @@ returns to the Starting screen if it goes away again, copes with a bad address
 or an address file, and takes the printing setting from `berchi-print.txt` (with
 the environment variable beating it, and a typo left printing silently).
 
-**Not checked: a real printer.** The options are read back off the running web
-view, but the test does not print, because that would print on the default
-printer. Try *Print again* on the reception screen with your printer before
-relying on it — and remember the dialog flashing past is silent printing
-working, so judge it by what comes out of the printer, not by the screen.
+Sections **G** and **H** cover the printing added since: that the salon's own
+pages may ask what this PC prints on, print a ticket and open the printer setup
+— and may **not** read or change the printer settings — that printing with
+nothing set up answers "not printed" with a reason rather than failing, and that
+the printer setup opens from the *Starting* screen while the salon system is
+down. They use `BERCHI_PRINTERS_FILE` so a run cannot scribble on the settings
+of the PC it runs on. Run one on its own with `node scripts/verify-shell.mjs G`.
+
+The layout of a ticket, the cut, the character handling and the settings file
+are covered by unit tests, which need no printer and run anywhere:
+
+```powershell
+cargo test --manifest-path src-tauri/Cargo.toml printing
+```
+
+They check the real ESC/POS bytes — that a ticket starts by initialising, that
+two copies really are two tickets, that a printer set to *tear it off by hand*
+is never sent a cut — against a driver that keeps the bytes instead of printing
+them.
+
+**Not checked: a real printer.** Nothing automated puts ink on paper, because it
+would print on whatever the PC has. Use *Print a test ticket* in *Printer setup*
+with your own printer before relying on it, and judge the cut amount by the
+paper rather than by the screen.
 
 ## Layout
 
-- `src/`: the two screens the program shows itself: `index.html` (*Starting*) and
-  `problem.html` (bad address). Plain HTML, one line of script, no network.
-- `src-tauri/src/lib.rs`: the whole program: the address, the watching, the
-  window, the rules about where it may go.
+- `src/`: the screens the program shows itself. `index.html` (*Starting*) and
+  `problem.html` (bad address) are plain HTML with one small script;
+  `printers.html` with `printers.js` and `printers.css` is the printer setup.
+  No network, no bundler, nothing fetched from anywhere.
+- `src-tauri/src/lib.rs`: the shell itself: the address, the watching, the
+  window, the rules about where it may go, and the permission that lets the
+  salon's own pages print.
+- `src-tauri/src/printing/`: everything about printing a ticket.
+  - `settings.rs`: what this PC knows about its printers, and reading and
+    writing `printers.json`.
+  - `discovery.rs`: what printers this PC can see.
+  - `transport.rs`: getting bytes to a printer, including the Windows print
+    spooler, which `escpos` has no driver for.
+  - `doc.rs`: a ticket described rather than printed, and the column arithmetic.
+  - `ticket.rs`: what the salon system sends, and the two templates.
+  - `render.rs`: a described ticket as ESC/POS, or as characters for the
+    preview — the same layout code either way.
+  - `mod.rs`: the commands the rest of the program and the salon system call.
+- `src-tauri/capabilities/`: what the program's own screens may do. What the
+  *salon's* pages may do is granted at start-up instead, in
+  `printing::salon_capability`, because the salon's address is not known until
+  then.
 - `scripts/verify-shell.mjs`: the check above.

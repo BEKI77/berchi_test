@@ -127,7 +127,39 @@ When the cashier types a name and taps **Issue ticket and print number**, a smal
 slip prints with the big number, the name and the time. The customer takes it to
 their stylist, and it also settles who arrived first: the lower number came first.
 
-The slip is laid out 80 mm wide for a receipt printer. To set it up:
+There are two ways this can print, and the better one needs the desktop window
+from section 6.
+
+### With the desktop window: a real receipt printer
+
+Open **Printer setup** in the window (there is a button on the *Starting the
+salon system* screen, and one in the salon system once it is up), press **Add**,
+and pick the printer. The slip and the receipt are then laid out for the roll
+and sent to the printer directly, which means:
+
+- The paper is **cut** at the end of each ticket, with the amount of paper fed
+  before the cut adjustable — that setting matters, because the cutter sits
+  above the print head and too little feed cuts through the last line.
+- The **cash drawer** can be kicked open when a sale is paid in cash.
+- The slip and the receipt can go to **different printers** — the slip at
+  reception, the receipt at the till.
+- The roll width is a setting, so a 58 mm roll needs no rebuild.
+
+There is a preview beside the settings and a **Print a test ticket** button, so
+the cut amount can be got right by printing, looking at the paper, and adjusting.
+Do that once before opening day. Full instructions are in
+[desktop/README.md](../desktop/README.md#setting-up-the-printer).
+
+Names typed in **Amharic cannot be printed** on a thermal printer — no receipt
+printer has the characters, whatever is configured — and come out as `?`. Latin
+names print normally.
+
+### Without it: printing the page
+
+This is what happens on a PC where no printer has been set up, and it is what
+happens anyway if the receipt printer is switched off or out of paper, so
+reception is never stopped by a printer. The slip is laid out 80 mm wide and
+printed as a web page. To set it up:
 
 1. Install the printer's Windows driver and make it the **default printer**, with
    its paper size set to the 80 mm roll.
@@ -144,9 +176,10 @@ The slip is laid out 80 mm wide for a receipt printer. To set it up:
    dialog appears and the cashier presses Print.
 3. Issue a test ticket and check the slip. The **Print again** button reprints it.
 
-**There is no "choose a printer" step, on purpose.** The slip goes to whichever
-printer Windows has as its default — that is why step 1 sets one. Reception
-cannot stop to answer a dialog for every customer.
+**Printing this way has no "choose a printer" step, on purpose.** The slip goes
+to whichever printer Windows has as its default — that is why step 1 sets one.
+Reception cannot stop to answer a dialog for every customer. (Set a printer up
+properly in the desktop window and you do choose, once, in a proper list.)
 
 Two things surprise people the first time:
 
@@ -166,10 +199,11 @@ the desktop window, put a file called `berchi-print.txt` next to
 back before opening day.
 
 For a 58 mm printer, change `PAPER_WIDTH_MM` at the top of
-`src/app/slip/[orderId]/page.tsx` to 58 and rebuild.
+`src/app/slip/[orderId]/page.tsx` to 58 and rebuild. (With a printer set up in
+the desktop window, the roll width is a setting and there is nothing to rebuild.)
 
 The slip page itself has been checked at 80 mm, but not yet on a real printer.
-Test with yours before opening day.
+Test with yours before opening day, whichever way you print.
 
 ## 6. The desktop window (optional)
 
@@ -199,9 +233,11 @@ What it gives over a browser tab:
   carries on by itself when the system is ready. If the system restarts (an
   update), it goes back to that screen within about 10 seconds instead of showing
   a browser error.
-- The number slip prints **straight to the default printer, with no dialog**
-  (section 5 explains why there is no printer to choose, and how to get a
-  printer list when you do want one).
+- **Printing on a real receipt printer**, chosen on the PC: the paper is cut at
+  the end of each ticket, the cash drawer can be kicked on a cash sale, and the
+  slip and the receipt can go to different printers (section 5). With none set
+  up it prints the older way, straight to the Windows default printer with no
+  dialog.
 - It only ever shows the salon system, opens once, and has no address bar to
   wander off with.
 

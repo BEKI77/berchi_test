@@ -1,0 +1,21 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "desktop",
+  "description": "What the program's own screens may do: the Starting screen and the printer settings window. These are pages bundled inside the program, not anything loaded from the salon server -- what the salon server may ask for is granted separately, at start-up, by printing::salon_capability, and is only the printing commands.",
+  "local": true,
+  "windows": ["main", "printers"],
+  "permissions": [
+    "core:default",
+    "core:window:allow-close",
+    "allow-list-printers",
+    "allow-printer-settings",
+    "allow-save-printer-settings",
+    "allow-preview-ticket",
+    "allow-test-print",
+    "allow-print-slip",
+    "allow-print-receipt",
+    "allow-open-cash-drawer",
+    "allow-printing-status",
+    "allow-open-printer-settings"
+  ]
+}

@@ -7,8 +7,10 @@
 # fails rather than shipping that default to the salon.
 #
 # When it runs:
-#   - a push or pull request that touches desktop/ -> builds, and keeps the
-#     installer as a workflow artifact for 30 days.
+#   - a push or pull request that touches desktop/ -> builds, and tries to keep
+#     the installer as a workflow artifact for 30 days. That upload is allowed to
+#     fail: artifact storage is a quota shared across the whole account, and a
+#     full one must not fail a build that worked.
 #   - a tag like desktop-v0.1.0 -> builds and publishes a GitHub Release with the
 #     installer attached, so the cashier PC can download it instead of needing
 #     Rust installed. (GitHub skips paths filters for tag pushes, so a tag always
@@ -49,11 +51,13 @@ jobs:
     name: Windows installer
     runs-on: windows-latest
     timeout-minutes: 45
+    # Only the last step writes anything, and only on a tag: it creates the
+    # release and uploads the installer to it.
+    permissions:
+      contents: write
     defaults:
       run:
         working-directory: desktop
-    outputs:
-      version: ${{ steps.app.outputs.version }}
 
     steps:
       - uses: actions/checkout@v4
@@ -135,8 +139,8 @@ jobs:
           BERCHI_DEFAULT_URL: ${{ secrets.SALON_URL }}
         run: npm run tauri build
 
-      # Flattened, so the release job below has a path that does not depend on
-      # where Cargo and the bundler happened to put things.
+      # Flattened, so the steps below have a path that does not depend on where
+      # Cargo and the bundler happened to put things.
       - name: Collect what to keep
         shell: bash
         run: |
@@ -145,31 +149,28 @@ jobs:
           cp src-tauri/target/release/berchi-cashier.exe dist/
           ls -l dist
 
+      # Convenient for grabbing a build of a branch, but it is the first thing to
+      # break: artifact storage is a quota shared across the whole account, and
+      # when it is full every upload fails. A release must not depend on it, and
+      # a full quota must not redden a build that worked, so this is allowed to
+      # fail on its own.
       - uses: actions/upload-artifact@v4
+        continue-on-error: true
         with:
           name: berchi-cashier-${{ steps.app.outputs.version }}
           path: desktop/dist/*
           if-no-files-found: error
           retention-days: 30
 
-  release:
-    name: Publish the installer
-    needs: build
-    if: startsWith(github.ref, 'refs/tags/desktop-v')
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: berchi-cashier-${{ needs.build.outputs.version }}
-          path: dist
-
-      - name: Attach it to the release
+      # Straight from this job, rather than handing the files to another one
+      # through the artifact store: release assets do not live in that quota, so
+      # tagging still produces an installer when artifact uploads are refused.
+      - name: Publish the release
+        if: startsWith(github.ref, 'refs/tags/desktop-v')
+        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ needs.build.outputs.version }}
+          VERSION: ${{ steps.app.outputs.version }}
         run: |
           set -euo pipefail
           cat > notes.md <<'NOTES'
@@ -179,13 +180,12 @@ jobs:
              signed-in Windows user only, so it needs no administrator rights.
              It is not code-signed, so SmartScreen may say "unknown publisher":
              choose **More info**, then **Run anyway**.
-          2. The salon system must already be running on that PC
-             (`docker compose -f docker-compose.cashier.yml ... up -d`).
-          3. If the salon system is not on this PC's own port 3000, put its
-             address (for example `http://192.168.1.50:3000`) on the first line
-             of a file called `berchi-url.txt` next to the installed program.
-          4. Start it. It shows *Starting the salon system* until the server
+          2. Start it. It shows *Starting the salon system* until the salon
              answers, then opens the cashier screens by itself.
+
+          This build points at the address held in the `SALON_URL` secret. To send
+          one PC somewhere else, put that address on the first line of a file
+          called `berchi-url.txt` next to the installed program.
 
           Full setup: `desktop/README.md` and `docs/CASHIER_PC.md`.
           NOTES
@@ -194,3 +194,4 @@ jobs:
               --title "Berchi Cashier $VERSION" --notes-file notes.md
           fi
           gh release upload "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --clobber dist/*-setup.exe
+

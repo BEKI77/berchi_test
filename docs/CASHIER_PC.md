@@ -167,8 +167,10 @@ cashier PC. It installs for that Windows user only, and needs no administrator
 rights.
 
 If no PC here has Rust, GitHub builds the same installer: push a tag like
-`desktop-v0.1.0` and download it from the release, or take it from the *Artifacts*
-of any run under *Actions* → *Desktop app*.
+`desktop-v0.1.0` and download it from the release. Builds of untagged branches
+put it under *Artifacts* on the run (*Actions* → *Desktop app*), but that upload
+is refused when the account's artifact storage is full, so a tag is the reliable
+way to get one.
 
 What it gives over a browser tab:
 

@@ -99,7 +99,7 @@ Other settings:
 
 | Setting | What it does |
 |---|---|
-| `BERCHI_SILENT_PRINT=0` | Brings the print dialog back (for choosing a printer). Silent by default. |
+| `BERCHI_SILENT_PRINT=1` | Skips the print dialog and prints straight to the default printer. The dialog shows by default. |
 | `BERCHI_WEBVIEW_ARGS` | Extra web view options, for diagnosing. |
 
 `http://` and `https://` are both supported. If the address cannot be used, the

@@ -6,8 +6,9 @@
 //   cargo build --manifest-path src-tauri/Cargo.toml     # once, or after a change
 //   SALON_URL=http://localhost:3000 npm run verify        # the salon system must be running
 //
-// Windows only. Silent printing is deliberately NOT exercised: it would print on
-// the default printer. The test only checks that the option is passed.
+// Windows only. Silent printing (BERCHI_SILENT_PRINT=1) is deliberately NOT
+// exercised: it would print on the default printer. The test only checks that
+// the dialog shows by default and the flag is passed when asked for.
 import { spawn, execSync } from "node:child_process";
 import fs from "node:fs";
 import http from "node:http";
@@ -100,7 +101,7 @@ if (which === "all" || which === "A") {
   check("it refuses to navigate away from the salon system", (await page.evalJs("location.origin")) === SALON_ORIGIN, await page.evalJs("location.href"));
 
   const args = powershell("(Get-CimInstance Win32_Process -Filter \"Name='msedgewebview2.exe'\" | Where-Object { $_.CommandLine -like '*com.berchi.cashier*' } | Select-Object -First 1).CommandLine");
-  check("web view was started with silent printing (--kiosk-printing)", args.includes("--kiosk-printing"), args.slice(0, 200));
+  check("the print dialog shows by default (no --kiosk-printing)", !args.includes("--kiosk-printing"), args.slice(0, 200));
   check("...and kept Tauri's own default options", args.includes("--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection"), args.slice(0, 200));
 
   console.log("\nB. A second launch does not open a second cashier");

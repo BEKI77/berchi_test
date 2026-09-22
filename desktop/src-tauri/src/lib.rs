@@ -10,8 +10,8 @@
 //! - The server goes away (an update, Docker restarting, the internet dropping):
 //!   it goes back to that screen instead of leaving a browser error page for the
 //!   cashier to puzzle over.
-//! - The number slip at reception prints straight to the default printer, with no
-//!   print dialog to tap through.
+//! - The number slip at reception shows the print dialog so the cashier can pick
+//!   a printer, unless BERCHI_SILENT_PRINT=1 sends it straight to the default one.
 //! - It will not wander off: the window only ever shows the salon server.
 
 use std::time::Duration;
@@ -30,7 +30,7 @@ const BAKED_IN_SALON_URL: Option<&str> = option_env!("BERCHI_DEFAULT_URL");
 
 /// Where the salon system lives when nothing else says otherwise: the cashier
 /// PC's own port 3000, which is what a developer running the Docker stack wants.
-const FALLBACK_SALON_URL: &str = "http://localhost:3000";
+const FALLBACK_SALON_URL: &str = "http://localhost:3002";
 
 /// A file next to the program that can name a different address, for a PC set up
 /// on another port. The BERCHI_URL environment variable does the same and wins.
@@ -211,10 +211,10 @@ fn browser_args() -> String {
     // Setting any option REPLACES Tauri's own defaults, so they are repeated.
     let mut args = String::from("--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection");
 
-    // Print straight to the default printer, no dialog: the number slip has to
-    // come out at reception without an extra tap. BERCHI_SILENT_PRINT=0 brings
-    // the dialog back, for setting up a printer.
-    if std::env::var("BERCHI_SILENT_PRINT").as_deref() != Ok("0") {
+    // The print dialog shows by default, so the cashier can pick a printer.
+    // BERCHI_SILENT_PRINT=1 skips it and prints straight to the default
+    // printer instead, for a till with only one printer ever attached.
+    if std::env::var("BERCHI_SILENT_PRINT").as_deref() == Ok("1") {
         args.push_str(" --kiosk-printing");
     }
 

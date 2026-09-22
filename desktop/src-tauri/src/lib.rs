@@ -517,6 +517,27 @@ mod tests {
         );
         assert!(NATIVE_FEEL.contains("\"drop\""), "a dropped file must not navigate the window");
         assert!(NATIVE_FEEL.contains("scrollbar"), "the browser's scrollbar must be replaced");
+
+        // The way in to the printer setup, on every screen. It used to be on
+        // the Starting screen only, which is the one screen that takes itself
+        // away as soon as the salon system answers -- so on a PC that was
+        // working properly it was never there to press.
+        assert!(
+            NATIVE_FEEL.contains("open_printer_settings"),
+            "every screen must offer a way into the printer setup"
+        );
+        assert!(
+            NATIVE_FEEL.contains("attachShadow"),
+            "it must be out of reach of the salon system's stylesheets"
+        );
+        assert!(
+            NATIVE_FEEL.contains("window.top !== window.self"),
+            "it must not be added to the frame the number slip is printed from"
+        );
+        assert!(
+            NATIVE_FEEL.contains("@media print"),
+            "it must never come out on a customer's slip"
+        );
         // It runs on a page served by the salon, so a throw here would take the
         // till down with it.
         assert!(NATIVE_FEEL.contains("catch"), "it must not be able to break the salon system");

@@ -136,12 +136,26 @@ at, so a typo cannot quietly stop the slip printing.
 
 ## Setting up the printer
 
-Open **Printer setup** and the program does the rest. There are two ways in:
+Open **Printer setup** and the program does the rest. There are three ways in,
+and the first works on **every screen**:
 
-- The button on the *Starting the salon system* screen, which is deliberately
-  reachable while the salon system is **down** &mdash; setting a printer up is
-  work for before opening, often on a PC whose Docker stack has not started yet.
-- From the salon system itself, once it is up.
+- The small **Printer** button in the bottom left corner, or **Ctrl+Alt+P**. The
+  program puts it on every page it shows, including the salon system's own and
+  the sign-in screen, so it is never more than one press away &mdash; and
+  including while the salon system is **down**, which is when a printer is
+  usually being set up.
+- From the salon system: **Admin → Settings → Receipt printer**.
+
+It used to be offered on the *Starting the salon system* screen only. That was a
+mistake worth recording: that screen takes itself away the moment the salon
+answers, so on a PC that was working properly the button was never there to
+press.
+
+The button is put there from outside the salon system, by a script the program
+injects (`src-tauri/src/native.js`), in its own shadow root &mdash; so the salon
+system's stylesheets cannot reach it and it cannot leak into them. It is not
+added to the hidden frame the number slip prints from, and it is hidden when
+printing, so it can never come out on a customer's slip.
 
 The window has three parts: the printers this PC knows about, the settings for
 the one being edited, and a preview of what will come out. The preview is laid
@@ -421,7 +435,8 @@ paper rather than by the screen.
 ## Layout
 
 - `src/`: the screens the program shows itself. `index.html` (*Starting*) and
-  `problem.html` (bad address) are plain HTML with one small script;
+  `problem.html` (bad address) are plain HTML with one small script (the 30
+  second hint; the printer button is injected by the program, on every screen);
   `printers.html` with `printers.js` and `printers.css` is the printer setup.
   No network, no bundler, nothing fetched from anywhere.
 - `src-tauri/src/lib.rs`: the shell itself: the address, the watching, the
@@ -429,9 +444,9 @@ paper rather than by the screen.
   salon's own pages print.
 - `src-tauri/src/native.js`: injected into every page before its own scripts
   run, including the salon system's. Takes away the browser behaviours that have
-  no place on a till, and nothing else — it deliberately does not style or
-  intercept anything the salon system does, so there is nothing for it to
-  disagree with.
+  no place on a till, and puts the way in to the printer setup on every screen.
+  Nothing else — it deliberately does not style or intercept anything the salon
+  system does, so there is nothing for it to disagree with.
 - `src-tauri/src/printing/`: everything about printing a ticket.
   - `settings.rs`: what this PC knows about its printers, and reading and
     writing `printers.json`.

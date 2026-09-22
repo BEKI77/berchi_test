@@ -81,6 +81,15 @@ const freePort = () => new Promise((resolve) => {
 
 const powershell = (command) => execSync(`powershell -NoProfile -ExecutionPolicy Bypass -Command "${command.replace(/"/g, '\\"')}"`).toString().trim();
 
+// The way in to the printer setup that the program injects into every page it
+// shows. It lives in a shadow root so the salon system's stylesheets cannot
+// reach it, which is also why it cannot simply be looked up by id.
+const PRINTER_BUTTON = {
+  exists: "!!document.getElementById('berchi-printer-setup')?.shadowRoot?.querySelector('button')",
+  label: "document.getElementById('berchi-printer-setup')?.shadowRoot?.querySelector('button')?.textContent?.trim()",
+  click: "document.getElementById('berchi-printer-setup').shadowRoot.querySelector('button').click()",
+};
+
 // The options the web view was actually started with. This is the only way to
 // see them: they are handed to WebView2 at creation and are not readable from
 // the page.
@@ -283,13 +292,9 @@ if (which === "all" || which === "H") {
   await sleep(2500);
 
   check("the Starting screen is showing", (await page.evalJs("document.body.innerText")).includes("Starting the salon system"));
-  check("the printer setup button is offered", (await page.evalJs("!!document.getElementById('printer-setup')")) === true);
-  // The button is always shown, so the only way it can fail is by saying so.
-  // An earlier version hid it when the program could not be reached, which is
-  // the one failure nobody can report.
-  check("nothing is complaining yet", (await page.evalJs("document.getElementById('printer-setup-trouble').hidden")) === true);
+  check("the printer setup button is offered", (await page.evalJs(PRINTER_BUTTON.exists)) === true);
 
-  await page.evalJs("document.getElementById('printer-setup').click()");
+  await page.evalJs(PRINTER_BUTTON.click);
   const setupWindow = await waitFor(async () => {
     const targets = await (await fetch(`http://127.0.0.1:${DEBUG_PORT}/json/list`)).json();
     return targets.some((t) => (t.url ?? "").includes("printers.html"));
@@ -330,6 +335,20 @@ if (which === "all" || which === "I") {
 
   const body = await page.evalJs("getComputedStyle(document.body).userSelect");
   check("text cannot be dragged blue", body === "none", String(body));
+
+  // The whole point of injecting it: the salon system is served from a web
+  // server and knows nothing about the printer, so the way in has to be put
+  // there from outside. The Starting screen is not enough -- it disappears by
+  // itself the moment the salon answers.
+  check("the printer setup is offered on the salon's own pages", (await page.evalJs(PRINTER_BUTTON.exists)) === true);
+  check("...and says what it is", (await page.evalJs(PRINTER_BUTTON.label)) === "Printer", String(await page.evalJs(PRINTER_BUTTON.label)));
+
+  // It sits outside the salon system's own root element, so a re-render on the
+  // way to another screen cannot take it away with it.
+  const outside = await page.evalJs(
+    "document.getElementById('berchi-printer-setup').parentElement === document.body",
+  );
+  check("...and cannot be swept away by the app re-rendering", outside === true);
 
   // A field must stay selectable, or a phone number cannot be copied out of one.
   const field = await page.evalJs(`(() => {

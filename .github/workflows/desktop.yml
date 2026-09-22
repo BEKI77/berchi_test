@@ -1,5 +1,11 @@
 # Builds the cashier's desktop window (desktop/) into a Windows installer.
 #
+# The salon's address is baked into the program at build time from the SALON_URL
+# repository secret (Settings -> Secrets and variables -> Actions), so a cashier
+# PC installs the program and connects with nothing to configure. A build without
+# the secret falls back to http://localhost:3000; a tagged release without it
+# fails rather than shipping that default to the salon.
+#
 # When it runs:
 #   - a push or pull request that touches desktop/ -> builds, and keeps the
 #     installer as a workflow artifact for 30 days.
@@ -10,9 +16,10 @@
 #   - Actions tab -> Desktop app -> Run workflow -> builds on demand.
 #
 # The program is Windows-only -- WebView2, silent printing, an NSIS installer --
-# so there is only a Windows job. desktop/scripts/verify-shell.mjs is deliberately
-# not run here: it drives a real web view against a running salon system, which CI
-# has no way to provide. Run it on the development PC before tagging a release.
+# so there is only a Windows job. The Rust unit tests do run here.
+# desktop/scripts/verify-shell.mjs is deliberately left out: it drives a real web
+# view against a running salon system, which CI has no way to provide. Run it on
+# the development PC before tagging a release.
 
 name: Desktop app
 
@@ -73,6 +80,33 @@ jobs:
         shell: bash
         run: echo "version=$(node -p "require('./src-tauri/tauri.conf.json').version")" >> "$GITHUB_OUTPUT"
 
+      # The salon's address is compiled into the program, so it has to be settled
+      # before the build rather than configured afterwards on every PC.
+      #
+      # It sits in a secret only to keep the domain out of this file. It is not a
+      # credential: anyone holding the installer can read the address straight
+      # back out of it, so nothing private belongs in it.
+      - name: Check the salon address
+        shell: bash
+        env:
+          SALON_URL: ${{ secrets.SALON_URL }}
+        run: |
+          if [ -z "$SALON_URL" ]; then
+            if [ "$GITHUB_REF_TYPE" = tag ]; then
+              echo "The SALON_URL secret is not set, so this release would point every" >&2
+              echo "cashier PC at http://localhost:3000. Add it under Settings ->" >&2
+              echo "Secrets and variables -> Actions, then re-run this workflow." >&2
+              exit 1
+            fi
+            echo "No SALON_URL secret (or a pull request from a fork): this build"
+            echo "falls back to http://localhost:3000."
+            exit 0
+          fi
+          case "$SALON_URL" in
+            http://*|https://*) echo "Building against the SALON_URL secret." ;;
+            *) echo "SALON_URL must start with http:// or https://" >&2; exit 1 ;;
+          esac
+
       # A release named after a version the program does not report would be
       # confusing on the cashier PC, where the only version on show is the one in
       # Add/Remove Programs.
@@ -88,7 +122,17 @@ jobs:
             exit 1
           fi
 
+      # Choosing the address and the rules about where the window may go. The
+      # tests needing the internet or a baked-in address are marked #[ignore],
+      # so this needs nothing running.
+      - name: Test
+        run: cargo test --manifest-path src-tauri/Cargo.toml
+
       - name: Build
+        env:
+          # Becomes the address the installed program polls, unless a
+          # berchi-url.txt or BERCHI_URL on the PC says otherwise.
+          BERCHI_DEFAULT_URL: ${{ secrets.SALON_URL }}
         run: npm run tauri build
 
       # Flattened, so the release job below has a path that does not depend on

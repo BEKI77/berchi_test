@@ -184,9 +184,17 @@ To have it start with Windows, put a shortcut to it in the folder that
 `Win + R`, `shell:startup` opens. If the salon system is not on port 3000, put its
 address in a file called `berchi-url.txt` next to the program.
 
+**It can point at a deployed salon instead.** Set the address once as the
+`SALON_URL` repository secret on GitHub and every installer built afterwards
+polls it, with nothing to set up on the PC
+([desktop/README.md](../desktop/README.md)). Weigh it first: this page exists
+because the salon keeps trading when the internet is down, and a window pointed
+at a domain stops working the moment the line does.
+
 **This is a window, not the offline rewrite.** The database and the server still
-run in Docker on the same PC, and the window needs them. The earlier idea of a
-Tauri program with its own database and no Docker has not been started.
+run in Docker on the same PC, and the window needs them (or a deployed salon).
+The earlier idea of a Tauri program with its own database and no Docker has not
+been started.
 
 The stylists' tablets keep using the browser (`/tablet`); this is for the PC.
 

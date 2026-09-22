@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { formatMoney } from "@/lib/money";
 import { ticketName, shortOrderNumber } from "@/lib/orders";
 import { useOrderEvents } from "@/lib/use-order-events";
+import { printTicket } from "@/lib/desktop-print";
 
 type Order = {
   id: string;
@@ -67,6 +68,26 @@ export function ReceptionClient() {
   const [printKey, setPrintKey] = useState(0);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
 
+  /**
+   * Prints the number slip.
+   *
+   * On a till running in the desktop window with a receipt printer set up, the
+   * slip goes straight to that printer as ESC/POS: laid out for the roll, cut at
+   * the end. Everywhere else -- an ordinary browser, or a PC where nobody has
+   * set a printer up yet -- it falls back to the hidden frame below, which is
+   * how this has always worked.
+   *
+   * The fallback also catches a printer that is switched off or out of paper. A
+   * slip comes out either way, because reception cannot stop for a printer, and
+   * the reason is shown so somebody knows to go and look at it.
+   */
+  const printSlip = useCallback(async (orderId: string) => {
+    const outcome = await printTicket("slip", orderId);
+    if (outcome?.printed) return;
+    if (outcome?.reason) toast.warning(outcome.reason);
+    setPrintKey((k) => k + 1);
+  }, []);
+
   const fetchOpen = useCallback(async () => {
     try {
       const res = await fetch("/api/orders?open=true");
@@ -99,7 +120,7 @@ export function ReceptionClient() {
       const order: Order = await res.json();
       setJustIssued(order);
       setName("");
-      setPrintKey((k) => k + 1);
+      printSlip(order.id);
       fetchOpen();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not issue a ticket");
@@ -185,7 +206,7 @@ export function ReceptionClient() {
               </Button>
               <Button
                 variant="outline"
-                onClick={() => setPrintKey((k) => k + 1)}
+                onClick={() => printSlip(justIssued.id)}
                 className="h-12 px-6 rounded-xl"
               >
                 <Printer className="h-4 w-4 mr-1.5" />

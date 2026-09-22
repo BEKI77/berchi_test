@@ -206,6 +206,99 @@ if (which === "all" || which === "F") {
   fs.rmSync(dir, { recursive: true, force: true });
 }
 
+if (which === "all" || which === "G") {
+  console.log("\nG. What the salon's pages may ask the program to do");
+
+  // The printer settings are kept per PC, so a run of this must not be able to
+  // scribble on the settings of the machine it runs on.
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "berchi-printers-"));
+  const settingsFile = path.join(dir, "printers.json");
+
+  const app = launch({ BERCHI_URL: SALON, BERCHI_PRINTERS_FILE: settingsFile });
+  const page = await attach();
+  await waitFor(async () => (await page.evalJs("location.origin")) === SALON_ORIGIN, 20000);
+
+  // Calls a command from the salon's own page, the way the salon system does,
+  // and reports what came back rather than throwing.
+  const fromSalon = async (command, args = {}) => {
+    const answer = await page.evalJs(`(async () => {
+      try {
+        const value = await window.__TAURI__.core.invoke(${JSON.stringify(command)}, ${JSON.stringify(args)});
+        return JSON.stringify({ ok: true, value });
+      } catch (error) {
+        return JSON.stringify({ ok: false, error: String(error) });
+      }
+    })()`);
+    try { return JSON.parse(answer); } catch { return { ok: false, error: String(answer) }; }
+  };
+
+  check("the salon's pages can reach the program at all", (await page.evalJs("typeof window.__TAURI__")) === "object");
+
+  const status = await fromSalon("printing_status");
+  check("...and may ask what this PC prints on", status.ok === true, status.error);
+  check("...which says no printer is set up on a fresh PC", status.ok && status.value?.slip === null, JSON.stringify(status.value));
+
+  // Least privilege. The till's own printer setup is not the salon server's
+  // business: a server that was tampered with must not be able to read it, and
+  // above all must not be able to point the receipts somewhere else.
+  for (const forbidden of ["printer_settings", "save_printer_settings", "list_printers", "test_print"]) {
+    const answer = await fromSalon(forbidden);
+    // Refused by the ACL specifically, not merely failing for some other
+    // reason -- a command that errored on its arguments would look the same.
+    const blocked = answer.ok === false && /not allowed/i.test(answer.error ?? "");
+    check(`...but may not call ${forbidden}`, blocked, JSON.stringify(answer));
+  }
+
+  // Printing with nothing set up must answer "not printed" rather than fail, or
+  // the salon system has nothing to fall back to and reception stops.
+  const printed = await fromSalon("print_slip", {
+    slip: { orderNumber: "ORD-20260922-0001", shortNumber: "1", salon: { name: "Berchi Salon" } },
+  });
+  check("printing with no printer set up answers rather than failing", printed.ok === true, printed.error);
+  check("...and says it did not print", printed.ok && printed.value?.printed === false, JSON.stringify(printed.value));
+  check("...and says why", printed.ok && typeof printed.value?.reason === "string" && printed.value.reason.length > 0, JSON.stringify(printed.value));
+
+  // The way in to the settings, from the salon system.
+  const opened = await fromSalon("open_printer_settings");
+  check("the salon's pages may open the printer setup", opened.ok === true, opened.error);
+
+  const setupWindow = await waitFor(async () => {
+    const targets = await (await fetch(`http://127.0.0.1:${DEBUG_PORT}/json/list`)).json();
+    return targets.some((t) => (t.url ?? "").includes("printers.html"));
+  }, 10000);
+  check("...and the printer setup window opens", setupWindow !== null);
+
+  page.close(); app.kill(); killApp();
+  fs.rmSync(dir, { recursive: true, force: true });
+}
+
+if (which === "all" || which === "H") {
+  console.log("\nH. The printer setup opens from the Starting screen");
+
+  // Deliberately checked with the salon system DOWN: setting a printer up is
+  // work for before opening, often on a PC whose Docker stack is not running.
+  const port = await freePort();
+  const app = launch({ BERCHI_URL: `http://localhost:${port}` });
+  const page = await attach();
+  await sleep(2500);
+
+  check("the Starting screen is showing", (await page.evalJs("document.body.innerText")).includes("Starting the salon system"));
+  check("the printer setup button is offered", (await page.evalJs("!!document.getElementById('printer-setup')")) === true);
+  // The button is always shown, so the only way it can fail is by saying so.
+  // An earlier version hid it when the program could not be reached, which is
+  // the one failure nobody can report.
+  check("nothing is complaining yet", (await page.evalJs("document.getElementById('printer-setup-trouble').hidden")) === true);
+
+  await page.evalJs("document.getElementById('printer-setup').click()");
+  const setupWindow = await waitFor(async () => {
+    const targets = await (await fetch(`http://127.0.0.1:${DEBUG_PORT}/json/list`)).json();
+    return targets.some((t) => (t.url ?? "").includes("printers.html"));
+  }, 10000);
+  check("...and it opens with the salon system still down", setupWindow !== null);
+
+  page.close(); app.kill(); killApp();
+}
+
 killApp();
 console.log(failures === 0 ? "\nAll checks passed.\n" : `\n${failures} check(s) FAILED.\n`);
 process.exit(failures === 0 ? 0 : 1);

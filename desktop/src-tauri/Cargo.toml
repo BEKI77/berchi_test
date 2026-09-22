@@ -13,8 +13,30 @@ crate-type = ["rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [] }
+# dynamic-acl lets the program hand the salon's own pages permission to print,
+# once, at start-up. The salon's address is not known until then -- it comes from
+# a file, a setting or the build -- so that permission cannot be written down in
+# advance in capabilities/.
+tauri = { version = "2", features = ["dynamic-acl"] }
 tauri-plugin-single-instance = "2"
+
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Speaks ESC/POS, the language receipt printers have used since the 1990s: text
+# styling, paper cuts, the cash drawer kick and QR codes, as bytes on a wire. It
+# does not find printers or talk to Windows -- that is src/printing/.
+#
+# serial_port is here for a till wired to a COM port. The libusb and hidapi
+# drivers are deliberately left out: they need those libraries present on the
+# build machine, and using them on the cashier PC means replacing the printer's
+# Windows driver with WinUSB, which stops every other program printing to it.
+escpos = { version = "0.20", features = ["serial_port"] }
+
+# The same serial library escpos drives, named here as well so the settings
+# window can offer the COM ports this PC actually has instead of asking the
+# cashier to know one. It is already in the tree; this only makes it reachable.
+serialport = "4.10"
 
 # Checks whether the salon is answering. Blocking, which suits the watching
 # thread, and small.
@@ -25,6 +47,22 @@ tauri-plugin-single-instance = "2"
 # CMake on the Windows build machine and would carry its own list of root
 # certificates.
 ureq = { version = "3", default-features = false, features = ["native-tls"] }
+
+[target.'cfg(windows)'.dependencies]
+# Windows' own print spooler, which is how a printer installed the ordinary way
+# (vendor driver, "Printers & scanners") is reached. See src/printing/spooler.rs.
+# Win32_Graphics_Gdi is not a mistake: OpenPrinterW takes a PRINTER_DEFAULTSW,
+# which carries a DEVMODEW, so windows-sys puts the whole call behind that
+# feature. We pass a null pointer for it and never touch a DEVMODEW ourselves.
+windows-sys = { version = "0.61", features = [
+    "Win32_Foundation",
+    "Win32_Graphics_Gdi",
+    "Win32_Graphics_Printing",
+] }
+
+# usbprint.sys: the class driver Windows gives a receipt printer plugged in with
+# no vendor driver at all. Windows-only, and it needs nothing installed to build.
+escpos = { version = "0.20", features = ["usbprint"] }
 
 [profile.release]
 codegen-units = 16

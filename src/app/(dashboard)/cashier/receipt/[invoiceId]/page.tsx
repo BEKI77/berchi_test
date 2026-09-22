@@ -19,6 +19,7 @@ import { toast } from "sonner";
 import { ticketName } from "@/lib/orders";
 import { formatMoney, formatPercent } from "@/lib/money";
 import { paymentMethodLabel } from "@/lib/payment-methods";
+import { printTicket } from "@/lib/desktop-print";
 
 type ReceiptData = {
   id: string;
@@ -58,6 +59,31 @@ export default function ReceiptPage() {
   const invoiceId = params.invoiceId as string;
   const [receipt, setReceipt] = useState<ReceiptData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [printing, setPrinting] = useState(false);
+
+  /**
+   * Prints the receipt.
+   *
+   * On a till running in the desktop window with a receipt printer set up, it
+   * goes to that printer as ESC/POS -- laid out for the roll, cut at the end,
+   * and the cash drawer kicked if the sale was cash and the drawer is wired to
+   * it. Everywhere else, and whenever that printer cannot be reached, it falls
+   * back to printing this page through the browser, which is what it always did.
+   */
+  const printReceipt = useCallback(async () => {
+    setPrinting(true);
+    try {
+      const outcome = await printTicket("receipt", invoiceId);
+      if (outcome?.printed) {
+        toast.success(outcome.printer ? `Printed on ${outcome.printer}` : "Printed");
+        return;
+      }
+      if (outcome?.reason) toast.warning(outcome.reason);
+      window.print();
+    } finally {
+      setPrinting(false);
+    }
+  }, [invoiceId]);
 
   const fetchReceipt = useCallback(async () => {
     try {
@@ -94,11 +120,12 @@ export default function ReceiptPage() {
           <ArrowLeft className="h-5 w-5 text-emerald-600" />
         </Button>
         <Button
-          onClick={() => window.print()}
+          onClick={printReceipt}
+          disabled={printing}
           className="rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 shadow-md shadow-emerald-200/40"
         >
           <Printer className="h-4 w-4 mr-2" />
-          Print Receipt
+          {printing ? "Printing..." : "Print Receipt"}
         </Button>
       </div>
 
@@ -192,7 +219,10 @@ export default function ReceiptPage() {
           {Number(receipt.discountAmount) > 0 && (
             <div className="flex justify-between text-xs">
               <span className="text-muted-foreground">
-                Discount {receipt.discountType === "PERCENTAGE" ? `(${Number(receipt.discountValue)}%)` : ""}
+                {/* discountValue is basis points for a percentage discount, the
+                    same as taxRate -- 10% is stored as 1000. Printing it raw
+                    read as "1000%". */}
+                Discount {receipt.discountType === "PERCENTAGE" ? `(${formatPercent(receipt.discountValue)})` : ""}
               </span>
               <span className="text-red-500">-ETB {formatMoney(Number(receipt.discountAmount))}</span>
             </div>

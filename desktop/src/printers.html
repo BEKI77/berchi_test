@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Printer setup</title>
+    <link rel="stylesheet" href="printers.css" />
+    <script src="printers.js" defer></script>
+  </head>
+  <body>
+    <header class="bar">
+      <div>
+        <h1>Printer setup</h1>
+        <p class="sub">
+          These settings belong to <strong>this computer</strong>, not to the salon
+          system. A second till is set up separately.
+        </p>
+      </div>
+      <div class="bar-actions">
+        <span id="saved-state" class="saved-state" role="status"></span>
+        <button id="save" type="button" class="primary" disabled>Save</button>
+      </div>
+    </header>
+
+    <main>
+      <!-- ---------------------------------------------------------------- -->
+      <aside class="column">
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Printers</h2>
+            <button id="add" type="button" class="quiet">Add</button>
+          </div>
+          <ul id="printer-list" class="printer-list"></ul>
+          <p id="no-printers" class="note" hidden>
+            No printer set up yet. Until one is, tickets print the old way &mdash;
+            through the window, to whichever printer Windows has as its default.
+          </p>
+        </section>
+
+        <section class="panel">
+          <h2>What prints where</h2>
+          <label class="field">
+            <span>Number slip</span>
+            <select id="job-slip"></select>
+          </label>
+          <label class="field">
+            <span>Receipt</span>
+            <select id="job-receipt"></select>
+          </label>
+          <p class="note">
+            Both can be the same printer. Anything left as <em>print through the
+            window</em> keeps working the way it always did, so a half-finished
+            setup never stops reception issuing tickets.
+          </p>
+        </section>
+      </aside>
+
+      <!-- ---------------------------------------------------------------- -->
+      <section id="editor" class="column editor" hidden>
+        <div class="panel">
+          <h2>This printer</h2>
+
+          <label class="field">
+            <span>Name</span>
+            <input id="name" type="text" maxlength="60" placeholder="Front counter" />
+            <small>What you will call it in the list above.</small>
+          </label>
+
+          <label class="field">
+            <span>How it is attached</span>
+            <select id="connection-kind">
+              <option value="systemPrinter">A printer installed in Windows</option>
+              <option value="network">On the network (Ethernet or Wi-Fi)</option>
+              <option value="usbClass">Plugged in by USB, no driver installed</option>
+              <option value="serial">On a serial (COM) port</option>
+              <option value="device">A device path</option>
+            </select>
+          </label>
+
+          <div id="connection-fields" class="indent"></div>
+        </div>
+
+        <div class="panel">
+          <h2>Paper</h2>
+          <div class="row">
+            <label class="field">
+              <span>Roll width</span>
+              <select id="paper-width">
+                <option value="80">80 mm (the usual one)</option>
+                <option value="58">58 mm</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Characters per line</span>
+              <input id="characters" type="number" min="24" max="64" step="1" />
+            </label>
+          </div>
+          <p class="note">
+            An ESC/POS printer lays out in characters, not millimetres. Changing the
+            roll width fills in the usual number; if your printer is set to a
+            smaller font it fits more, so the number stays editable. The test print
+            has a ruler across it for counting.
+          </p>
+        </div>
+
+        <div class="panel">
+          <h2>Cutting the paper</h2>
+          <label class="field">
+            <span>At the end of a ticket</span>
+            <select id="cut-mode">
+              <option value="full">Cut right through</option>
+              <option value="partial">Leave a small tab holding it on</option>
+              <option value="none">No cut &mdash; tear it off by hand</option>
+            </select>
+          </label>
+
+          <label class="field">
+            <span>Cut amount <output id="feed-value" class="value"></output></span>
+            <input id="feed-lines" type="range" min="0" max="20" step="1" />
+            <small>
+              Blank lines rolled out before the blade comes down. The cutter sits
+              above the print head, so with none of them the cut lands in the middle
+              of the last line. Too many and every sale throws away paper. Four suits
+              most printers &mdash; find yours by printing a test and looking at what
+              comes out.
+            </small>
+          </label>
+        </div>
+
+        <div class="panel">
+          <h2>Cash drawer</h2>
+          <label class="check">
+            <input id="drawer-open" type="checkbox" />
+            <span>Open the drawer when a sale is paid in cash</span>
+          </label>
+          <label class="field">
+            <span>Wired to</span>
+            <select id="drawer-pin">
+              <option value="pin2">Pin 2 (nearly always this one)</option>
+              <option value="pin5">Pin 5</option>
+            </select>
+          </label>
+          <p class="note">
+            Only a cash sale opens it. A card or transfer popping the drawer is how a
+            till loses count of what should be in it.
+          </p>
+        </div>
+
+        <div class="panel">
+          <h2>Extras</h2>
+          <label class="field">
+            <span>Copies of each receipt</span>
+            <input id="copies" type="number" min="1" max="3" step="1" />
+            <small>Two if one stays in the till.</small>
+          </label>
+          <label class="field">
+            <span>Extra lines under the salon name</span>
+            <textarea id="header" rows="2" placeholder="Licence 12/345"></textarea>
+          </label>
+          <label class="field">
+            <span>Extra lines at the very bottom</span>
+            <textarea id="footer" rows="2" placeholder="Open 9 to 7, Tuesday to Sunday"></textarea>
+          </label>
+          <small class="note">One line each.</small>
+        </div>
+
+        <div class="panel danger-zone">
+          <button id="test" type="button">Print a test ticket</button>
+          <button id="remove" type="button" class="danger">Remove this printer</button>
+        </div>
+      </section>
+
+      <!-- ---------------------------------------------------------------- -->
+      <aside class="column">
+        <section class="panel sticky">
+          <div class="panel-head">
+            <h2>What comes out</h2>
+            <div class="tabs" id="preview-tabs" role="tablist">
+              <button type="button" data-sample="slip" role="tab">Slip</button>
+              <button type="button" data-sample="receipt" role="tab">Receipt</button>
+              <button type="button" data-sample="test" role="tab">Test</button>
+            </div>
+          </div>
+          <pre id="preview" class="paper" aria-live="polite"></pre>
+          <p class="note">
+            Laid out by the same code that drives the printer, at the width set
+            above, so a name that wraps awkwardly here wraps awkwardly on paper.
+            Large text cannot be shown large, so it is shown where it will sit.
+          </p>
+        </section>
+      </aside>
+    </main>
+
+    <p id="empty" class="empty" hidden>
+      Choose a printer on the left, or add one.
+    </p>
+
+    <footer class="bar foot">
+      <span id="path" class="path"></span>
+      <button id="close" type="button" class="quiet">Close</button>
+    </footer>
+
+    <!-- ------------------------------------------------------------------ -->
+    <dialog id="add-dialog">
+      <h2>Add a printer</h2>
+      <p class="note" id="looking">Looking for printers&hellip;</p>
+      <ul id="candidates" class="candidates"></ul>
+      <p id="candidate-problems" class="note problem" hidden></p>
+      <div class="dialog-actions">
+        <button id="add-manual" type="button" class="quiet">
+          Set one up by hand
+        </button>
+        <button id="add-cancel" type="button">Cancel</button>
+      </div>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" hidden></div>
+  </body>
+</html>

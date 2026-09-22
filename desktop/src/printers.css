@@ -1,0 +1,402 @@
+/* The printer settings window.
+ *
+ * Offline on purpose, like styles.css: no web fonts, nothing fetched from
+ * anywhere. This is a separate sheet rather than an addition to styles.css
+ * because that one centres a single splash panel in the middle of the window,
+ * which is the opposite of what a settings screen wants. */
+
+* { box-sizing: border-box; }
+
+:root {
+  --ink: #1f2937;
+  --quiet: #6b7280;
+  --line: #e5e7eb;
+  --panel: #ffffff;
+  --rose: #be185d;
+  --rose-deep: #9d174d;
+  --rose-wash: #fdf2f8;
+  --danger: #b91c1c;
+  --danger-wash: #fef2f2;
+}
+
+html, body { height: 100%; margin: 0; }
+
+body {
+  display: flex;
+  flex-direction: column;
+  background: #f8fafc;
+  color: var(--ink);
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+}
+
+/* --- the bars top and bottom ------------------------------------------- */
+
+.bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.9rem 1.25rem;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+}
+
+.bar h1 {
+  margin: 0;
+  font-size: 1.15rem;
+  color: var(--rose);
+}
+
+.bar .sub {
+  margin: 0.15rem 0 0;
+  font-size: 0.82rem;
+  color: var(--quiet);
+}
+
+.bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.saved-state {
+  font-size: 0.82rem;
+  color: var(--quiet);
+}
+
+.saved-state.unsaved { color: #b45309; }
+
+.foot {
+  border-top: 1px solid var(--line);
+  border-bottom: 0;
+  padding: 0.5rem 1.25rem;
+}
+
+.path {
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 0.75rem;
+  color: var(--quiet);
+  word-break: break-all;
+}
+
+/* --- the three columns -------------------------------------------------- */
+
+main {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 250px minmax(0, 1fr) minmax(0, 380px);
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  overflow: auto;
+  align-items: start;
+}
+
+/* Below about 1000px the preview drops under the form rather than being
+   squeezed to a width no receipt would fit in. */
+@media (max-width: 1040px) {
+  main { grid-template-columns: 230px minmax(0, 1fr); }
+  main > .column:last-child { grid-column: 1 / -1; }
+}
+
+.column { display: flex; flex-direction: column; gap: 1rem; min-width: 0; }
+
+.panel {
+  padding: 0.9rem 1rem;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 0.7rem;
+}
+
+.panel h2 {
+  margin: 0 0 0.75rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--quiet);
+}
+
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.panel-head h2 { margin: 0; }
+
+.sticky { position: sticky; top: 0; }
+
+/* --- the list of printers ---------------------------------------------- */
+
+.printer-list { margin: 0; padding: 0; list-style: none; }
+
+.printer-list li + li { margin-top: 0.35rem; }
+
+.printer-list button {
+  width: 100%;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  background: #fff;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.printer-list button:hover { border-color: #f9a8d4; background: var(--rose-wash); }
+
+.printer-list button[aria-current="true"] {
+  border-color: var(--rose);
+  background: var(--rose-wash);
+  box-shadow: inset 2px 0 0 var(--rose);
+}
+
+.printer-list .who { display: block; font-weight: 600; }
+
+.printer-list .how {
+  display: block;
+  margin-top: 0.1rem;
+  font-size: 0.76rem;
+  color: var(--quiet);
+}
+
+/* --- forms -------------------------------------------------------------- */
+
+.field { display: block; margin-bottom: 0.85rem; }
+.field:last-child { margin-bottom: 0; }
+
+.field > span {
+  display: block;
+  margin-bottom: 0.25rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.field small,
+small.note {
+  display: block;
+  margin-top: 0.3rem;
+  font-size: 0.76rem;
+  line-height: 1.45;
+  color: var(--quiet);
+}
+
+input[type="text"],
+input[type="number"],
+select,
+textarea {
+  width: 100%;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.45rem;
+  background: #fff;
+  color: inherit;
+  font: inherit;
+}
+
+input:focus, select:focus, textarea:focus {
+  outline: 2px solid #f9a8d4;
+  outline-offset: 1px;
+  border-color: var(--rose);
+}
+
+textarea { resize: vertical; font-family: inherit; }
+
+input[type="range"] { width: 100%; accent-color: var(--rose); }
+
+.value {
+  margin-left: 0.35rem;
+  padding: 0.05rem 0.4rem;
+  border-radius: 0.3rem;
+  background: var(--rose-wash);
+  color: var(--rose-deep);
+  font-weight: 700;
+  font-size: 0.78rem;
+}
+
+.check {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin-bottom: 0.85rem;
+  font-size: 0.85rem;
+}
+
+.check input { margin-top: 0.15rem; accent-color: var(--rose); }
+
+.row { display: flex; gap: 0.75rem; }
+.row > .field { flex: 1; }
+
+.indent { margin-top: 0.25rem; }
+
+.note {
+  margin: 0.6rem 0 0;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: var(--quiet);
+}
+
+.note.problem {
+  padding: 0.5rem 0.7rem;
+  border: 1px solid #fecaca;
+  border-radius: 0.45rem;
+  background: var(--danger-wash);
+  color: #991b1b;
+}
+
+/* --- buttons ------------------------------------------------------------ */
+
+button {
+  padding: 0.45rem 0.85rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.45rem;
+  background: #fff;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) { border-color: #9ca3af; background: #f9fafb; }
+button:disabled { opacity: 0.5; cursor: default; }
+
+button.primary {
+  border-color: var(--rose);
+  background: var(--rose);
+  color: #fff;
+  font-weight: 600;
+}
+
+button.primary:hover:not(:disabled) { background: var(--rose-deep); border-color: var(--rose-deep); }
+
+button.quiet {
+  padding: 0.3rem 0.6rem;
+  border-color: transparent;
+  background: transparent;
+  color: var(--rose);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+button.quiet:hover:not(:disabled) { background: var(--rose-wash); border-color: transparent; }
+
+button.danger { border-color: #fecaca; color: var(--danger); }
+button.danger:hover:not(:disabled) { background: var(--danger-wash); border-color: #fca5a5; }
+
+.danger-zone { display: flex; gap: 0.6rem; justify-content: space-between; }
+
+/* --- the preview -------------------------------------------------------- */
+
+.tabs { display: flex; gap: 0.15rem; }
+
+.tabs button {
+  padding: 0.22rem 0.55rem;
+  border: 1px solid transparent;
+  border-radius: 0.35rem;
+  background: transparent;
+  color: var(--quiet);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.tabs button[aria-selected="true"] {
+  background: var(--rose-wash);
+  border-color: #f9a8d4;
+  color: var(--rose-deep);
+}
+
+/* The paper. A white strip on a grey desk, monospaced so a character on screen
+   is a character on the roll, and never wrapped by the browser -- if a line is
+   too wide it should look too wide, not be quietly folded. */
+.paper {
+  margin: 0;
+  padding: 0.9rem 0.8rem;
+  min-height: 12rem;
+  max-height: 60vh;
+  overflow: auto;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 0.3rem;
+  box-shadow: 0 1px 6px rgba(15, 23, 42, 0.08);
+  color: #111;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 12px;
+  line-height: 1.35;
+  white-space: pre;
+  tab-size: 2;
+}
+
+/* --- nothing chosen ----------------------------------------------------- */
+
+.empty {
+  margin: 0;
+  padding: 2.5rem 1.25rem;
+  text-align: center;
+  color: var(--quiet);
+}
+
+/* --- the add dialog ----------------------------------------------------- */
+
+dialog {
+  width: min(30rem, 90vw);
+  padding: 1.25rem;
+  border: 1px solid var(--line);
+  border-radius: 0.8rem;
+  color: var(--ink);
+  font-family: inherit;
+}
+
+dialog::backdrop { background: rgba(15, 23, 42, 0.35); }
+
+dialog h2 { margin: 0 0 0.5rem; font-size: 1rem; }
+
+.candidates { margin: 0.75rem 0; padding: 0; list-style: none; max-height: 22rem; overflow: auto; }
+.candidates li + li { margin-top: 0.35rem; }
+
+.candidates button {
+  width: 100%;
+  padding: 0.55rem 0.7rem;
+  text-align: left;
+  border-radius: 0.5rem;
+}
+
+.candidates .who { display: block; font-weight: 600; }
+.candidates .how { display: block; margin-top: 0.1rem; font-size: 0.76rem; color: var(--quiet); }
+
+.candidates .is-default {
+  display: inline-block;
+  margin-left: 0.4rem;
+  padding: 0.02rem 0.35rem;
+  border-radius: 0.25rem;
+  background: var(--rose-wash);
+  color: var(--rose-deep);
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.dialog-actions { display: flex; justify-content: space-between; gap: 0.6rem; margin-top: 0.5rem; }
+
+/* --- the toast ---------------------------------------------------------- */
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 3.5rem;
+  transform: translateX(-50%);
+  max-width: min(34rem, 90vw);
+  padding: 0.65rem 1rem;
+  border-radius: 0.55rem;
+  background: #111827;
+  color: #fff;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.28);
+  z-index: 10;
+}
+
+.toast[hidden] { display: none; }
+.toast.bad { background: #991b1b; }
+.toast.good { background: #065f46; }

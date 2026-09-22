@@ -10,11 +10,14 @@
 //! - The server goes away (an update, Docker restarting, the internet dropping):
 //!   it goes back to that screen instead of leaving a browser error page for the
 //!   cashier to puzzle over.
-//! - The number slip at reception prints straight to the default printer, with no
-//!   print dialog to tap through. There is no printer chooser: the printer is the
-//!   Windows default one, and berchi-print.txt brings the dialog back for the one
-//!   time somebody needs to see the list.
+//! - Tickets print on a real receipt printer, chosen on this PC: see
+//!   [`printing`]. With no printer set up it falls back to the older behaviour,
+//!   printing the page straight to the Windows default printer with no dialog,
+//!   and berchi-print.txt brings the dialog back for the one time somebody needs
+//!   to see the list.
 //! - It will not wander off: the window only ever shows the salon server.
+
+pub mod printing;
 
 use std::time::Duration;
 
@@ -289,6 +292,28 @@ fn navigation_allowed(target: &Url, salon: &Url) -> bool {
         || target.host_str() == Some("tauri.localhost")
 }
 
+/// Every address this window may end up showing the salon at.
+///
+/// The printing permission is written in terms of these, so that it covers
+/// exactly what [`navigation_allowed`] covers and no more. Getting this wrong in
+/// either direction is bad: too narrow and printing stops the moment the server
+/// redirects, too wide and somewhere that is not the salon can drive the till's
+/// printer.
+fn salon_origins(salon: &Url) -> Vec<String> {
+    let mut origins = vec![salon.origin().ascii_serialization()];
+
+    // The window follows its own server's jump to https, so that address has to
+    // be able to print too. Same rule as is_https_upgrade below: bare domain
+    // only, because an address carrying a port was written deliberately.
+    if salon.scheme() == "http" && salon.port().is_none() {
+        if let Some(host) = salon.host_str() {
+            origins.push(format!("https://{host}"));
+        }
+    }
+
+    origins
+}
+
 /// A salon written down as `http://` that redirects to `https://` on the same
 /// host, which is what a deployed salon behind a load balancer normally does.
 ///
@@ -315,6 +340,18 @@ pub fn run() {
                 let _ = window.set_focus();
             }
         }))
+        .invoke_handler(tauri::generate_handler![
+            printing::list_printers,
+            printing::printer_settings,
+            printing::save_printer_settings,
+            printing::preview_ticket,
+            printing::test_print,
+            printing::print_slip,
+            printing::print_receipt,
+            printing::open_cash_drawer,
+            printing::printing_status,
+            printing::open_printer_settings,
+        ])
         .setup(|app| {
             let salon = salon_url();
             let first_screen = if salon.is_ok() { "index.html" } else { "problem.html" };
@@ -328,6 +365,23 @@ pub fn run() {
 
             match salon {
                 Ok(salon) => {
+                    // Let the salon's own pages ask this program to print. They
+                    // are loaded over the network, so without this Tauri refuses
+                    // them the IPC altogether -- which is the right default, and
+                    // why this is granted to one address and five commands.
+                    //
+                    // A refusal here is not worth stopping for: the window still
+                    // works, and the salon system falls back to printing through
+                    // the web view, exactly as it did before any of this.
+                    if let Err(problem) =
+                        app.add_capability(printing::salon_capability(&salon_origins(&salon)))
+                    {
+                        eprintln!(
+                            "berchi-cashier: the salon system will not be able to use the \
+                             receipt printer directly: {problem}"
+                        );
+                    }
+
                     let for_navigation = salon.clone();
                     let window = builder
                         .on_navigation(move |target| navigation_allowed(target, &for_navigation))
@@ -426,6 +480,48 @@ mod tests {
         // to be dragged back down to http.
         let secure = url("https://salon.example.com");
         assert!(!navigation_allowed(&url("http://salon.example.com/"), &secure));
+    }
+
+    /// Printing is allowed from exactly the addresses the window may show, and
+    /// from nowhere else. Too narrow and printing stops the moment the server
+    /// redirects; too wide and somewhere that is not the salon drives the till.
+    #[test]
+    fn printing_is_allowed_from_the_salon_and_nowhere_else() {
+        assert_eq!(salon_origins(&url("https://salon.example.com")), vec![
+            "https://salon.example.com".to_string()
+        ]);
+
+        // http:// on a bare domain may be redirected to https:// by its own
+        // server, and the window follows it, so both can print.
+        assert_eq!(salon_origins(&url("http://salon.example.com")), vec![
+            "http://salon.example.com".to_string(),
+            "https://salon.example.com".to_string(),
+        ]);
+
+        // An address carrying a port was written deliberately and is left alone,
+        // exactly as navigation_allowed leaves it alone.
+        assert_eq!(salon_origins(&url("http://192.168.1.50:3000")), vec![
+            "http://192.168.1.50:3000".to_string()
+        ]);
+        assert_eq!(salon_origins(&url("http://localhost:3000")), vec![
+            "http://localhost:3000".to_string()
+        ]);
+    }
+
+    /// The two have to agree: an address that may print but may not be shown, or
+    /// the other way about, is a bug in one of them.
+    #[test]
+    fn what_may_print_matches_what_may_be_shown() {
+        for address in ["https://salon.example.com", "http://salon.example.com", "http://192.168.1.50:3000"] {
+            let salon = url(address);
+            for origin in salon_origins(&salon) {
+                let target = url(&format!("{origin}/cashier"));
+                assert!(
+                    navigation_allowed(&target, &salon),
+                    "{origin} may print but may not be shown"
+                );
+            }
+        }
     }
 
     #[test]

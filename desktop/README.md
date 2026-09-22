@@ -17,7 +17,9 @@ browser handles badly:
 - **The server goes away** (an update, Docker restarting, the internet dropping):
   within about 10 seconds it goes back to that screen, instead of leaving a
   browser error page.
-- **The number slip prints with no dialog**, straight to the default printer.
+- **The number slip prints with no dialog**, straight to whichever printer
+  Windows has as its default. There is no printer chooser; see
+  [Choosing a printer](#choosing-a-printer).
 - **It cannot wander off:** the window only ever shows the salon server. The page
   it shows has no way to call into the program or the computer.
 - **A second launch** brings the first window forward instead of opening another.
@@ -104,11 +106,43 @@ Other settings:
 
 | Setting | What it does |
 |---|---|
-| `BERCHI_SILENT_PRINT=0` | Brings the print dialog back (for choosing a printer). Silent by default. |
+| `berchi-print.txt` next to the program | `dialog` to print through the print dialog, `silent` to print by itself. Silent if the file is missing. |
+| `BERCHI_SILENT_PRINT` | `0` for the dialog, `1` for silent. Beats the file, for trying one without committing to it. |
 | `BERCHI_WEBVIEW_ARGS` | Extra web view options, for diagnosing. |
 
 `http://` and `https://` are both supported. If the address cannot be used, the
 window says so instead of waiting forever.
+
+A word nobody recognises in `berchi-print.txt` is passed over rather than guessed
+at, so a typo cannot quietly stop the slip printing.
+
+### Choosing a printer
+
+There is no printer chooser in the salon system, by design. The slip prints
+straight to **whichever printer Windows has as its default**, because reception
+cannot stop to answer a dialog for every customer.
+
+So the printer is chosen in Windows, under *Settings → Bluetooth & devices →
+Printers & scanners → Set as default*, and it should be the receipt printer with
+its paper size set to the 80 mm roll.
+
+**Chromium flashes the print dialog up for about a second before printing
+anyway** ([crbug.com/169004](https://crbug.com/169004)). A dialog that appears
+and vanishes on its own is silent printing working, not a fault — it is just not
+a chooser, so there is no printer list there to read.
+
+To see the printers Windows offers, and pick one per print, put a file called
+`berchi-print.txt` next to the program holding one line:
+
+```
+dialog
+```
+
+Restart the window and the full dialog stays open, with the printer list and the
+paper settings. This is worth doing once while setting the PC up, to confirm the
+right printer is the default and the slip comes out at the right width. Delete
+the file (or change it to `silent`) before opening day, so reception is not
+tapping Print for every customer.
 
 ## Connecting it to the salon system
 
@@ -213,6 +247,15 @@ seeing too.
 | It drops back to *Starting* mid-sale | The server stopped answering twice in a row (about 10 seconds). It returns by itself. On a domain that usually means the internet; on the salon PC, check `docker compose ... logs app --tail 50`. |
 | Tablets work, this PC does not | Router AP/client isolation, or the salon network is set to *Public* on the cashier PC. |
 
+### When printing goes wrong
+
+| What you see | Usually means |
+|---|---|
+| The print dialog appears and vanishes before you can read it, with no printer list | Silent printing, working. Chromium flashes the dialog up for about a second before printing by itself ([crbug.com/169004](https://crbug.com/169004)). It is not a chooser: the slip goes to the Windows default printer. To pick a printer, see [Choosing a printer](#choosing-a-printer). |
+| The dialog flashes and nothing comes out | The Windows default printer is the wrong one, offline, or out of paper. *Settings → Printers & scanners* shows which one is the default and whether it has a job stuck in its queue. |
+| A printer list would help, but the file is ignored | `berchi-print.txt` has to sit **next to `berchi-cashier.exe`**, not in the folder the shortcut starts in, and the window has to be restarted. Check `BERCHI_SILENT_PRINT` is not also set, because it beats the file. |
+| The slip prints, but too wide or cut off | The default printer's paper size is not the 80 mm roll. Set it in the printer's Windows properties. For a 58 mm roll, change `PAPER_WIDTH_MM` in `src/app/slip/[orderId]/page.tsx` and rebuild the salon system. |
+
 `BERCHI_URL` overrides everything if you want to try an address without editing
 or rebuilding anything. From the folder the shortcut points at:
 
@@ -257,13 +300,15 @@ npm run verify
 This launches the real program and checks: it opens the salon system, is
 maximized and titled, refuses to leave the salon server, passes the silent-print
 option, opens only once, waits while the server is down, carries on when it comes back,
-returns to the Starting screen if it goes away again, and copes with a bad address
-or an address file.
+returns to the Starting screen if it goes away again, copes with a bad address
+or an address file, and takes the printing setting from `berchi-print.txt` (with
+the environment variable beating it, and a typo left printing silently).
 
-**Not checked: a real printer.** The silent-print option is passed to the web
+**Not checked: a real printer.** The options are read back off the running web
 view, but the test does not print, because that would print on the default
 printer. Try *Print again* on the reception screen with your printer before
-relying on it.
+relying on it — and remember the dialog flashing past is silent printing
+working, so judge it by what comes out of the printer, not by the screen.
 
 ## Layout
 

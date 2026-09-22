@@ -54,20 +54,25 @@ For development, `cd src-tauri; cargo build` makes a faster debug build.
 `.github/workflows/desktop.yml` builds the same installer on a Windows runner, so
 a PC without Rust can still get one.
 
-- **Any push or pull request touching `desktop/`** builds it and tries to keep
-  the installer under the run's *Artifacts* for 30 days. *Actions* → *Desktop
-  app* → *Run workflow* does the same on demand. Artifact storage is a quota
-  shared across the whole GitHub account, so that upload can be refused with
-  *"Artifact storage quota has been hit"* — the build is still marked green,
-  because it built. Tag a release if you need the installer regardless.
-- **A tag** publishes a release with the installer attached, which is the easiest
-  thing to point the salon at, and the one that keeps working when artifact
-  storage is full (release assets are not in that quota):
+- **Any push to a branch touching `desktop/`** builds it and replaces that
+  branch's pre-release under *Releases* — `desktop-latest-main` for `main` — with
+  the new installer, so the newest build of a branch is always one download
+  away. *Actions* → *Desktop app* → *Run workflow* does the same on demand.
+  Release assets are not in the account's artifact storage quota, so this keeps
+  working when that is full.
+- **A tag** publishes a release for that version with the installer attached.
+  Unlike a branch's pre-release it stays put when later builds come along, which
+  makes it the one to point the salon at:
 
   ```bash
   # the tag must match the version in src-tauri/tauri.conf.json, or the build stops
   git tag desktop-v0.1.0 && git push origin desktop-v0.1.0
   ```
+- **A pull request touching `desktop/`** builds it but publishes no release; it
+  tries to keep the installer under the run's *Artifacts* for 30 days instead.
+  Artifact storage is a quota shared across the whole GitHub account, so that
+  upload can be refused with *"Artifact storage quota has been hit"* — the build
+  is still marked green, because it built.
 
 To release a new version, bump `version` in both `src-tauri/tauri.conf.json` and
 `src-tauri/Cargo.toml` first, then tag.
@@ -124,11 +129,11 @@ points at it, with nothing to configure on the cashier PC:
 1. On GitHub: **Settings → Secrets and variables → Actions → New repository
    secret**. Name it `SALON_URL` and set it to the full address including the
    scheme — `https://salon.example.com`, no trailing path.
-2. Build it: push a tag (`git tag desktop-v0.1.0 && git push origin desktop-v0.1.0`)
-   or run *Actions → Desktop app → Run workflow*. The address is compiled in, so
-   it has to be set before the build, not after. A **tagged release** with no
-   secret fails on purpose rather than shipping installers that point at
-   `localhost`.
+2. Build it: push a tag (`git tag desktop-v0.1.0 && git push origin desktop-v0.1.0`),
+   push to a branch, or run *Actions → Desktop app → Run workflow*. The address
+   is compiled in, so it has to be set before the build, not after. Any build
+   that would publish a release fails on purpose with no secret, rather than
+   shipping installers that point at `localhost`.
 3. Install the `-setup.exe` from the release on the cashier PC and start it.
 
 Two things to know before pointing the salon at a deployed domain:

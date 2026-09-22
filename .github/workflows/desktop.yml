@@ -1,21 +1,27 @@
-# Builds the cashier's desktop window (desktop/) into a Windows installer.
+# Builds the cashier's desktop window (desktop/) into a Windows installer, and
+# attaches it to a GitHub Release so the cashier PC can download it instead of
+# needing Rust installed.
 #
 # The salon's address is baked into the program at build time from the SALON_URL
 # repository secret (Settings -> Secrets and variables -> Actions), so a cashier
-# PC installs the program and connects with nothing to configure. A build without
-# the secret falls back to http://localhost:3000; a tagged release without it
-# fails rather than shipping that default to the salon.
+# PC installs the program and connects with nothing to configure. A pull request
+# built without the secret falls back to http://localhost:3000; a build that
+# publishes a release without it fails rather than shipping that default to the
+# salon.
 #
 # When it runs:
-#   - a push or pull request that touches desktop/ -> builds, and tries to keep
-#     the installer as a workflow artifact for 30 days. That upload is allowed to
-#     fail: artifact storage is a quota shared across the whole account, and a
-#     full one must not fail a build that worked.
-#   - a tag like desktop-v0.1.0 -> builds and publishes a GitHub Release with the
-#     installer attached, so the cashier PC can download it instead of needing
-#     Rust installed. (GitHub skips paths filters for tag pushes, so a tag always
-#     builds, whatever the tagged commit touched.)
-#   - Actions tab -> Desktop app -> Run workflow -> builds on demand.
+#   - a push to a branch that touches desktop/ -> builds, and replaces that
+#     branch's pre-release (desktop-latest-main for main) with the new installer,
+#     so the newest build of a branch is always one download away.
+#   - Actions tab -> Desktop app -> Run workflow -> the same, on demand.
+#   - a tag like desktop-v0.1.0 -> builds and publishes a GitHub Release for that
+#     version with the installer attached. Unlike a branch's, it stays put.
+#     (GitHub skips paths filters for tag pushes, so a tag always builds,
+#     whatever the tagged commit touched.)
+#   - a pull request that touches desktop/ -> builds, publishes no release, and
+#     tries to keep the installer as a workflow artifact for 30 days. That upload
+#     is allowed to fail: artifact storage is a quota shared across the whole
+#     account, and a full one must not fail a build that worked.
 #
 # The program is Windows-only -- WebView2, silent printing, an NSIS installer --
 # so there is only a Windows job. The Rust unit tests do run here.
@@ -51,8 +57,8 @@ jobs:
     name: Windows installer
     runs-on: windows-latest
     timeout-minutes: 45
-    # Only the last step writes anything, and only on a tag: it creates the
-    # release and uploads the installer to it.
+    # Only the publishing steps at the end write anything, and never for a pull
+    # request: they create the release and upload the installer to it.
     permissions:
       contents: write
     defaults:
@@ -84,6 +90,30 @@ jobs:
         shell: bash
         run: echo "version=$(node -p "require('./src-tauri/tauri.conf.json').version")" >> "$GITHUB_OUTPUT"
 
+      # Which release this build goes to, if any:
+      #   kind=version -- a desktop-v* tag: that version's own release.
+      #   kind=branch  -- a branch: its desktop-latest-<branch> pre-release, which
+      #                   every build of the branch replaces. Anything in the
+      #                   branch name but letters, digits, ".", "_" and "-"
+      #                   becomes "-", so feature/x gives desktop-latest-feature-x.
+      #   neither      -- a pull request, or a manual run on some other tag.
+      - name: Work out where the installer is published
+        id: release
+        shell: bash
+        run: |
+          case "$GITHUB_EVENT_NAME/$GITHUB_REF_TYPE" in
+            pull_request/*) ;;
+            */tag)
+              case "$GITHUB_REF_NAME" in
+                desktop-v*)
+                  echo "kind=version" >> "$GITHUB_OUTPUT"
+                  echo "tag=$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT" ;;
+              esac ;;
+            */branch)
+              echo "kind=branch" >> "$GITHUB_OUTPUT"
+              echo "tag=desktop-latest-${GITHUB_REF_NAME//[^A-Za-z0-9._-]/-}" >> "$GITHUB_OUTPUT" ;;
+          esac
+
       # The salon's address is compiled into the program, so it has to be settled
       # before the build rather than configured afterwards on every PC.
       #
@@ -94,10 +124,11 @@ jobs:
         shell: bash
         env:
           SALON_URL: ${{ secrets.SALON_URL }}
+          RELEASE: ${{ steps.release.outputs.tag }}
         run: |
           if [ -z "$SALON_URL" ]; then
-            if [ "$GITHUB_REF_TYPE" = tag ]; then
-              echo "The SALON_URL secret is not set, so this release would point every" >&2
+            if [ -n "$RELEASE" ]; then
+              echo "The SALON_URL secret is not set, so release $RELEASE would point every" >&2
               echo "cashier PC at http://localhost:3000. Add it under Settings ->" >&2
               echo "Secrets and variables -> Actions, then re-run this workflow." >&2
               exit 1
@@ -115,7 +146,7 @@ jobs:
       # confusing on the cashier PC, where the only version on show is the one in
       # Add/Remove Programs.
       - name: The tag and tauri.conf.json must agree
-        if: startsWith(github.ref, 'refs/tags/desktop-v')
+        if: steps.release.outputs.kind == 'version'
         shell: bash
         run: |
           tagged="${GITHUB_REF_NAME#desktop-v}"
@@ -149,12 +180,13 @@ jobs:
           cp src-tauri/target/release/berchi-cashier.exe dist/
           ls -l dist
 
-      # Convenient for grabbing a build of a branch, but it is the first thing to
-      # break: artifact storage is a quota shared across the whole account, and
-      # when it is full every upload fails. A release must not depend on it, and
-      # a full quota must not redden a build that worked, so this is allowed to
-      # fail on its own.
+      # Only for builds that publish no release -- in practice, pull requests.
+      # It is the first thing to break: artifact storage is a quota shared across
+      # the whole account, and when it is full every upload fails. A full quota
+      # must not redden a build that worked, so this is allowed to fail on its
+      # own.
       - uses: actions/upload-artifact@v4
+        if: steps.release.outputs.kind == ''
         continue-on-error: true
         with:
           name: berchi-cashier-${{ steps.app.outputs.version }}
@@ -162,11 +194,12 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      # Straight from this job, rather than handing the files to another one
-      # through the artifact store: release assets do not live in that quota, so
-      # tagging still produces an installer when artifact uploads are refused.
+      # Both publishing steps upload straight from this job, rather than handing
+      # the files to another one through the artifact store: release assets do
+      # not live in that quota, so they keep working when artifact uploads are
+      # refused.
       - name: Publish the release
-        if: startsWith(github.ref, 'refs/tags/desktop-v')
+        if: steps.release.outputs.kind == 'version'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -195,3 +228,42 @@ jobs:
           fi
           gh release upload "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --clobber dist/*-setup.exe
 
+      # The branch's pre-release is deleted and made again rather than edited:
+      # that moves its tag to the commit just built, and drops the previous
+      # build's installer, whose file name changes with the version. Being a
+      # pre-release, it is never shown as the repository's latest release, so the
+      # tagged versions keep that place.
+      - name: Publish the branch's latest build
+        if: steps.release.outputs.kind == 'branch'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.release.outputs.tag }}
+          VERSION: ${{ steps.app.outputs.version }}
+        run: |
+          set -euo pipefail
+          commit="${GITHUB_SHA:0:7}"
+          cat > notes.md <<NOTES
+          The newest build of the \`$GITHUB_REF_NAME\` branch, from commit $commit. Every
+          build of that branch replaces this pre-release, installer and all. For a
+          version that stays put, use a \`desktop-v\` release.
+
+          On the cashier PC, download the \`-setup.exe\` below and run it. It installs
+          for the signed-in Windows user only, so it needs no administrator rights.
+          It is not code-signed, so SmartScreen may say "unknown publisher": choose
+          **More info**, then **Run anyway**.
+
+          This build points at the address held in the \`SALON_URL\` secret. Full
+          setup: \`desktop/README.md\` and \`docs/CASHIER_PC.md\`.
+          NOTES
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release delete "$TAG" --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes
+          fi
+          # A run cancelled between the delete and the create leaves the tag
+          # behind, and a release made on an existing tag stays on its old commit.
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" >/dev/null 2>&1; then
+            gh api -X DELETE "repos/$GITHUB_REPOSITORY/git/refs/tags/$TAG"
+          fi
+          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --prerelease --title "Berchi Cashier $VERSION ($GITHUB_REF_NAME, latest build)" \
+            --notes-file notes.md dist/*-setup.exe

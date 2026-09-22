@@ -167,10 +167,10 @@ cashier PC. It installs for that Windows user only, and needs no administrator
 rights.
 
 If no PC here has Rust, GitHub builds the same installer: push a tag like
-`desktop-v0.1.0` and download it from the release. Builds of untagged branches
-put it under *Artifacts* on the run (*Actions* → *Desktop app*), but that upload
-is refused when the account's artifact storage is full, so a tag is the reliable
-way to get one.
+`desktop-v0.1.0` and download it from that release. Every push to a branch that
+changes `desktop/` also replaces the branch's pre-release (`desktop-latest-main`
+for `main`) with its newest installer, but that moves on with every build, so
+install the salon from a tagged version.
 
 What it gives over a browser tab:
 

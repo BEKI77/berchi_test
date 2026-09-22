@@ -166,6 +166,10 @@ That produces an installer (`Berchi Cashier_0.1.0_x64-setup.exe`) to run on the
 cashier PC. It installs for that Windows user only, and needs no administrator
 rights.
 
+If no PC here has Rust, GitHub builds the same installer: push a tag like
+`desktop-v0.1.0` and download it from the release, or take it from the *Artifacts*
+of any run under *Actions* → *Desktop app*.
+
 What it gives over a browser tab:
 
 - It shows **Starting the salon system...** while the PC is still starting, and
@@ -180,9 +184,17 @@ To have it start with Windows, put a shortcut to it in the folder that
 `Win + R`, `shell:startup` opens. If the salon system is not on port 3000, put its
 address in a file called `berchi-url.txt` next to the program.
 
+**It can point at a deployed salon instead.** Set the address once as the
+`SALON_URL` repository secret on GitHub and every installer built afterwards
+polls it, with nothing to set up on the PC
+([desktop/README.md](../desktop/README.md)). Weigh it first: this page exists
+because the salon keeps trading when the internet is down, and a window pointed
+at a domain stops working the moment the line does.
+
 **This is a window, not the offline rewrite.** The database and the server still
-run in Docker on the same PC, and the window needs them. The earlier idea of a
-Tauri program with its own database and no Docker has not been started.
+run in Docker on the same PC, and the window needs them (or a deployed salon).
+The earlier idea of a Tauri program with its own database and no Docker has not
+been started.
 
 The stylists' tablets keep using the browser (`/tablet`); this is for the PC.
 

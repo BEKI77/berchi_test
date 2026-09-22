@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, text, boolean, timestamp, integer } from "drizzle-orm/pg-core";
+import { pgTable, uuid, varchar, text, boolean, timestamp, integer, index } from "drizzle-orm/pg-core";
 
 export const productCategories = pgTable("product_categories", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -24,4 +24,6 @@ export const products = pgTable("products", {
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
-});
+}, (t) => [
+  index("products_category_id_idx").on(t.categoryId),
+]);

@@ -16,6 +16,16 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "2", features = [] }
 tauri-plugin-single-instance = "2"
 
+# Checks whether the salon is answering. Blocking, which suits the watching
+# thread, and small.
+#
+# native-tls means the operating system's own TLS: SChannel on Windows, so
+# certificates are trusted exactly as the web view trusts them, and the build
+# needs no extra tools. The default (rustls with aws-lc-rs) would want NASM and
+# CMake on the Windows build machine and would carry its own list of root
+# certificates.
+ureq = { version = "3", default-features = false, features = ["native-tls"] }
+
 [profile.release]
 codegen-units = 16
 lto = "thin"

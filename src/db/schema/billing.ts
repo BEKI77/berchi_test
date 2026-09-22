@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, timestamp, integer} from "drizzle-orm/pg-core";
+import { pgTable, uuid, varchar, timestamp, integer, index } from "drizzle-orm/pg-core";
 import { invoiceStatusEnum, discountTypeEnum, paymentMethodEnum } from "./enums";
 import { serviceOrders } from "./orders";
 
@@ -17,7 +17,10 @@ export const invoices = pgTable("invoices", {
   status: invoiceStatusEnum("status").default("PENDING").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
-});
+}, (t) => [
+  index("invoices_created_at_idx").on(t.createdAt),
+  index("invoices_status_idx").on(t.status),
+]);
 
 export const payments = pgTable("payments", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -27,4 +30,6 @@ export const payments = pgTable("payments", {
   reference: varchar("reference", { length: 255 }),
   chapaTxRef: varchar("chapa_tx_ref", { length: 255 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (t) => [
+  index("payments_created_at_idx").on(t.createdAt),
+]);

@@ -30,6 +30,14 @@ browser handles badly:
   only thing the salon's pages may ask the program to do is print a ticket,
   open the cash drawer or open the printer settings window &mdash; they cannot
   read or change the printer settings, or touch anything else on the PC.
+- **It does not behave like a browser.** No right-click menu offering *Back*,
+  *Reload* and *Save as*; no dragging labels blue; no find bar or print dialog
+  over the top of the till; no zooming the whole screen by catching Ctrl and the
+  wheel. Fields still select and copy normally, and **reloading still works** —
+  F5 is the only way back from a page that has wedged, and the watching thread
+  only notices the *server* going away. This is done by a script injected before
+  each page runs (`src-tauri/src/native.js`), so it reaches the salon system
+  without the salon system knowing anything about it.
 - **A second launch** brings the first window forward instead of opening another.
 
 **It is not the offline rewrite.** The earlier plan for a Tauri app with its own
@@ -388,6 +396,11 @@ the printer setup opens from the *Starting* screen while the salon system is
 down. They use `BERCHI_PRINTERS_FILE` so a run cannot scribble on the settings
 of the PC it runs on. Run one on its own with `node scripts/verify-shell.mjs G`.
 
+Section **I** checks the browser behaviours are gone — on the salon's own pages,
+which is the point, since the script has to reach a page served from a web
+server. It also checks the two things that must *not* be taken away: reloading,
+and selecting text in a field.
+
 The layout of a ticket, the cut, the character handling and the settings file
 are covered by unit tests, which need no printer and run anywhere:
 
@@ -414,6 +427,11 @@ paper rather than by the screen.
 - `src-tauri/src/lib.rs`: the shell itself: the address, the watching, the
   window, the rules about where it may go, and the permission that lets the
   salon's own pages print.
+- `src-tauri/src/native.js`: injected into every page before its own scripts
+  run, including the salon system's. Takes away the browser behaviours that have
+  no place on a till, and nothing else — it deliberately does not style or
+  intercept anything the salon system does, so there is nothing for it to
+  disagree with.
 - `src-tauri/src/printing/`: everything about printing a ticket.
   - `settings.rs`: what this PC knows about its printers, and reading and
     writing `printers.json`.

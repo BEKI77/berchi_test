@@ -299,6 +299,51 @@ if (which === "all" || which === "H") {
   page.close(); app.kill(); killApp();
 }
 
+if (which === "all" || which === "I") {
+  console.log("\nI. It does not behave like a browser");
+
+  const app = launch({ BERCHI_URL: SALON });
+  const page = await attach();
+  await waitFor(async () => (await page.evalJs("location.origin")) === SALON_ORIGIN, 20000);
+  await sleep(1500);
+
+  // Checked on the salon's own pages, not the program's: the point of the
+  // injected script is that it reaches a page served from a web server, which
+  // knows nothing about any of this.
+  const prevented = async (kind, init) => page.evalJs(`(() => {
+    const Ctor = ${kind === "keydown" ? "KeyboardEvent" : "MouseEvent"};
+    const event = new Ctor(${JSON.stringify(kind)}, { bubbles: true, cancelable: true, ...${JSON.stringify(init)} });
+    (${kind === "keydown" ? "window" : "document.body"}).dispatchEvent(event);
+    return event.defaultPrevented;
+  })()`);
+
+  check("right-clicking does not open the browser's menu", (await prevented("contextmenu", {})) === true);
+  check("Ctrl+F does not open the browser's find bar", (await prevented("keydown", { key: "f", ctrlKey: true })) === true);
+  check("a dropped file does not navigate the window", (await prevented("drop", {})) === true);
+
+  // Deliberately still working: reloading is the only way back from a page that
+  // has wedged, and the watching thread only notices the *server* going away.
+  check(
+    "...but reloading still works, as the way back from a wedged page",
+    (await prevented("keydown", { key: "r", ctrlKey: true })) === false,
+  );
+
+  const body = await page.evalJs("getComputedStyle(document.body).userSelect");
+  check("text cannot be dragged blue", body === "none", String(body));
+
+  // A field must stay selectable, or a phone number cannot be copied out of one.
+  const field = await page.evalJs(`(() => {
+    const input = document.createElement("input");
+    document.body.appendChild(input);
+    const how = getComputedStyle(input).userSelect;
+    input.remove();
+    return how;
+  })()`);
+  check("but a field can still be selected and copied from", field !== "none", String(field));
+
+  page.close(); app.kill(); killApp();
+}
+
 killApp();
 console.log(failures === 0 ? "\nAll checks passed.\n" : `\n${failures} check(s) FAILED.\n`);
 process.exit(failures === 0 ? 0 : 1);

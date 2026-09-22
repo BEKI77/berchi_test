@@ -50,6 +50,19 @@ const URL_FILE: &str = "berchi-url.txt";
 /// Windows offers should not need one.
 const PRINT_FILE: &str = "berchi-print.txt";
 
+/// Runs in the window before any page's own scripts, on the program's own
+/// screens and on the salon system alike. It takes away the browser behaviours
+/// that have no place on a till -- the right-click menu, the find bar, dragging
+/// text blue -- without touching what the salon system does. See native.js.
+const NATIVE_FEEL: &str = include_str!("native.js");
+
+/// What the window shows before a page has painted.
+///
+/// White, because that is the salon system's own background and it is what the
+/// window shows for all but the first second of the day. Without it the web
+/// view starts black and every navigation flashes.
+const WINDOW_BACKGROUND: tauri::utils::config::Color = tauri::utils::config::Color(255, 255, 255, 255);
+
 /// A light page that only answers when the whole system is up, unlike a bare
 /// open port: Docker accepts connections on a published port before the app
 /// inside is listening, and a load balancer in front of a deployed salon answers
@@ -359,7 +372,13 @@ pub fn run() {
             let builder = WebviewWindowBuilder::new(app, "main", WebviewUrl::App(first_screen.into()))
                 .title("Berchi Cashier")
                 .maximized(true)
-                .min_inner_size(1024.0, 700.0);
+                .min_inner_size(1024.0, 700.0)
+                // What makes it feel like a program rather than a browser tab.
+                .initialization_script(NATIVE_FEEL)
+                .background_color(WINDOW_BACKGROUND)
+                // Ctrl and the mouse wheel zooming the whole till, which on a
+                // fixed screen only ever happens by accident.
+                .zoom_hotkeys_enabled(false);
             #[cfg(windows)]
             let builder = builder.additional_browser_args(&browser_args());
 
@@ -480,6 +499,27 @@ mod tests {
         // to be dragged back down to http.
         let secure = url("https://salon.example.com");
         assert!(!navigation_allowed(&url("http://salon.example.com/"), &secure));
+    }
+
+    /// The script is embedded at build time, so a renamed or emptied file would
+    /// otherwise show up only as a window that has quietly gone back to
+    /// behaving like a browser -- which nobody reports, because nothing is
+    /// visibly broken.
+    #[test]
+    fn the_window_is_settled_before_any_page_runs() {
+        assert!(
+            NATIVE_FEEL.contains("contextmenu"),
+            "the browser's right-click menu must be taken away"
+        );
+        assert!(
+            NATIVE_FEEL.contains("user-select"),
+            "dragging text blue must be taken away"
+        );
+        assert!(NATIVE_FEEL.contains("\"drop\""), "a dropped file must not navigate the window");
+        assert!(NATIVE_FEEL.contains("scrollbar"), "the browser's scrollbar must be replaced");
+        // It runs on a page served by the salon, so a throw here would take the
+        // till down with it.
+        assert!(NATIVE_FEEL.contains("catch"), "it must not be able to break the salon system");
     }
 
     /// Printing is allowed from exactly the addresses the window may show, and

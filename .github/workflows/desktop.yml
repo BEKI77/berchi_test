@@ -23,8 +23,11 @@
 #     is allowed to fail: artifact storage is a quota shared across the whole
 #     account, and a full one must not fail a build that worked.
 #
-# The program is Windows-only -- WebView2, silent printing, an NSIS installer --
-# so there is only a Windows job. The Rust unit tests do run here.
+# There is only a Windows job because the salon's tills are Windows and that is
+# what the release has to contain. The program itself builds and runs on Linux
+# and macOS too (see desktop/README.md), and `cargo test` passes on all three --
+# what is Windows-only is silent printing through the web view and this
+# installer. The Rust unit tests run here.
 # desktop/scripts/verify-shell.mjs is deliberately left out: it drives a real web
 # view against a running salon system, which CI has no way to provide. Run it on
 # the development PC before tagging a release.

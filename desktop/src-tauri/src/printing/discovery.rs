@@ -166,48 +166,47 @@ fn default_printer() -> Option<String> {
     }
 }
 
-/// Print queues CUPS knows about.
+/// Print queues CUPS knows about, on Linux and macOS.
 ///
-/// The salon runs on Windows. This exists so the settings window can be built
-/// and tried on the machine it is developed on.
+/// The same idea as the Windows spooler above, and offered the same way: these
+/// are the printers already set up on this computer, so picking one is picking
+/// something that is known to work rather than typing a path from memory.
+///
+/// A queue CUPS has **stopped** is still offered, and said to be stopped. It is
+/// very often the right printer -- a stopped queue is usually a working printer
+/// that had one bad job -- and leaving it out of the list would look like the
+/// printer had disappeared.
 #[cfg(not(windows))]
 fn installed_printers() -> Result<Vec<Candidate>, String> {
-    let listed = match run("lpstat", &["-a"]) {
-        Ok(output) => output,
-        // No CUPS on this machine is not a fault worth reporting: it just means
-        // there are no queues to offer.
-        Err(_) => return Ok(Vec::new()),
+    use super::cups;
+
+    let listed = match cups::queues() {
+        Ok(names) => names,
+        // Worth saying plainly rather than showing an empty list: a PC with no
+        // print system is a thing somebody has to go and fix, and an empty list
+        // looks like the printer is at fault.
+        Err(cups::NotRun::Missing) => return Err(cups::NO_CUPS.into()),
+        Err(cups::NotRun::Failed(why)) => {
+            return Err(format!("The print system would not list its queues: {why}"))
+        }
     };
 
-    let default = run("lpstat", &["-d"]).ok().and_then(|line| {
-        line.split(':').nth(1).map(|name| name.trim().to_string()).filter(|n| !n.is_empty())
-    });
+    let default = cups::default_queue();
+    let stopped = cups::stopped_queues();
 
     Ok(listed
-        .lines()
-        .filter_map(|line| line.split_whitespace().next())
-        .filter(|name| !name.is_empty())
+        .into_iter()
         .map(|name| Candidate {
-            is_default: default.as_deref() == Some(name),
-            detail: Some("A print queue on this computer".into()),
-            connection: Connection::SystemPrinter { name: name.to_string() },
-            label: name.to_string(),
+            is_default: default.as_deref() == Some(name.as_str()),
+            detail: Some(if stopped.contains(&name) {
+                "A print queue on this computer - stopped, needs cupsenable".to_string()
+            } else {
+                "A print queue on this computer".to_string()
+            }),
+            connection: Connection::SystemPrinter { name: name.clone() },
+            label: name,
         })
         .collect())
-}
-
-#[cfg(not(windows))]
-fn run(program: &str, args: &[&str]) -> Result<String, String> {
-    let output = std::process::Command::new(program)
-        .args(args)
-        .output()
-        .map_err(|err| format!("cannot run {program}: {err}"))?;
-
-    if output.status.success() {
-        Ok(String::from_utf8_lossy(&output.stdout).to_string())
-    } else {
-        Err(String::from_utf8_lossy(&output.stderr).trim().to_string())
-    }
 }
 
 // ---------------------------------------------------------------------------
@@ -244,10 +243,112 @@ fn usb_printers() -> Result<Vec<Candidate>, String> {
         .collect())
 }
 
-#[cfg(not(windows))]
+/// USB printers Linux picked up with its own kernel driver.
+///
+/// Exactly the Windows case above, arriving by a different road. `usblp` gives a
+/// receipt printer a node under `/dev/usb/` the moment it is plugged in, with no
+/// queue and no driver to install; `/dev/lp*` is the same for one on a parallel
+/// port. Written to as a file, both are perfectly good ESC/POS printers.
+///
+/// Offering these matters more on Linux than the equivalent does on Windows.
+/// A till whose printer has no CUPS queue -- because the vendor ships a Windows
+/// driver and nothing else, which is most of them -- would otherwise find
+/// *nothing* under **Add**, and have no way to know that typing `/dev/usb/lp0`
+/// into a device path would have worked.
+#[cfg(target_os = "linux")]
 fn usb_printers() -> Result<Vec<Candidate>, String> {
-    // The USB path is a Windows driver. On Linux the same printer appears as a
-    // device file, which the device connection covers.
+    let mut found = Vec::new();
+
+    // usblp, the driver a USB receipt printer gets with nothing installed.
+    found.extend(nodes_in("/dev/usb", "lp", "Plugged in by USB"));
+    // The parallel port, for an older till. Same driver interface.
+    found.extend(nodes_in("/dev", "lp", "On a parallel port"));
+
+    Ok(found)
+}
+
+/// Printer device nodes in one directory, as candidates.
+///
+/// A directory that is not there is not a fault: `/dev/usb` only exists once
+/// something has been plugged in, which is the ordinary state of a PC with no
+/// printer attached.
+#[cfg(target_os = "linux")]
+fn nodes_in(directory: &str, prefix: &str, how: &str) -> Vec<Candidate> {
+    let Ok(entries) = std::fs::read_dir(directory) else {
+        return Vec::new();
+    };
+
+    let mut found: Vec<Candidate> = entries
+        .flatten()
+        .filter_map(|entry| {
+            let name = entry.file_name().into_string().ok()?;
+            if !is_printer_node(&name, prefix) {
+                return None;
+            }
+
+            let path = entry.path().to_string_lossy().to_string();
+            let detail = match refused(&entry.path()) {
+                None => how.to_string(),
+                Some(why) => format!("{how} - {why}"),
+            };
+
+            Some(Candidate {
+                label: path.clone(),
+                detail: Some(detail),
+                connection: Connection::Device { path },
+                is_default: false,
+            })
+        })
+        .collect();
+
+    // read_dir hands them over in whatever order the filesystem likes, and a
+    // list that reorders itself between two looks is unsettling to use.
+    found.sort_by(|left, right| left.label.cmp(&right.label));
+    found
+}
+
+/// Whether a name in `/dev` is a printer node: the prefix, then a number.
+///
+/// `lp0`, `lp1`, and not `lp` on its own or `lptest`. Matching on the prefix
+/// alone would sweep up whatever else a distribution happens to keep there and
+/// offer it to the salon as a printer.
+#[cfg(target_os = "linux")]
+fn is_printer_node(name: &str, prefix: &str) -> bool {
+    match name.strip_prefix(prefix) {
+        Some(number) => !number.is_empty() && number.bytes().all(|byte| byte.is_ascii_digit()),
+        None => false,
+    }
+}
+
+/// Why this program could not write to a device node, if it could not.
+///
+/// Worth finding out here rather than at the till: on Fedora, Debian and most
+/// others these nodes belong to the `lp` group, and an account that is not in it
+/// gets *permission denied* with nothing to suggest what to do about it. That is
+/// the single most likely thing to stop a Linux till printing, and it is
+/// invisible until somebody tries.
+#[cfg(target_os = "linux")]
+fn refused(path: &std::path::Path) -> Option<String> {
+    use std::os::unix::fs::OpenOptionsExt;
+
+    // O_NONBLOCK so that a printer which is switched off cannot leave the
+    // settings window hanging on an open() that never returns. 0o4000 is the
+    // Linux value; this function is Linux-only, so it needs no others.
+    const O_NONBLOCK: i32 = 0o4000;
+
+    match std::fs::OpenOptions::new().write(true).custom_flags(O_NONBLOCK).open(path) {
+        Ok(_) => None,
+        Err(err) if err.kind() == std::io::ErrorKind::PermissionDenied => {
+            Some("not allowed: run  sudo usermod -aG lp $USER  and sign in again".to_string())
+        }
+        Err(err) => Some(format!("cannot be opened: {err}")),
+    }
+}
+
+/// macOS has no printer device nodes: a USB printer there is reached through
+/// CUPS, which [`installed_printers`] already offers.
+#[cfg(all(unix, not(target_os = "linux")))]
+fn usb_printers() -> Result<Vec<Candidate>, String> {
     Ok(Vec::new())
 }
 
@@ -266,6 +367,7 @@ fn serial_ports() -> Result<Vec<Candidate>, String> {
 
     Ok(ports
         .into_iter()
+        .filter(|port| real_serial_port(&port.port_name))
         .map(|port| Candidate {
             label: port.port_name.clone(),
             detail: Some(match port.port_type {
@@ -286,6 +388,41 @@ fn serial_ports() -> Result<Vec<Candidate>, String> {
         .collect())
 }
 
+/// Whether a serial port is a real one, or a ghost.
+///
+/// Linux declares `/dev/ttyS0` through `/dev/ttyS31` whether or not the PC has
+/// the hardware, so a laptop with no serial port at all still lists thirty-two
+/// of them. Offering those buries the printer somebody is actually looking for
+/// under three screens of scrolling, which on a Linux till is the difference
+/// between *Add* being useful and being unusable.
+///
+/// The kernel says which are real: `/sys/class/tty/ttySN/type` is `0`
+/// (`PORT_UNKNOWN`) for a port with no UART behind it, and the chip number for
+/// one with. Anything that is not a `ttyS` -- a USB adapter, a Bluetooth port --
+/// only exists when it is plugged in, so it is taken at face value.
+#[cfg(target_os = "linux")]
+fn real_serial_port(port_name: &str) -> bool {
+    let Some(tty) = port_name.strip_prefix("/dev/") else {
+        return true;
+    };
+    if !tty.starts_with("ttyS") {
+        return true;
+    }
+
+    match std::fs::read_to_string(format!("/sys/class/tty/{tty}/type")) {
+        Ok(kind) => kind.trim() != "0",
+        // No sysfs to ask: better to offer a port that is not there than to hide
+        // one that is.
+        Err(_) => true,
+    }
+}
+
+/// Windows and macOS only list serial ports they actually have.
+#[cfg(not(target_os = "linux"))]
+fn real_serial_port(_port_name: &str) -> bool {
+    true
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -300,6 +437,63 @@ mod tests {
         // has to come back rather than fail.
         for candidate in &found.printers {
             assert!(!candidate.label.is_empty());
+        }
+    }
+
+    /// A USB receipt printer on Linux is a device node, and `Add` has to offer
+    /// it: with no CUPS queue -- which is the ordinary state of a printer whose
+    /// vendor ships a Windows driver and nothing else -- it is the only way to
+    /// reach it, and a list that leaves it out looks like a list with no
+    /// printer in it.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_printer_node_is_a_prefix_and_a_number() {
+        assert!(is_printer_node("lp0", "lp"));
+        assert!(is_printer_node("lp12", "lp"));
+
+        // Not printers, whatever else they are.
+        assert!(!is_printer_node("lp", "lp"));
+        assert!(!is_printer_node("lptest", "lp"));
+        assert!(!is_printer_node("loop0", "lp"));
+        assert!(!is_printer_node("", "lp"));
+    }
+
+    /// Linux declares `/dev/ttyS0` to `/dev/ttyS31` whether or not the hardware
+    /// is there. Offering all thirty-two buries the printer somebody came to
+    /// find, so only the ones with a real UART behind them are kept -- and
+    /// anything that is not a `ttyS` is taken at its word, because a USB or
+    /// Bluetooth port only exists when it is really there.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_usb_serial_adapter_is_never_mistaken_for_a_phantom_port() {
+        assert!(real_serial_port("/dev/ttyUSB0"));
+        assert!(real_serial_port("/dev/ttyACM0"));
+        assert!(real_serial_port("/dev/rfcomm0"));
+        // Not under /dev at all: nothing to check, so nothing is hidden.
+        assert!(real_serial_port("COM1"));
+    }
+
+    /// Prints what this particular computer can see, for supporting a till from
+    /// a distance. Ignored because the answer is different on every machine and
+    /// there is nothing to assert about it -- the point is to read it:
+    ///
+    /// ```text
+    /// cargo test --manifest-path src-tauri/Cargo.toml what_this_computer_can_see -- --ignored --nocapture
+    /// ```
+    #[test]
+    #[ignore = "reports what is attached to this machine; nothing to assert"]
+    fn what_this_computer_can_see() {
+        let found = look();
+        for candidate in &found.printers {
+            println!(
+                "{}  [{}]  {}",
+                candidate.label,
+                candidate.detail.as_deref().unwrap_or(""),
+                candidate.connection.describe()
+            );
+        }
+        for problem in &found.problems {
+            println!("problem: {problem}");
         }
     }
 

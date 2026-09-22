@@ -27,6 +27,10 @@
 //! page: that belongs to the PC, and is done in the window this program opens
 //! itself.
 
+/// Linux and macOS reach a printer through CUPS. Windows has its own spooler
+/// API and never needs this.
+#[cfg(not(windows))]
+pub mod cups;
 pub mod discovery;
 pub mod doc;
 pub mod render;
@@ -57,6 +61,25 @@ const SETTINGS_PAGE: &str = "printers.html";
 pub struct Stored {
     pub settings: Settings,
     pub path: String,
+    /// Which operating system this till runs.
+    ///
+    /// The settings window uses it to say the true thing: *Printers & scanners*
+    /// on Windows, a print queue on Linux, `COM1` against `/dev/ttyUSB0`. The
+    /// alternative is one set of words that is wrong on two platforms out of
+    /// three, which is how a salon comes to believe the program does not
+    /// support its computer.
+    pub platform: &'static str,
+}
+
+/// Which operating system this is, in one word, for the settings window.
+pub fn platform() -> &'static str {
+    if cfg!(windows) {
+        "windows"
+    } else if cfg!(target_os = "macos") {
+        "macos"
+    } else {
+        "linux"
+    }
 }
 
 /// What happened when a ticket was sent.
@@ -140,7 +163,11 @@ pub fn list_printers() -> discovery::Found {
 #[tauri::command]
 pub fn printer_settings(app: AppHandle) -> Result<Stored, String> {
     let path = settings_path(&app)?;
-    Ok(Stored { settings: settings::load(&path)?, path: path.display().to_string() })
+    Ok(Stored {
+        settings: settings::load(&path)?,
+        path: path.display().to_string(),
+        platform: platform(),
+    })
 }
 
 /// Saves the settings, having first checked a printer could act on them.
@@ -149,7 +176,7 @@ pub fn save_printer_settings(app: AppHandle, settings: Settings) -> Result<Store
     let path = settings_path(&app)?;
     let tidied = settings.tidied()?;
     settings::save(&path, &tidied)?;
-    Ok(Stored { settings: tidied, path: path.display().to_string() })
+    Ok(Stored { settings: tidied, path: path.display().to_string(), platform: platform() })
 }
 
 /// The ticket as characters, for the preview beside the settings form.

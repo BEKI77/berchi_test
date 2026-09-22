@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, boolean, timestamp, text, jsonb , unique } from "drizzle-orm/pg-core";
+import { pgTable, uuid, varchar, boolean, timestamp, text, jsonb , unique, index } from "drizzle-orm/pg-core";
 
 // Permissions table - defines individual permissions
 export const permissions = pgTable("permissions", {
@@ -32,6 +32,8 @@ export const rolePermissions = pgTable("role_permissions", {
   // Without this the seed's onConflictDoNothing has nothing to conflict on, so
   // every re-run duplicated every assignment.
   unique("role_permissions_role_id_permission_id_unique").on(t.roleId, t.permissionId),
+  // roleId is covered by the unique above (leading column); permissionId is not.
+  index("role_permissions_permission_id_idx").on(t.permissionId),
 ]);
 
 // User-Permissions junction table - for direct user permission assignments
@@ -44,6 +46,7 @@ export const userPermissions = pgTable("user_permissions", {
   updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
 }, (t) => [
   unique("user_permissions_user_id_permission_id_unique").on(t.userId, t.permissionId),
+  index("user_permissions_permission_id_idx").on(t.permissionId),
 ]);
 
 // Permission templates - predefined permission sets for easy setup

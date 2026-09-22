@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, timestamp, index } from "drizzle-orm/pg-core";
 import { appointmentStatusEnum, appointmentSourceEnum } from "./enums";
 import { customers } from "./customers";
 import { staff } from "./staff";
@@ -16,4 +16,9 @@ export const appointments = pgTable("appointments", {
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
-});
+}, (t) => [
+  index("appointments_start_time_idx").on(t.startTime),
+  index("appointments_staff_id_start_time_idx").on(t.staffId, t.startTime),
+  index("appointments_customer_id_idx").on(t.customerId),
+  index("appointments_service_id_idx").on(t.serviceId),
+]);

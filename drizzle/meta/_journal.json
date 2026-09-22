@@ -78,6 +78,13 @@
       "when": 1789901821226,
       "tag": "0010_staff_pin",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1790060421963,
+      "tag": "0011_performance_indexes",
+      "breakpoints": true
     }
   ]
 }

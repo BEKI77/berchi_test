@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, text, boolean, timestamp, integer } from "drizzle-orm/pg-core";
+import { pgTable, uuid, varchar, text, boolean, timestamp, integer, index } from "drizzle-orm/pg-core";
 import { products } from "./products";
 
 export const serviceCategories = pgTable("service_categories", {
@@ -20,7 +20,9 @@ export const services = pgTable("services", {
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
-});
+}, (t) => [
+  index("services_category_id_idx").on(t.categoryId),
+]);
 
 export const serviceConsumables = pgTable("service_consumables", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -28,4 +30,7 @@ export const serviceConsumables = pgTable("service_consumables", {
   productId: uuid("product_id").notNull().references(() => products.id),
   portionsRequired: integer("portions_required").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (t) => [
+  index("service_consumables_service_id_idx").on(t.serviceId),
+  index("service_consumables_product_id_idx").on(t.productId),
+]);

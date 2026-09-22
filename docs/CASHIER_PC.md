@@ -132,9 +132,9 @@ from section 6.
 
 ### With the desktop window: a real receipt printer
 
-Open **Printer setup** in the window (there is a button on the *Starting the
-salon system* screen, and one in the salon system once it is up), press **Add**,
-and pick the printer. The slip and the receipt are then laid out for the roll
+Open **Printer setup** in the window &mdash; the small **Printer** button in the
+bottom left corner of every screen, or **Ctrl+Alt+P**, or *Admin → Settings →
+Receipt printer*. Press **Add** and pick the printer. The slip and the receipt are then laid out for the roll
 and sent to the printer directly, which means:
 
 - The paper is **cut** at the end of each ticket, with the amount of paper fed

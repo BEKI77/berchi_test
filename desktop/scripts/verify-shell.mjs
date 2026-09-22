@@ -81,6 +81,15 @@ const freePort = () => new Promise((resolve) => {
 
 const powershell = (command) => execSync(`powershell -NoProfile -ExecutionPolicy Bypass -Command "${command.replace(/"/g, '\\"')}"`).toString().trim();
 
+// The way in to the printer setup that the program injects into every page it
+// shows. It lives in a shadow root so the salon system's stylesheets cannot
+// reach it, which is also why it cannot simply be looked up by id.
+const PRINTER_BUTTON = {
+  exists: "!!document.getElementById('berchi-printer-setup')?.shadowRoot?.querySelector('button')",
+  label: "document.getElementById('berchi-printer-setup')?.shadowRoot?.querySelector('button')?.textContent?.trim()",
+  click: "document.getElementById('berchi-printer-setup').shadowRoot.querySelector('button').click()",
+};
+
 // The options the web view was actually started with. This is the only way to
 // see them: they are handed to WebView2 at creation and are not readable from
 // the page.
@@ -283,18 +292,73 @@ if (which === "all" || which === "H") {
   await sleep(2500);
 
   check("the Starting screen is showing", (await page.evalJs("document.body.innerText")).includes("Starting the salon system"));
-  check("the printer setup button is offered", (await page.evalJs("!!document.getElementById('printer-setup')")) === true);
-  // The button is always shown, so the only way it can fail is by saying so.
-  // An earlier version hid it when the program could not be reached, which is
-  // the one failure nobody can report.
-  check("nothing is complaining yet", (await page.evalJs("document.getElementById('printer-setup-trouble').hidden")) === true);
+  check("the printer setup button is offered", (await page.evalJs(PRINTER_BUTTON.exists)) === true);
 
-  await page.evalJs("document.getElementById('printer-setup').click()");
+  await page.evalJs(PRINTER_BUTTON.click);
   const setupWindow = await waitFor(async () => {
     const targets = await (await fetch(`http://127.0.0.1:${DEBUG_PORT}/json/list`)).json();
     return targets.some((t) => (t.url ?? "").includes("printers.html"));
   }, 10000);
   check("...and it opens with the salon system still down", setupWindow !== null);
+
+  page.close(); app.kill(); killApp();
+}
+
+if (which === "all" || which === "I") {
+  console.log("\nI. It does not behave like a browser");
+
+  const app = launch({ BERCHI_URL: SALON });
+  const page = await attach();
+  await waitFor(async () => (await page.evalJs("location.origin")) === SALON_ORIGIN, 20000);
+  await sleep(1500);
+
+  // Checked on the salon's own pages, not the program's: the point of the
+  // injected script is that it reaches a page served from a web server, which
+  // knows nothing about any of this.
+  const prevented = async (kind, init) => page.evalJs(`(() => {
+    const Ctor = ${kind === "keydown" ? "KeyboardEvent" : "MouseEvent"};
+    const event = new Ctor(${JSON.stringify(kind)}, { bubbles: true, cancelable: true, ...${JSON.stringify(init)} });
+    (${kind === "keydown" ? "window" : "document.body"}).dispatchEvent(event);
+    return event.defaultPrevented;
+  })()`);
+
+  check("right-clicking does not open the browser's menu", (await prevented("contextmenu", {})) === true);
+  check("Ctrl+F does not open the browser's find bar", (await prevented("keydown", { key: "f", ctrlKey: true })) === true);
+  check("a dropped file does not navigate the window", (await prevented("drop", {})) === true);
+
+  // Deliberately still working: reloading is the only way back from a page that
+  // has wedged, and the watching thread only notices the *server* going away.
+  check(
+    "...but reloading still works, as the way back from a wedged page",
+    (await prevented("keydown", { key: "r", ctrlKey: true })) === false,
+  );
+
+  const body = await page.evalJs("getComputedStyle(document.body).userSelect");
+  check("text cannot be dragged blue", body === "none", String(body));
+
+  // The whole point of injecting it: the salon system is served from a web
+  // server and knows nothing about the printer, so the way in has to be put
+  // there from outside. The Starting screen is not enough -- it disappears by
+  // itself the moment the salon answers.
+  check("the printer setup is offered on the salon's own pages", (await page.evalJs(PRINTER_BUTTON.exists)) === true);
+  check("...and says what it is", (await page.evalJs(PRINTER_BUTTON.label)) === "Printer", String(await page.evalJs(PRINTER_BUTTON.label)));
+
+  // It sits outside the salon system's own root element, so a re-render on the
+  // way to another screen cannot take it away with it.
+  const outside = await page.evalJs(
+    "document.getElementById('berchi-printer-setup').parentElement === document.body",
+  );
+  check("...and cannot be swept away by the app re-rendering", outside === true);
+
+  // A field must stay selectable, or a phone number cannot be copied out of one.
+  const field = await page.evalJs(`(() => {
+    const input = document.createElement("input");
+    document.body.appendChild(input);
+    const how = getComputedStyle(input).userSelect;
+    input.remove();
+    return how;
+  })()`);
+  check("but a field can still be selected and copied from", field !== "none", String(field));
 
   page.close(); app.kill(); killApp();
 }

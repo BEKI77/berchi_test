@@ -97,7 +97,7 @@ export default async function SlipPage({
       </div>
 
       <div className="no-print">
-        <PrintButton />
+        <PrintButton orderId={orderId} />
       </div>
       {print === "1" && <AutoPrint />}
     </>

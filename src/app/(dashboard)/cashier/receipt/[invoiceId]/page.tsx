@@ -53,6 +53,10 @@ const methodIcons: Record<string, React.ReactNode> = {
   BANK_TRANSFER: <Landmark className="h-4 w-4" />,
 };
 
+// Width the receipt prints at through the browser, like the slip page's.
+// Change to 58 for a 58mm printer.
+const RECEIPT_WIDTH_MM = 80;
+
 export default function ReceiptPage() {
   const router = useRouter();
   const params = useParams();
@@ -114,6 +118,20 @@ export default function ReceiptPage() {
 
   return (
     <div className="max-w-md mx-auto space-y-4">
+      {/* Printed through the browser -- no receipt printer on this PC, or it
+          could not be reached -- only the receipt goes on the paper, at the
+          roll's width, not the dashboard around it. The cut is then up to the
+          printer driver's "cut at end of document" setting. */}
+      <style>{`
+        @media print {
+          @page { margin: 0; }
+          html, body { background: #fff !important; }
+          body * { visibility: hidden !important; }
+          .receipt-print, .receipt-print * { visibility: visible !important; }
+          .h-screen, main { height: auto !important; overflow: visible !important; }
+          .receipt-print { position: absolute; left: 0; top: 0; width: ${RECEIPT_WIDTH_MM}mm; }
+        }
+      `}</style>
       {/* Top Nav */}
       <div className="flex items-center justify-between print:hidden">
         <Button variant="ghost" size="icon" onClick={() => router.back()} className="rounded-xl hover:bg-emerald-50">
@@ -130,7 +148,7 @@ export default function ReceiptPage() {
       </div>
 
       {/* Receipt Card */}
-      <div className="bg-white border border-gray-200 rounded-2xl shadow-lg overflow-hidden print:shadow-none print:border-none print:rounded-none">
+      <div className="receipt-print bg-white border border-gray-200 rounded-2xl shadow-lg overflow-hidden print:shadow-none print:border-none print:rounded-none">
         {/* Header */}
         <div className="text-center pt-8 pb-5 px-6 bg-gradient-to-b from-emerald-50/80 to-white">
           <h1 className="text-2xl font-black tracking-tight text-emerald-700">BERCHI SALON</h1>

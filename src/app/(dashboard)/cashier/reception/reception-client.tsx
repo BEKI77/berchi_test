@@ -10,7 +10,7 @@ import { toast } from "sonner";
 import { formatMoney } from "@/lib/money";
 import { ticketName, shortOrderNumber } from "@/lib/orders";
 import { useOrderEvents } from "@/lib/use-order-events";
-import { printTicket } from "@/lib/desktop-print";
+import { printTicket, printerSetupAction } from "@/lib/desktop-print";
 
 type Order = {
   id: string;
@@ -84,7 +84,7 @@ export function ReceptionClient() {
   const printSlip = useCallback(async (orderId: string) => {
     const outcome = await printTicket("slip", orderId);
     if (outcome?.printed) return;
-    if (outcome?.reason) toast.warning(outcome.reason);
+    if (outcome?.reason) toast.warning(outcome.reason, { action: printerSetupAction() });
     setPrintKey((k) => k + 1);
   }, []);
 

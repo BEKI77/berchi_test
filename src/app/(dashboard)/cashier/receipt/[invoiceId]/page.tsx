@@ -19,7 +19,7 @@ import { toast } from "sonner";
 import { ticketName } from "@/lib/orders";
 import { formatMoney, formatPercent } from "@/lib/money";
 import { paymentMethodLabel } from "@/lib/payment-methods";
-import { printTicket } from "@/lib/desktop-print";
+import { printTicket, printerSetupAction } from "@/lib/desktop-print";
 
 type ReceiptData = {
   id: string;
@@ -78,7 +78,7 @@ export default function ReceiptPage() {
         toast.success(outcome.printer ? `Printed on ${outcome.printer}` : "Printed");
         return;
       }
-      if (outcome?.reason) toast.warning(outcome.reason);
+      if (outcome?.reason) toast.warning(outcome.reason, { action: printerSetupAction() });
       window.print();
     } finally {
       setPrinting(false);

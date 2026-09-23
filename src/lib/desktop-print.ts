@@ -113,6 +113,17 @@ export async function printTicket(kind: TicketKind, id: string): Promise<PrintOu
 }
 
 /**
+ * Says why a ticket did not go to the receipt printer, with a way to set one up.
+ *
+ * The browser's print dialog asks for a printer every time, so the fix worth
+ * offering is picking one once, in the desktop window's printer settings, after
+ * which every ticket prints there without asking.
+ */
+export function printerSetupAction(): { label: string; onClick: () => void } {
+  return { label: "Set up printer", onClick: () => void openPrinterSettings() };
+}
+
+/**
  * Opens the printer settings, if the salon system is in the desktop window.
  * Returns whether there was a window to open them in.
  */

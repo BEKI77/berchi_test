@@ -17,6 +17,7 @@ import {
   ClipboardList,
   CreditCard,
   History,
+  FileBarChart,
   DollarSign,
   UserCircle,
   Sparkles,
@@ -42,6 +43,7 @@ const cashierNav: NavItem[] = [
   { title: "Pending Orders", href: "/cashier", icon: ClipboardList },
   { title: "Appointments", href: "/cashier/appointments", icon: Calendar },
   { title: "Transactions", href: "/cashier/transactions", icon: CreditCard },
+  { title: "Order Report", href: "/reports/orders", icon: FileBarChart },
 ];
 
 const adminNav: NavItem[] = [
@@ -53,6 +55,7 @@ const adminNav: NavItem[] = [
   { title: "Appointments", href: "/admin/appointments", icon: Calendar, requiredPermissions: ["appointments.view"] },
   { title: "Expenses", href: "/admin/expenses", icon: DollarSign, requiredPermissions: ["expenses.view"] },
   { title: "Invoices", href: "/admin/invoices", icon: Receipt, requiredPermissions: ["billing.view"] },
+  { title: "Order Report", href: "/reports/orders", icon: FileBarChart, requiredPermissions: ["billing.view"] },
   { title: "Employees", href: "/admin/employees", icon: Award, requiredPermissions: ["staff.view"] },
   { title: "Reports", href: "/admin/reports", icon: BarChart3, requiredPermissions: ["reports.view"] },
   { title: "Product Usage", href: "/admin/analytics", icon: Sparkles, requiredPermissions: ["reports.view"] },

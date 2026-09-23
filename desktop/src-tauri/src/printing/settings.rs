@@ -374,13 +374,22 @@ impl Default for Settings {
 }
 
 impl Settings {
-    /// The printer a ticket should go to, or `None` if none was assigned.
+    /// The printer a ticket should go to, or `None` if this PC has none.
+    ///
+    /// A ticket nobody assigned still goes to a printer this PC already has:
+    /// the other ticket's, or else the first one saved. Once a printer has been
+    /// chosen it keeps being used, rather than every print falling back to the
+    /// window's print dialog and asking for a printer all over again.
     pub fn printer_for(&self, job: Job) -> Option<&Printer> {
-        let id = match job {
-            Job::Slip => self.jobs.slip.as_deref(),
-            Job::Receipt => self.jobs.receipt.as_deref(),
-        }?;
-        self.printer(id)
+        let (own, other) = match job {
+            Job::Slip => (&self.jobs.slip, &self.jobs.receipt),
+            Job::Receipt => (&self.jobs.receipt, &self.jobs.slip),
+        };
+        [own, other]
+            .into_iter()
+            .filter_map(|id| id.as_deref().and_then(|id| self.printer(id)))
+            .next()
+            .or_else(|| self.printers.first())
     }
 
     pub fn printer(&self, id: &str) -> Option<&Printer> {
@@ -579,6 +588,22 @@ mod tests {
         assert_eq!(tidied.printers[0].cut.feed_lines, MAX_FEED_LINES);
         assert_eq!(tidied.printers[0].copies, MAX_COPIES);
         assert_eq!(tidied.printers[0].paper.characters_per_line, MIN_CHARACTERS_PER_LINE);
+    }
+
+    /// A printer once chosen keeps printing, even for a ticket never assigned
+    /// to it, instead of the print dialog asking every time.
+    #[test]
+    fn an_unassigned_ticket_uses_the_printer_already_chosen() {
+        let mut settings = Settings::default();
+        settings.printers.push(printer());
+        assert_eq!(settings.printer_for(Job::Slip).unwrap().id, "p1");
+
+        let mut second = printer();
+        second.id = "p2".into();
+        settings.printers.push(second);
+        settings.jobs.receipt = Some("p2".into());
+        assert_eq!(settings.printer_for(Job::Slip).unwrap().id, "p2");
+        assert_eq!(settings.printer_for(Job::Receipt).unwrap().id, "p2");
     }
 
     /// A ticket pointed at a deleted printer would stop printing with nothing

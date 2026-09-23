@@ -16,6 +16,7 @@ import {
   ClipboardList,
   CreditCard,
   History,
+  FileBarChart,
   DollarSign,
   UserCircle,
   Award,
@@ -37,6 +38,7 @@ const cashierNav: NavItem[] = [
   { title: "Pending Orders", href: "/cashier", icon: ClipboardList },
   { title: "Appointments", href: "/cashier/appointments", icon: Calendar },
   { title: "Transactions", href: "/cashier/transactions", icon: CreditCard },
+  { title: "Order Report", href: "/reports/orders", icon: FileBarChart },
 ];
 
 const adminNav: NavItem[] = [
@@ -48,6 +50,7 @@ const adminNav: NavItem[] = [
   { title: "Appointments", href: "/admin/appointments", icon: Calendar },
   { title: "Expenses", href: "/admin/expenses", icon: DollarSign },
   { title: "Invoices", href: "/admin/invoices", icon: Receipt },
+  { title: "Order Report", href: "/reports/orders", icon: FileBarChart },
   { title: "Employees", href: "/admin/employees", icon: Award },
   { title: "Reports", href: "/admin/reports", icon: BarChart3 },
   { title: "Product Usage", href: "/admin/analytics", icon: Sparkles },

@@ -403,11 +403,11 @@ function add(connection, name) {
   state.settings.printers.push(printer);
   state.chosen = printer.id;
 
-  // The first printer set up takes both tickets. That is what a salon with one
-  // receipt printer wants, and it saves a step nobody would understand skipping.
-  if (state.settings.printers.length === 1) {
-    state.settings.jobs.slip = printer.id;
-    state.settings.jobs.receipt = printer.id;
+  // A new printer takes any ticket that has no printer yet. With one receipt
+  // printer that is both, which is what a salon with one printer wants, and it
+  // saves a step nobody would understand skipping.
+  for (const job of ["slip", "receipt"]) {
+    if (!state.settings.jobs[job]) state.settings.jobs[job] = printer.id;
   }
 
   state.unsaved = true;
@@ -537,9 +537,11 @@ function remove() {
   state.settings.printers = state.settings.printers.filter((p) => p.id !== printer.id);
 
   // A ticket pointed at a printer that is gone would stop printing with nothing
-  // on screen to say why, so it goes back to printing through the window.
+  // on screen to say why, so it moves to a printer that is still here. Only
+  // with no printer left does it go back to printing through the window.
+  const remaining = state.settings.printers[0]?.id ?? null;
   for (const job of ["slip", "receipt"]) {
-    if (state.settings.jobs[job] === printer.id) state.settings.jobs[job] = null;
+    if (state.settings.jobs[job] === printer.id) state.settings.jobs[job] = remaining;
   }
 
   state.chosen = state.settings.printers[0]?.id ?? null;

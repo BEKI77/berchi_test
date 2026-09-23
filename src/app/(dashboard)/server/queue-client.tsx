@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
 import { ticketName } from "@/lib/orders";
+import { TicketNumber } from "@/components/ticket-number";
 import { formatMoney } from "@/lib/money";
 
 type Order = {
@@ -195,11 +196,11 @@ export function ServerQueueClient({ userId }: { userId: string }) {
                 <div className="h-1 bg-gradient-to-r from-blue-400 to-blue-500" />
                 <CardContent className="pt-4">
                   <div className="flex items-start justify-between mb-3">
-                    <div>
-                      <p className="font-semibold text-base">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <TicketNumber orderNumber={order.orderNumber} />
+                      <p className="font-semibold text-base truncate">
                         {ticketName(order)}
                       </p>
-                      <p className="text-xs text-muted-foreground mt-0.5">{order.orderNumber}</p>
                     </div>
                     <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-blue-50 border border-blue-100">
                       <Clock className="h-3 w-3 text-blue-500" />
@@ -240,9 +241,9 @@ export function ServerQueueClient({ userId }: { userId: string }) {
                 <div className="h-1 bg-gradient-to-r from-amber-300 to-amber-400" />
                 <CardContent className="pt-4">
                   <div className="flex items-start justify-between mb-2">
-                    <div>
-                      <p className="font-semibold">{ticketName(order)}</p>
-                      <p className="text-xs text-muted-foreground">{order.orderNumber}</p>
+                    <div className="flex items-center gap-3 min-w-0">
+                      <TicketNumber orderNumber={order.orderNumber} />
+                      <p className="font-semibold truncate">{ticketName(order)}</p>
                     </div>
                     <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-amber-50 border border-amber-100">
                       <span className="h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse" />
@@ -276,9 +277,9 @@ export function ServerQueueClient({ userId }: { userId: string }) {
               <Card key={order.id} className="rounded-xl border-emerald-100/60 opacity-60 hover:opacity-80 transition-opacity">
                 <CardContent className="pt-4">
                   <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium text-sm">{ticketName(order)}</p>
-                      <p className="text-xs text-muted-foreground">{order.orderNumber}</p>
+                    <div className="flex items-center gap-3 min-w-0">
+                      <TicketNumber orderNumber={order.orderNumber} className="grayscale" />
+                      <p className="font-medium text-sm truncate">{ticketName(order)}</p>
                     </div>
                     <div className="text-right">
                       <span className="font-semibold text-emerald-600 text-sm">ETB {getOrderTotal(order)}</span>

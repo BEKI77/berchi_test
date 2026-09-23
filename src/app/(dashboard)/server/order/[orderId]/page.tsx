@@ -26,6 +26,7 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { ticketName } from "@/lib/orders";
+import { TicketNumber } from "@/components/ticket-number";
 import { formatMoney } from "@/lib/money";
 import { endTabletSession, useSessionMode } from "@/components/layout/session-mode";
 
@@ -390,12 +391,12 @@ export default function ActiveOrderPage() {
         <Button variant="ghost" size="icon" onClick={() => router.push("/server")} className="rounded-xl hover:bg-pink-50">
           <ArrowLeft className="h-5 w-5 text-pink-500" />
         </Button>
-        <div className="flex-1">
-          <h1 className="text-xl font-bold tracking-tight">
+        <TicketNumber orderNumber={order.orderNumber} size="lg" />
+        <div className="flex-1 min-w-0">
+          <h1 className="text-xl font-bold tracking-tight truncate">
             {ticketName(order)}
           </h1>
           <div className="flex items-center gap-3 text-xs text-muted-foreground">
-            <span className="font-medium">{order.orderNumber}</span>
             <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 border border-blue-100 text-blue-600 font-semibold">
               <Clock className="h-3 w-3" />
               {elapsed}m
@@ -643,7 +644,8 @@ export default function ActiveOrderPage() {
             <div className={`p-4 border-b flex items-center justify-between ${modalType === "manage-service" ? "bg-slate-50 border-slate-100" :
                 modalType === "services" ? "bg-pink-50 border-pink-100" : "bg-violet-50 border-violet-100"
               }`}>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3 min-w-0">
+                <TicketNumber orderNumber={order.orderNumber} />
                 <h3 className="font-bold text-sm uppercase tracking-wider">
                   {modalType === "manage-service" ? `Manage Products: ${activeItemForConsumables?.service.name}` :
                     modalType === "services" ? "Add Services" : "Add Extra Products"}

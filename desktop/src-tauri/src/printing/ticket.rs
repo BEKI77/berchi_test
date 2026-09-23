@@ -190,11 +190,22 @@ fn non_empty(value: &Option<String>) -> Option<&str> {
 ///
 /// As large as the paper allows, up to the point where it stops looking like a
 /// number and starts looking like a mistake. A two-digit number on 80 mm paper
-/// comes out about 3 cm tall, which is the point: it has to be readable at
-/// arm's length, held up across a busy salon.
+/// prints at 8x -- the most ESC/POS can express, about 4 cm tall -- which is
+/// the point: it has to be readable at arm's length, held up across a busy salon.
 fn number_size(number: &str, width: u8) -> u8 {
     let characters = number.chars().count().max(1) as u8;
-    (width / characters).clamp(2, 6)
+    (width / characters).clamp(2, 8)
+}
+
+/// How large the full ticket number under it can be printed: double size when
+/// it fits the paper, otherwise double height only so it never wraps.
+fn full_number_style(number: &str, width: u8) -> Style {
+    let characters = number.chars().count() as u8;
+    if characters.saturating_mul(2) <= width {
+        Style::centered().bold().scale(2, 2)
+    } else {
+        Style::centered().bold().scale(1, 2)
+    }
 }
 
 /// The number slip.
@@ -214,10 +225,11 @@ pub fn slip(ticket: &Slip, printer: &Printer) -> Doc {
     } else {
         ticket.short_number.trim().to_string()
     };
-    doc.line(&short, Style::centered().bold().scale(number_size(&short, width), 6));
+    doc.line(&short, Style::centered().bold().scale(number_size(&short, width), 8));
 
     doc.blank();
-    doc.centered(ticket.order_number.trim());
+    let full = ticket.order_number.trim();
+    doc.line(full, full_number_style(full, width));
     doc.rule();
 
     if let Some(customer) = non_empty(&ticket.customer) {
@@ -455,7 +467,8 @@ mod tests {
     #[test]
     fn the_number_is_printed_as_large_as_the_paper_takes() {
         // Two digits on 80 mm paper: as large as ESC/POS goes.
-        assert_eq!(number_size("45", 42), 6);
+        assert_eq!(number_size("45", 42), 8);
+        assert_eq!(number_size("1234", 42), 8);
         // A long number shrinks rather than running off the edge.
         assert_eq!(number_size("12345678", 42), 5);
         assert!(number_size("12345678", 42) * 8 <= 42);

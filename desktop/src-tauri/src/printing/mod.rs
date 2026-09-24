@@ -287,18 +287,28 @@ pub fn printing_status(app: AppHandle) -> Status {
 }
 
 /// Opens the printer settings window, or brings it forward if it is already up.
+///
+/// Async on purpose: on Windows, building a window from a synchronous command
+/// deadlocks WebView2, and the window comes up blank.
 #[tauri::command]
-pub fn open_printer_settings(app: AppHandle) -> Result<(), String> {
+pub async fn open_printer_settings(app: AppHandle) -> Result<(), String> {
     if let Some(window) = app.get_webview_window(SETTINGS_WINDOW) {
         let _ = window.unminimize();
         let _ = window.set_focus();
         return Ok(());
     }
 
-    WebviewWindowBuilder::new(&app, SETTINGS_WINDOW, WebviewUrl::App(SETTINGS_PAGE.into()))
-        .title("Printer setup - Berchi Cashier")
-        .inner_size(1060.0, 820.0)
-        .min_inner_size(760.0, 560.0)
+    let builder =
+        WebviewWindowBuilder::new(&app, SETTINGS_WINDOW, WebviewUrl::App(SETTINGS_PAGE.into()))
+            .title("Printer setup - Berchi Cashier")
+            .inner_size(1060.0, 820.0)
+            .min_inner_size(760.0, 560.0);
+    // WebView2 will not open a second view in the same profile with different
+    // browser options, so this window has to use the main window's.
+    #[cfg(windows)]
+    let builder = builder.additional_browser_args(&crate::browser_args());
+
+    builder
         .build()
         .map(|_| ())
         .map_err(|err| format!("Cannot open the printer settings: {err}"))

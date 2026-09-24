@@ -275,7 +275,7 @@ fn choose_silent_printing(from_env: Option<String>, from_file: Option<String>) -
 
 /// Windows only: the web view's start-up options.
 #[cfg(windows)]
-fn browser_args() -> String {
+pub(crate) fn browser_args() -> String {
     // Setting any option REPLACES Tauri's own defaults, so they are repeated.
     let mut args = String::from("--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection");
 
